@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nadia's Nalugu Celebration</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --gold:#C9A84C;
+  --gold-light:#F0D080;
+  --gold-pale:#FDF6E3;
+  --purple:#6B3FA0;
+  --purple-dark:#4A2570;
+  --purple-light:#9B6DD1;
+  --purple-pale:#F3EEFF;
+  --white:#FFFFFF;
+  --text:#2D1F3D;
+  --gray:#888;
+}
+
+body{font-family:'Lato',sans-serif;color:var(--text);background:#fff;overflow-x:hidden;}
+
+/* ── HERO ── */
+#hero{
+  min-height:100vh;
+  background: linear-gradient(160deg, var(--purple-dark) 0%, var(--purple) 50%, #8B4FC8 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:2rem 1.5rem;position:relative;overflow:hidden;
+}
+#hero::before{
+  content:'';position:absolute;inset:0;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%23C9A84C' opacity='0.25'/%3E%3C/svg%3E");
+  background-size:60px 60px;
+}
+.hero-badge{
+  background:var(--gold);color:var(--purple-dark);
+  font-family:'Lato',sans-serif;font-weight:700;font-size:.75rem;
+  letter-spacing:.15em;text-transform:uppercase;
+  padding:.4rem 1.2rem;border-radius:2rem;margin-bottom:1.5rem;
+  position:relative;
+}
+.hero-title{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(2.8rem,9vw,5.5rem);
+  color:var(--gold-light);line-height:1.1;
+  position:relative;
+}
+.hero-subtitle{
+  font-family:'Playfair Display',serif;font-style:italic;
+  font-size:clamp(1.1rem,3.5vw,1.8rem);
+  color:rgba(255,255,255,0.85);margin-top:.5rem;position:relative;
+}
+.hero-divider{
+  width:80px;height:3px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  margin:1.5rem auto;
+}
+.hero-details{
+  color:rgba(255,255,255,0.9);font-size:1rem;
+  line-height:2;position:relative;
+}
+.hero-details span{color:var(--gold-light);font-weight:700;}
+.hero-details .icon{margin-right:.4rem;}
+
+.countdown{
+  display:flex;gap:1rem;margin-top:2rem;position:relative;flex-wrap:wrap;justify-content:center;
+}
+.countdown-box{
+  background:rgba(255,255,255,0.1);border:1px solid rgba(201,168,76,0.4);
+  border-radius:.75rem;padding:.8rem 1.2rem;min-width:70px;
+  backdrop-filter:blur(6px);
+}
+.countdown-box .num{
+  font-family:'Playfair Display',serif;font-size:2rem;
+  color:var(--gold-light);display:block;line-height:1;
+}
+.countdown-box .lbl{
+  font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,0.6);
+}
+.dress-badge{
+  margin-top:1.8rem;position:relative;
+  background:rgba(201,168,76,0.15);border:1px solid var(--gold);
+  border-radius:2rem;padding:.5rem 1.4rem;
+  color:var(--gold-light);font-size:.85rem;letter-spacing:.08em;
+}
+
+/* ── SECTION SHARED ── */
+section{padding:4rem 1.5rem;}
+.section-header{text-align:center;margin-bottom:2.5rem;}
+.section-header h2{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(1.8rem,5vw,2.6rem);color:var(--purple-dark);
+}
+.section-header p{color:var(--gray);margin-top:.4rem;font-size:.95rem;}
+.gold-line{
+  width:60px;height:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold-light));
+  margin:.8rem auto 0;border-radius:2px;
+}
+
+/* ── SCHEDULE ── */
+#schedule{background:var(--gold-pale);}
+.timeline{max-width:650px;margin:0 auto;position:relative;padding-left:1rem;}
+.timeline::before{
+  content:'';position:absolute;left:28px;top:0;bottom:0;
+  width:2px;background:linear-gradient(180deg,var(--gold),var(--purple-light));
+}
+.tl-item{display:flex;gap:1.2rem;margin-bottom:2rem;align-items:flex-start;}
+.tl-dot{
+  flex-shrink:0;width:16px;height:16px;
+  background:var(--gold);border:3px solid var(--white);
+  border-radius:50%;margin-top:.35rem;position:relative;z-index:1;
+  box-shadow:0 0 0 3px var(--gold);
+}
+.tl-content{
+  background:var(--white);border-radius:.75rem;padding:1rem 1.2rem;
+  flex:1;border-left:4px solid var(--gold);
+  box-shadow:0 2px 8px rgba(107,63,160,0.08);
+}
+.tl-time{
+  font-size:.75rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--purple);margin-bottom:.2rem;
+}
+.tl-title{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--text);}
+.tl-desc{font-size:.85rem;color:var(--gray);margin-top:.3rem;}
+
+/* ── PHOTO WALL ── */
+#photos{background:var(--purple-pale);}
+.photo-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:.75rem;max-width:900px;margin:0 auto;
+}
+.photo-tile{
+  aspect-ratio:1;border-radius:.75rem;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2rem;cursor:pointer;position:relative;
+}
+.photo-tile::after{
+  content:'📸';position:absolute;bottom:.4rem;right:.4rem;
+  font-size:.85rem;opacity:.6;
+}
+.pt1{background:linear-gradient(135deg,#C9A84C33,#6B3FA033);}
+.pt2{background:linear-gradient(135deg,#9B6DD133,#F0D08033);}
+.pt3{background:linear-gradient(135deg,#4A257033,#C9A84C55);}
+.pt4{background:linear-gradient(135deg,#F0D08033,#9B6DD155);}
+.photo-upload-label{
+  display:block;text-align:center;margin-top:1.5rem;
+  color:var(--purple);font-size:.9rem;
+}
+.upload-btn{
+  background:var(--purple);color:var(--white);border:none;
+  padding:.7rem 1.8rem;border-radius:2rem;font-size:.9rem;
+  cursor:pointer;margin-top:.8rem;font-family:'Lato',sans-serif;
+  display:block;margin-left:auto;margin-right:auto;
+}
+.upload-btn:hover{background:var(--purple-dark);}
+
+/* ── RSVP ── */
+#rsvp{background:linear-gradient(135deg,var(--purple-dark),var(--purple));}
+.rsvp-card{
+  max-width:420px;margin:0 auto;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(201,168,76,0.3);
+  border-radius:1.25rem;padding:2rem;text-align:center;
+  backdrop-filter:blur(8px);
+}
+.rsvp-card h2{
+  font-family:'Playfair Display',serif;color:var(--gold-light);font-size:2rem;
+  margin-bottom:.4rem;
+}
+.rsvp-card p{color:rgba(255,255,255,0.75);font-size:.9rem;margin-bottom:1.5rem;}
+.rsvp-count{
+  font-family:'Playfair Display',serif;font-size:3.5rem;
+  color:var(--gold-light);line-height:1;
+}
+.rsvp-count-label{color:rgba(255,255,255,0.55);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.5rem;}
+.rsvp-btn{
+  background:linear-gradient(135deg,var(--gold),var(--gold-light));
+  color:var(--purple-dark);border:none;
+  padding:.85rem 2.2rem;border-radius:2rem;
+  font-size:1rem;font-weight:700;cursor:pointer;
+  font-family:'Lato',sans-serif;letter-spacing:.05em;width:100%;
+}
+.rsvp-btn.going{background:linear-gradient(135deg,#5cb85c,#7dd87d);color:#fff;}
+.rsvp-msg{margin-top:.8rem;font-size:.85rem;color:var(--gold-light);}
+
+/* ── POLL ── */
+#poll{background:var(--gold-pale);}
+.poll-card{max-width:540px;margin:0 auto;}
+.poll-option{
+  background:var(--white);border-radius:.75rem;padding:1rem 1.2rem;
+  margin-bottom:1rem;cursor:pointer;border:2px solid transparent;
+  box-shadow:0 2px 8px rgba(107,63,160,0.07);
+  position:relative;overflow:hidden;
+}
+.poll-option:hover{border-color:var(--purple-light);}
+.poll-option.selected{border-color:var(--purple);}
+.poll-bar{
+  position:absolute;left:0;top:0;bottom:0;
+  background:linear-gradient(90deg,rgba(107,63,160,0.1),rgba(201,168,76,0.15));
+  border-radius:.75rem;z-index:0;
+}
+.poll-inner{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;}
+.poll-label{font-weight:700;color:var(--text);font-size:.95rem;}
+.poll-pct{font-weight:700;color:var(--purple);font-size:1.1rem;}
+.poll-total{text-align:center;color:var(--gray);font-size:.85rem;margin-top:.5rem;}
+
+/* ── MESSAGE WALL ── */
+#messages{background:var(--purple-pale);}
+.msg-form{max-width:540px;margin:0 auto 2rem;}
+.msg-form input, .msg-form textarea{
+  width:100%;padding:.75rem 1rem;border-radius:.6rem;
+  border:1.5px solid rgba(107,63,160,0.25);
+  font-family:'Lato',sans-serif;font-size:.95rem;
+  margin-bottom:.75rem;background:#fff;color:var(--text);
+  outline:none;
+}
+.msg-form input:focus,.msg-form textarea:focus{border-color:var(--purple);}
+.msg-form textarea{height:90px;resize:vertical;}
+.msg-submit{
+  background:linear-gradient(135deg,var(--purple),var(--purple-light));
+  color:#fff;border:none;padding:.75rem 2rem;
+  border-radius:2rem;font-size:.95rem;cursor:pointer;
+  font-family:'Lato',sans-serif;font-weight:700;
+}
+.msg-submit:hover{background:var(--purple-dark);}
+.msg-wall{max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:.8rem;}
+.msg-card{
+  background:#fff;border-radius:.75rem;padding:1rem 1.2rem;
+  border-left:4px solid var(--gold);
+  box-shadow:0 2px 8px rgba(107,63,160,0.06);
+}
+.msg-name{font-weight:700;color:var(--purple);font-size:.9rem;}
+.msg-time{font-size:.72rem;color:var(--gray);margin-left:.5rem;}
+.msg-text{margin-top:.4rem;font-size:.9rem;color:var(--text);line-height:1.5;}
+
+/* ── MESSAGE ACTION BUTTONS ── */
+.msg-actions{
+  display:flex;gap:.5rem;margin-top:.65rem;
+}
+.msg-btn{
+  border:none;border-radius:1.5rem;
+  font-family:'Lato',sans-serif;font-size:.75rem;
+  font-weight:700;cursor:pointer;padding:.3rem .85rem;
+  transition:opacity .15s;
+}
+.msg-btn:hover{opacity:.8;}
+.msg-btn-edit{
+  background:rgba(107,63,160,0.12);color:var(--purple);
+}
+.msg-btn-delete{
+  background:rgba(220,60,60,0.1);color:#c0392b;
+}
+.msg-btn-save{
+  background:linear-gradient(135deg,var(--purple),var(--purple-light));color:#fff;
+}
+.msg-btn-cancel{
+  background:rgba(107,63,160,0.1);color:var(--purple);
+}
+
+/* ── Edit inline area ── */
+.msg-edit-area{
+  width:100%;margin-top:.5rem;padding:.6rem .8rem;
+  border-radius:.5rem;border:1.5px solid var(--purple-light);
+  font-family:'Lato',sans-serif;font-size:.9rem;color:var(--text);
+  resize:vertical;min-height:70px;outline:none;
+  background:#faf7ff;
+}
+.msg-edit-area:focus{border-color:var(--purple);}
+
+/* ── FOOTER ── */
+footer{
+  background:var(--purple-dark);color:rgba(255,255,255,0.6);
+  text-align:center;padding:1.5rem;font-size:.82rem;
+}
+footer span{color:var(--gold);}
+
+@media(min-width:600px){
+  .photo-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
+}
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<section id="hero">
+  <div class="hero-badge">✨ You're Invited ✨</div>
+  <h1 class="hero-title">Nadia's<br>Nalugu</h1>
+  <p class="hero-subtitle">A Sacred Turmeric Celebration</p>
+  <div class="hero-divider"></div>
+  <div class="hero-details">
+    <div><span class="icon">📅</span><span>Friday, April 25, 2025 · 4:00 PM</span></div>
+    <div><span class="icon">📍</span><span>2511 Sapline Ridge Ln, Brookeville, MD 20833</span></div>
+  </div>
+  <div class="countdown" id="countdown">
+    <div class="countdown-box"><span class="num" id="cd-days">--</span><span class="lbl">Days</span></div>
+    <div class="countdown-box"><span class="num" id="cd-hrs">--</span><span class="lbl">Hours</span></div>
+    <div class="countdown-box"><span class="num" id="cd-min">--</span><span class="lbl">Mins</span></div>
+    <div class="countdown-box"><span class="num" id="cd-sec">--</span><span class="lbl">Secs</span></div>
+  </div>
+  <div class="dress-badge">👗 Dress Code: Indian Traditional Attire</div>
+</section>
+
+<!-- ── SCHEDULE ── -->
+<section id="schedule">
+  <div class="section-header">
+    <h2>Evening Schedule</h2>
+    <p>Join us for a beautiful evening of tradition &amp; celebration</p>
+    <div class="gold-line"></div>
+  </div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-time">4:00 PM</div>
+        <div class="tl-title">Doors Open &amp; Welcome</div>
+        <div class="tl-desc">Guests arrive, mingle &amp; settle in</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-time">4:30 PM</div>
+        <div class="tl-title">Welcome Ceremony &amp; Dosa Station 🫓</div>
+        <div class="tl-desc">Live dosa &amp; idli station — freshly made traditional South Indian snacks</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-time">5:30 PM</div>
+        <div class="tl-title">Nalugu Ceremony 🌿</div>
+        <div class="tl-desc">Sacred turmeric ritual — the heart of our celebration for Nadia</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-time">6:30 PM</div>
+        <div class="tl-title">Dinner 🍽️</div>
+        <div class="tl-desc">Sumptuous traditional feast served with love</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        <div class="tl-time">7:30 PM</div>
+        <div class="tl-title">Dance &amp; Celebrations 💃</div>
+        <div class="tl-desc">Music, dancing &amp; making memories together</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PHOTO WALL ── -->
+<section id="photos">
+  <div class="section-header">
+    <h2>Photo Wall</h2>
+    <p>Memories we'll cherish forever</p>
+    <div class="gold-line"></div>
+  </div>
+  <div class="photo-grid" id="photoGrid">
+    <div class="photo-tile pt1">🌸</div>
+    <div class="photo-tile pt2">🌿</div>
+    <div class="photo-tile pt3">💛</div>
+    <div class="photo-tile pt4">🪔</div>
+    <div class="photo-tile pt2">🌺</div>
+    <div class="photo-tile pt1">✨</div>
+    <div class="photo-tile pt3">🎊</div>
+    <div class="photo-tile pt4">🌼</div>
+  </div>
+  <div class="photo-upload-label">
+    <p>Share your photos from the celebration!</p>
+    <label class="upload-btn" for="photoUpload">📷 Add a Photo</label>
+    <input type="file" id="photoUpload" accept="image/*" style="display:none;" multiple>
+  </div>
+</section>
+
+<!-- ── RSVP ── -->
+<section id="rsvp">
+  <div class="rsvp-card">
+    <h2>Will You Join Us?</h2>
+    <p>Let Nadia know you'll be celebrating with her!</p>
+    <div class="rsvp-count" id="rsvpCount">0</div>
+    <div class="rsvp-count-label">Guests Going 🎉</div>
+    <button class="rsvp-btn" id="rsvpBtn" onclick="handleRSVP()">💛 +1 I'm Going!</button>
+    <div class="rsvp-msg" id="rsvpMsg"></div>
+  </div>
+</section>
+
+<!-- ── POLL ── -->
+<section id="poll">
+  <div class="section-header">
+    <h2>Quick Poll</h2>
+    <p>Cast your vote for Nadia!</p>
+    <div class="gold-line"></div>
+  </div>
+  <div class="poll-card">
+    <p style="text-align:center;margin-bottom:1.2rem;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--purple-dark);">Which part of the evening are you most excited about?</p>
+    <div class="poll-option" id="opt1" onclick="vote(1)">
+      <div class="poll-bar" id="bar1" style="width:0%"></div>
+      <div class="poll-inner">
+        <span class="poll-label">🌿 Nalugu Turmeric Ceremony</span>
+        <span class="poll-pct" id="pct1">0%</span>
+      </div>
+    </div>
+    <div class="poll-option" id="opt2" onclick="vote(2)">
+      <div class="poll-bar" id="bar2" style="width:0%"></div>
+      <div class="poll-inner">
+        <span class="poll-label">💃 Dinner &amp; Dance Party</span>
+        <span class="poll-pct" id="pct2">0%</span>
+      </div>
+    </div>
+    <div class="poll-total" id="pollTotal">0 votes cast</div>
+  </div>
+</section>
+
+<!-- ── MESSAGE WALL ── -->
+<section id="messages">
+  <div class="section-header">
+    <h2>Guest Messages</h2>
+    <p>Leave your love &amp; blessings for Nadia 💛</p>
+    <div class="gold-line"></div>
+  </div>
+  <div class="msg-form">
+    <input type="text" id="msgName" placeholder="Your Name" maxlength="40">
+    <textarea id="msgText" placeholder="Write your message or blessing for Nadia..." maxlength="300"></textarea>
+    <button class="msg-submit" onclick="postMessage()">Send Blessing 🌸</button>
+  </div>
+  <div class="msg-wall" id="msgWall"></div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <p>Made with <span>♥</span> for <span>Nadia's Nalugu</span> · April 25, 2025 · Brookeville, MD</p>
+  <p style="margin-top:.4rem;">🌿 Traditional Turmeric Ceremony · Live Dosa &amp; Idli Station 🫓</p>
+</footer>
+
+<script>
+// ── COUNTDOWN ──
+function updateCountdown(){
+  const target=new Date('2025-04-25T16:00:00');
+  const now=new Date();
+  let diff=target-now;
+  if(diff<0){
+    document.getElementById('countdown').innerHTML='<div style="color:var(--gold-light);font-family:Playfair Display,serif;font-size:1.5rem;">🎉 The Celebration is Live!</div>';
+    return;
+  }
+  const d=Math.floor(diff/86400000);
+  const h=Math.floor((diff%86400000)/3600000);
+  const m=Math.floor((diff%3600000)/60000);
+  const s=Math.floor((diff%60000)/1000);
+  document.getElementById('cd-days').textContent=String(d).padStart(2,'0');
+  document.getElementById('cd-hrs').textContent=String(h).padStart(2,'0');
+  document.getElementById('cd-min').textContent=String(m).padStart(2,'0');
+  document.getElementById('cd-sec').textContent=String(s).padStart(2,'0');
+}
+updateCountdown();
+setInterval(updateCountdown,1000);
+
+// ── RSVP ──
+function loadRSVP(){
+  const count=parseInt(localStorage.getItem('nadia_nalugu_rsvp')||'0');
+  document.getElementById('rsvpCount').textContent=count;
+  const voted=localStorage.getItem('nadia_nalugu_voted');
+  if(voted){
+    document.getElementById('rsvpBtn').textContent='✅ You\'re Going!';
+    document.getElementById('rsvpBtn').classList.add('going');
+    document.getElementById('rsvpMsg').textContent='We can\'t wait to celebrate with you! 🎉';
+  }
+}
+function handleRSVP(){
+  const voted=localStorage.getItem('nadia_nalugu_voted');
+  if(voted){
+    document.getElementById('rsvpMsg').textContent='You already RSVP\'d! See you there 💛';
+    return;
+  }
+  let count=parseInt(localStorage.getItem('nadia_nalugu_rsvp')||'0')+1;
+  localStorage.setItem('nadia_nalugu_rsvp',count);
+  localStorage.setItem('nadia_nalugu_voted','1');
+  document.getElementById('rsvpCount').textContent=count;
+  document.getElementById('rsvpBtn').textContent='✅ You\'re Going!';
+  document.getElementById('rsvpBtn').classList.add('going');
+  document.getElementById('rsvpMsg').textContent='Yay! We\'re so excited to celebrate with you! 🎉';
+}
+loadRSVP();
+
+// ── POLL ──
+function loadPoll(){
+  const v1=parseInt(localStorage.getItem('nadia_poll_1')||'0');
+  const v2=parseInt(localStorage.getItem('nadia_poll_2')||'0');
+  const total=v1+v2;
+  const p1=total?Math.round(v1/total*100):0;
+  const p2=total?Math.round(v2/total*100):0;
+  document.getElementById('bar1').style.width=p1+'%';
+  document.getElementById('bar2').style.width=p2+'%';
+  document.getElementById('pct1').textContent=p1+'%';
+  document.getElementById('pct2').textContent=p2+'%';
+  document.getElementById('pollTotal').textContent=total+' vote'+(total!==1?'s':'')+' cast';
+  const myVote=localStorage.getItem('nadia_poll_voted');
+  if(myVote){
+    document.getElementById('opt'+myVote).classList.add('selected');
+    document.getElementById('opt1').style.cursor='default';
+    document.getElementById('opt2').style.cursor='default';
+  }
+}
+function vote(n){
+  if(localStorage.getItem('nadia_poll_voted'))return;
+  const key='nadia_poll_'+n;
+  localStorage.setItem(key,parseInt(localStorage.getItem(key)||'0')+1);
+  localStorage.setItem('nadia_poll_voted',n);
+  loadPoll();
+}
+loadPoll();
+
+// ── MESSAGES ──
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function saveMessages(msgs){
+  localStorage.setItem('nadia_messages',JSON.stringify(msgs));
+}
+
+function getMessages(){
+  return JSON.parse(localStorage.getItem('nadia_messages')||'[]');
+}
+
+function loadMessages(){
+  const msgs=getMessages();
+  const wall=document.getElementById('msgWall');
+  wall.innerHTML='';
+  if(msgs.length===0){
+    wall.innerHTML='<p style="text-align:center;color:var(--gray);font-size:.9rem;">Be the first to leave a blessing! 🌸</p>';
+    return;
+  }
+  // display newest first; store original index for edit/delete
+  const reversed=[...msgs].map((m,i)=>({...m,origIndex:i})).reverse();
+  reversed.forEach(m=>{
+    const div=document.createElement('div');
+    div.className='msg-card';
+    div.dataset.index=m.origIndex;
+    div.innerHTML=`
+      <div>
+        <span class="msg-name">${escHtml(m.name)}</span>
+        <span class="msg-time">${m.time}</span>
+      </div>
+      <div class="msg-text">${escHtml(m.text)}</div>
+      <div class="msg-actions">
+        <button class="msg-btn msg-btn-edit" onclick="startEdit(this, ${m.origIndex})">✏️ Edit</button>
+        <button class="msg-btn msg-btn-delete" onclick="deleteMessage(${m.origIndex})">🗑️ Delete</button>
+      </div>`;
+    wall.appendChild(div);
+  });
+}
+
+function startEdit(btn, index){
+  const msgs=getMessages();
+  const m=msgs[index];
+  // find the card
+  const card=document.querySelector(`.msg-card[data-index="${index}"]`);
+  if(!card)return;
+  // hide static text and actions
+  const textDiv=card.querySelector('.msg-text');
+  const actionsDiv=card.querySelector('.msg-actions');
+  textDiv.style.display='none';
+  actionsDiv.style.display='none';
+  // create inline editor if not already present
+  if(card.querySelector('.msg-edit-area'))return;
+  const textarea=document.createElement('textarea');
+  textarea.className='msg-edit-area';
+  textarea.value=m.text;
+  textarea.maxLength=300;
+  const editActions=document.createElement('div');
+  editActions.className='msg-actions msg-edit-actions';
+  editActions.innerHTML=`
+    <button class="msg-btn msg-btn-save" onclick="saveEdit(${index})">💾 Save</button>
+    <button class="msg-btn msg-btn-cancel" onclick="cancelEdit(${index})">✕ Cancel</button>`;
+  card.appendChild(textarea);
+  card.appendChild(editActions);
+  textarea.focus();
+}
+
+function saveEdit(index){
+  const card=document.querySelector(`.msg-card[data-index="${index}"]`);
+  if(!card)return;
+  const textarea=card.querySelector('.msg-edit-area');
+  const newText=textarea.value.trim();
+  if(!newText){alert('Message cannot be empty 💛');return;}
+  const msgs=getMessages();
+  msgs[index].text=newText;
+  saveMessages(msgs);
+  loadMessages();
+}
+
+function cancelEdit(index){
+  const card=document.querySelector(`.msg-card[data-index="${index}"]`);
+  if(!card)return;
+  const textarea=card.querySelector('.msg-edit-area');
+  const editActions=card.querySelector('.msg-edit-actions');
+  const textDiv=card.querySelector('.msg-text');
+  const actionsDiv=card.querySelector('.msg-actions:not(.msg-edit-actions)');
+  if(textarea)textarea.remove();
+  if(editActions)editActions.remove();
+  if(textDiv)textDiv.style.display='';
+  if(actionsDiv)actionsDiv.style.display='';
+}
+
+function deleteMessage(index){
+  if(!confirm('Delete this message? This cannot be undone.'))return;
+  const msgs=getMessages();
+  msgs.splice(index,1);
+  saveMessages(msgs);
+  loadMessages();
+}
+
+function postMessage(){
+  const name=document.getElementById('msgName').value.trim();
+  const text=document.getElementById('msgText').value.trim();
+  if(!name||!text){alert('Please enter your name and message 💛');return;}
+  const msgs=getMessages();
+  const now=new Date();
+  const time=now.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  msgs.push({name,text,time});
+  saveMessages(msgs);
+  document.getElementById('msgName').value='';
+  document.getElementById('msgText').value='';
+  loadMessages();
+}
+loadMessages();
+
+// ── PHOTO UPLOAD ──
+document.getElementById('photoUpload').addEventListener('change',function(e){
+  const files=Array.from(e.target.files);
+  const grid=document.getElementById('photoGrid');
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=function(ev){
+      const tile=document.createElement('div');
+      tile.className='photo-tile';
+      tile.style.background='#eee';
+      const img=document.createElement('img');
+      img.src=ev.target.result;
+      img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:.75rem;';
+      tile.appendChild(img);
+      grid.insertBefore(tile,grid.firstChild);
+    };
+    reader.readAsDataURL(file);
+  });
+});
+</script>
+</body>
+</html>

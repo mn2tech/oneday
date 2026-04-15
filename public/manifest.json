@@ -1,0 +1,10 @@
+{
+  "name": "OneDay",
+  "short_name": "OneDay",
+  "description": "AI-powered event microsites",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#0a0a0f",
+  "theme_color": "#7c5cfc",
+  "icons": []
+}

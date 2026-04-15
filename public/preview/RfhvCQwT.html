@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chitti's Birthday Bash 🥃</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy: #0d1b3e;
+  --navy-mid: #162550;
+  --navy-light: #1e3370;
+  --silver: #c0c8d8;
+  --silver-light: #e8ecf4;
+  --silver-bright: #f0f3fa;
+  --gold: #d4af6a;
+  --white: #ffffff;
+  --text-light: #a0aec0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--navy);
+  color: var(--white);
+  min-height: 100vh;
+}
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(13,27,62,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(192,200,216,0.15);
+  padding: 0 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 54px;
+}
+.nav-logo { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--gold); }
+.nav-links { display: flex; gap: 18px; }
+.nav-links a { color: var(--silver); text-decoration: none; font-size: 0.78rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; }
+.nav-links a:hover { color: var(--white); }
+
+/* HERO */
+#hero {
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--navy-mid) 0%, var(--navy) 50%, #0a1428 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 80px 20px 40px;
+  position: relative; overflow: hidden;
+}
+#hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(192,200,216,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-eyebrow {
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--gold);
+  background: rgba(212,175,106,0.12);
+  border: 1px solid rgba(212,175,106,0.3);
+  padding: 6px 18px; border-radius: 50px; margin-bottom: 24px;
+}
+.hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.8rem, 8vw, 5.5rem);
+  line-height: 1.1; font-weight: 700;
+  color: var(--white);
+}
+.hero-title span { color: var(--gold); }
+.hero-sub {
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  color: var(--silver); margin-top: 10px; font-weight: 300; letter-spacing: 0.04em;
+}
+.hero-meta {
+  margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+}
+.hero-chip {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(192,200,216,0.2);
+  border-radius: 8px; padding: 10px 18px;
+  font-size: 0.85rem; color: var(--silver-light);
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-chip .icon { font-size: 1rem; }
+.countdown {
+  margin-top: 40px;
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+}
+.countdown-box {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(192,200,216,0.18);
+  border-radius: 12px; padding: 16px 20px; min-width: 72px; text-align: center;
+}
+.countdown-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.2rem; font-weight: 700; color: var(--white); line-height: 1;
+}
+.countdown-label {
+  font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--silver); margin-top: 4px;
+}
+.hero-deco {
+  margin-top: 40px; font-size: 2rem; opacity: 0.5; letter-spacing: 12px;
+}
+.scroll-hint { margin-top: 30px; color: var(--text-light); font-size: 0.78rem; }
+
+/* SECTIONS */
+section { padding: 70px 20px; max-width: 760px; margin: 0 auto; }
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  color: var(--white); margin-bottom: 8px;
+}
+.section-line {
+  width: 50px; height: 3px;
+  background: linear-gradient(90deg, var(--gold), var(--silver));
+  border-radius: 2px; margin-bottom: 36px;
+}
+
+/* SCHEDULE */
+#schedule { border-top: 1px solid rgba(192,200,216,0.1); }
+.timeline { position: relative; padding-left: 28px; }
+.timeline::before {
+  content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
+  width: 2px; background: linear-gradient(to bottom, var(--gold), var(--silver-light), rgba(192,200,216,0.1));
+  border-radius: 2px;
+}
+.tl-item { position: relative; margin-bottom: 32px; }
+.tl-dot {
+  position: absolute; left: -24px; top: 6px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--gold); border: 2px solid var(--navy);
+  box-shadow: 0 0 0 3px rgba(212,175,106,0.25);
+}
+.tl-time {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--gold); font-weight: 600; margin-bottom: 4px;
+}
+.tl-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(192,200,216,0.12);
+  border-radius: 12px; padding: 16px 18px;
+}
+.tl-card h3 { font-size: 1rem; color: var(--white); font-weight: 600; margin-bottom: 4px; }
+.tl-card p { font-size: 0.85rem; color: var(--silver); line-height: 1.5; }
+.dress-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 28px; padding: 10px 18px;
+  background: rgba(212,175,106,0.1);
+  border: 1px solid rgba(212,175,106,0.3);
+  border-radius: 8px; font-size: 0.85rem; color: var(--gold);
+}
+
+/* PHOTO WALL */
+#photos { border-top: 1px solid rgba(192,200,216,0.1); }
+.photo-wall-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 8px;
+}
+.photo-wall-header .section-title { margin-bottom: 0; }
+.btn-upload {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, var(--gold), #b8943a);
+  color: var(--navy); font-weight: 700; font-size: 0.85rem;
+  border: none; border-radius: 50px; padding: 10px 22px;
+  cursor: pointer; letter-spacing: 0.03em; white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.btn-upload:hover { opacity: 0.88; }
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.photo-tile {
+  border-radius: 10px; overflow: hidden;
+  aspect-ratio: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(192,200,216,0.1);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; position: relative;
+}
+.photo-tile:first-child { grid-column: span 2; aspect-ratio: 2/1; }
+.photo-tile .tile-icon { font-size: 1.8rem; opacity: 0.4; }
+.photo-tile .tile-label { font-size: 0.65rem; color: var(--text-light); margin-top: 6px; letter-spacing: 0.08em; }
+.photo-tile:hover { border-color: rgba(212,175,106,0.4); }
+.photo-tile img {
+  width: 100%; height: 100%; object-fit: cover;
+  position: absolute; inset: 0;
+}
+.photo-tile .tile-delete {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(13,27,62,0.75); border: 1px solid rgba(220,53,69,0.4);
+  color: #e87a85; border-radius: 6px; font-size: 0.7rem;
+  padding: 3px 7px; cursor: pointer; display: none;
+  backdrop-filter: blur(4px);
+}
+.photo-tile:hover .tile-delete { display: block; }
+
+/* RSVP */
+#rsvp { border-top: 1px solid rgba(192,200,216,0.1); text-align: center; }
+.rsvp-card {
+  background: linear-gradient(135deg, rgba(22,37,80,0.8), rgba(13,27,62,0.9));
+  border: 1px solid rgba(192,200,216,0.15);
+  border-radius: 16px; padding: 40px 24px;
+}
+.rsvp-count-display {
+  font-family: 'Playfair Display', serif;
+  font-size: 3.5rem; color: var(--gold); line-height: 1;
+}
+.rsvp-count-label { font-size: 0.85rem; color: var(--silver); margin-top: 4px; margin-bottom: 28px; }
+.btn-rsvp {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, var(--gold), #b8943a);
+  color: var(--navy); font-weight: 700; font-size: 1rem;
+  border: none; border-radius: 50px; padding: 14px 36px;
+  cursor: pointer; letter-spacing: 0.03em;
+}
+.btn-rsvp:hover { opacity: 0.9; }
+.btn-rsvp:disabled {
+  background: rgba(192,200,216,0.2); color: var(--silver);
+  cursor: default;
+}
+.rsvp-msg { margin-top: 16px; font-size: 0.85rem; color: var(--silver); min-height: 22px; }
+
+/* POLL */
+#poll { border-top: 1px solid rgba(192,200,216,0.1); }
+.poll-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(192,200,216,0.12);
+  border-radius: 16px; padding: 28px 24px;
+}
+.poll-question { font-size: 1.05rem; color: var(--white); font-weight: 600; margin-bottom: 20px; line-height: 1.4; }
+.poll-option { margin-bottom: 14px; }
+.poll-option-btn {
+  width: 100%; text-align: left; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(192,200,216,0.15); border-radius: 10px;
+  color: var(--white); font-size: 0.9rem; padding: 12px 16px;
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+}
+.poll-option-btn:hover { border-color: var(--gold); }
+.poll-option-btn.voted { border-color: var(--gold); background: rgba(212,175,106,0.1); }
+.poll-bar-wrap {
+  margin-top: 8px; background: rgba(255,255,255,0.05);
+  border-radius: 50px; height: 8px; overflow: hidden; display: none;
+}
+.poll-bar { height: 100%; border-radius: 50px; background: linear-gradient(90deg, var(--gold), var(--silver)); transition: width 0.5s ease; }
+.poll-pct { font-size: 0.78rem; color: var(--silver); margin-top: 4px; display: none; }
+.poll-total { font-size: 0.78rem; color: var(--text-light); margin-top: 16px; }
+
+/* MESSAGE WALL */
+#messages { border-top: 1px solid rgba(192,200,216,0.1); }
+.msg-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+.msg-row { display: flex; gap: 10px; }
+.msg-input {
+  flex: 1; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(192,200,216,0.15); border-radius: 10px;
+  color: var(--white); font-family: 'Inter', sans-serif; font-size: 0.9rem;
+  padding: 12px 14px; resize: none; outline: none;
+}
+.msg-input::placeholder { color: var(--text-light); }
+.msg-input:focus { border-color: rgba(192,200,216,0.4); }
+.msg-name-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(192,200,216,0.15); border-radius: 10px;
+  color: var(--white); font-family: 'Inter', sans-serif; font-size: 0.9rem;
+  padding: 12px 14px; outline: none; width: 100%;
+}
+.msg-name-input::placeholder { color: var(--text-light); }
+.msg-name-input:focus { border-color: rgba(192,200,216,0.4); }
+.btn-post {
+  background: linear-gradient(135deg, var(--navy-light), #2a4a9e);
+  border: 1px solid rgba(192,200,216,0.2);
+  color: var(--white); font-size: 0.88rem; font-weight: 600;
+  padding: 12px 22px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+}
+.btn-post:hover { border-color: var(--silver); }
+.msg-list { display: flex; flex-direction: column; gap: 12px; }
+.msg-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(192,200,216,0.1);
+  border-radius: 12px; padding: 16px;
+}
+.msg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.msg-author { font-size: 0.82rem; font-weight: 600; color: var(--gold); }
+.msg-date { font-size: 0.72rem; color: var(--text-light); }
+.msg-body { font-size: 0.88rem; color: var(--silver-light); line-height: 1.55; }
+.msg-actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn-edit, .btn-delete, .btn-save, .btn-cancel {
+  font-size: 0.72rem; font-weight: 600; padding: 5px 12px;
+  border-radius: 6px; cursor: pointer; border: 1px solid;
+}
+.btn-edit { background: transparent; border-color: rgba(192,200,216,0.25); color: var(--silver); }
+.btn-edit:hover { border-color: var(--silver); color: var(--white); }
+.btn-delete { background: transparent; border-color: rgba(220,53,69,0.3); color: #e87a85; }
+.btn-delete:hover { background: rgba(220,53,69,0.1); }
+.btn-save { background: rgba(212,175,106,0.15); border-color: var(--gold); color: var(--gold); }
+.btn-save:hover { background: rgba(212,175,106,0.25); }
+.btn-cancel { background: transparent; border-color: rgba(192,200,216,0.2); color: var(--silver); }
+.btn-cancel:hover { border-color: var(--silver); }
+.edit-input {
+  width: 100%; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(212,175,106,0.4); border-radius: 8px;
+  color: var(--white); font-family: 'Inter', sans-serif; font-size: 0.88rem;
+  padding: 8px 12px; outline: none; margin-bottom: 2px;
+}
+.edit-input:focus { border-color: var(--gold); }
+
+/* FOOTER */
+footer {
+  border-top: 1px solid rgba(192,200,216,0.1);
+  text-align: center; padding: 32px 20px;
+  font-size: 0.78rem; color: var(--text-light);
+}
+footer span { color: var(--gold); }
+
+@media (min-width: 600px) {
+  .photo-grid { grid-template-columns: repeat(4, 1fr); }
+  .photo-tile:first-child { grid-column: span 2; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🥃 Chitti's Birthday</div>
+  <div class="nav-links">
+    <a href="#schedule">Schedule</a>
+    <a href="#rsvp">RSVP</a>
+    <a href="#poll">Poll</a>
+    <a href="#messages">Wall</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-eyebrow">🎉 You're Invited</div>
+  <h1 class="hero-title">Happy Birthday<br><span>Jerome Kola</span></h1>
+  <p class="hero-sub">"Chitti" Turns Up 🥃</p>
+
+  <div class="hero-meta">
+    <div class="hero-chip"><span class="icon">📅</span> April 15th, 2025</div>
+    <div class="hero-chip"><span class="icon">🕗</span> 8:00 PM</div>
+    <div class="hero-chip"><span class="icon">📍</span> Virginia Jordan's Place</div>
+  </div>
+
+  <div class="countdown" id="countdown">
+    <div class="countdown-box"><div class="countdown-num" id="cd-days">00</div><div class="countdown-label">Days</div></div>
+    <div class="countdown-box"><div class="countdown-num" id="cd-hours">00</div><div class="countdown-label">Hours</div></div>
+    <div class="countdown-box"><div class="countdown-num" id="cd-mins">00</div><div class="countdown-label">Mins</div></div>
+    <div class="countdown-box"><div class="countdown-num" id="cd-secs">00</div><div class="countdown-label">Secs</div></div>
+  </div>
+
+  <div class="hero-deco">🥃 🎂 🥃</div>
+  <div class="scroll-hint">↓ Scroll to explore</div>
+</section>
+
+<!-- SCHEDULE -->
+<section id="schedule">
+  <h2 class="section-title">Night Schedule</h2>
+  <div class="section-line"></div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-time">8:00 PM</div>
+      <div class="tl-card">
+        <h3>🚗 Meet at Jody's Parking Lot</h3>
+        <p>Gather up, link with the crew, and get ready to roll out together. Don't be late!</p>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-time">8:30 PM</div>
+      <div class="tl-card">
+        <h3>🥃 Head to Whisky Room</h3>
+        <p>Time to celebrate! Whisky, food, family & friends — the birthday vibes are officially ON.</p>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-time">All Night</div>
+      <div class="tl-card">
+        <h3>🎉 Celebrate Chitti!</h3>
+        <p>Good times, great company, unforgettable memories. This one's for Jerome!</p>
+      </div>
+    </div>
+  </div>
+  <div class="dress-badge">👔 Dress Code: <strong>Casual</strong> &nbsp;·&nbsp; 🎨 Navy &amp; Silver</div>
+</section>
+
+<!-- PHOTO WALL -->
+<section id="photos">
+  <div class="photo-wall-header">
+    <div>
+      <h2 class="section-title">Photo Wall</h2>
+    </div>
+    <button class="btn-upload" onclick="document.getElementById('photoUploadInput').click()">
+      📸 Add Photos
+    </button>
+  </div>
+  <div class="section-line"></div>
+  <input type="file" id="photoUploadInput" accept="image/*" multiple style="display:none;" onchange="handlePhotoUpload(event)">
+  <div class="photo-grid" id="photoGrid"></div>
+</section>
+
+<!-- RSVP -->
+<section id="rsvp">
+  <h2 class="section-title">RSVP</h2>
+  <div class="section-line"></div>
+  <div class="rsvp-card">
+    <div class="rsvp-count-display" id="rsvpCount">0</div>
+    <div class="rsvp-count-label">people are going 🎉</div>
+    <button class="btn-rsvp" id="rsvpBtn" onclick="handleRSVP()">
+      <span>🥃</span> Count Me In!
+    </button>
+    <div class="rsvp-msg" id="rsvpMsg"></div>
+  </div>
+</section>
+
+<!-- POLL -->
+<section id="poll">
+  <h2 class="section-title">Quick Poll</h2>
+  <div class="section-line"></div>
+  <div class="poll-card">
+    <div class="poll-question">🥃 What are you most excited for tonight?</div>
+
+    <div class="poll-option" id="pollOpt0">
+      <button class="poll-option-btn" id="pollBtn0" onclick="castVote(0)">
+        <span>🥃 The Whisky & Vibes</span>
+        <span class="poll-pct-inline" id="pct0"></span>
+      </button>
+      <div class="poll-bar-wrap" id="barWrap0"><div class="poll-bar" id="bar0" style="width:0%"></div></div>
+      <div class="poll-pct" id="pollPct0"></div>
+    </div>
+
+    <div class="poll-option" id="pollOpt1">
+      <button class="poll-option-btn" id="pollBtn1" onclick="castVote(1)">
+        <span>🎂 The Birthday Celebration</span>
+        <span class="poll-pct-inline" id="pct1"></span>
+      </button>
+      <div class="poll-bar-wrap" id="barWrap1"><div class="poll-bar" id="bar1" style="width:0%"></div></div>
+      <div class="poll-pct" id="pollPct1"></div>
+    </div>
+
+    <div class="poll-total" id="pollTotal"></div>
+  </div>
+</section>
+
+<!-- MESSAGE WALL -->
+<section id="messages">
+  <h2 class="section-title">Guest Message Wall</h2>
+  <div class="section-line"></div>
+  <div class="msg-form">
+    <input class="msg-name-input" id="msgName" type="text" placeholder="Your name (e.g. Auntie Dee 💛)" maxlength="40">
+    <div class="msg-row">
+      <textarea class="msg-input" id="msgText" rows="3" placeholder="Leave a birthday message for Chitti 🥃🎂…" maxlength="280"></textarea>
+      <button class="btn-post" onclick="postMessage()">Post<br>💬</button>
+    </div>
+  </div>
+  <div class="msg-list" id="msgList"></div>
+</section>
+
+<footer>
+  <p>🥃 Celebrating <span>Jerome "Chitti" Kola</span> · April 15, 2025 · Virginia Jordan's Place</p>
+  <p style="margin-top:6px;">Whisky · Food · Family · Friends · Love 🎂</p>
+</footer>
+
+<script>
+// ─── COUNTDOWN ───────────────────────────────────────────
+function updateCountdown() {
+  const target = new Date('2025-04-15T20:00:00');
+  const now = new Date();
+  const diff = target - now;
+  if (diff <= 0) {
+    document.getElementById('cd-days').textContent = '00';
+    document.getElementById('cd-hours').textContent = '00';
+    document.getElementById('cd-mins').textContent = '00';
+    document.getElementById('cd-secs').textContent = '🎉';
+    return;
+  }
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  document.getElementById('cd-days').textContent = String(d).padStart(2,'0');
+  document.getElementById('cd-hours').textContent = String(h).padStart(2,'0');
+  document.getElementById('cd-mins').textContent = String(m).padStart(2,'0');
+  document.getElementById('cd-secs').textContent = String(s).padStart(2,'0');
+}
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
+// ─── PHOTO WALL ──────────────────────────────────────────
+function getStoredPhotos() {
+  try {
+    return JSON.parse(localStorage.getItem('chitti_photos') || '[]');
+  } catch(e) { return []; }
+}
+function saveStoredPhotos(photos) {
+  try {
+    localStorage.setItem('chitti_photos', JSON.stringify(photos));
+  } catch(e) {
+    alert('Storage full — some photos could not be saved. Try removing existing photos first.');
+  }
+}
+
+function buildPhotoGrid() {
+  const grid = document.getElementById('photoGrid');
+  grid.innerHTML = '';
+
+  // Default placeholder tiles
+  const defaults = [
+    {icon:'🎂', label:'Birthday Cake'},
+    {icon:'🥃', label:'Whisky Time'},
+    {icon:'🎉', label:'Party Vibes'},
+    {icon:'👨‍👩‍👧‍👦', label:'Family Love'},
+    {icon:'🥂', label:'Cheers!'},
+    {icon:'📸', label:'Memories'},
+    {icon:'🎶', label:'Good Music'},
+    {icon:'🌟', label:'Celebrate'},
+  ];
+
+  // Uploaded photos from localStorage
+  const uploadedPhotos = getStoredPhotos();
+
+  // Render uploaded photos first
+  uploadedPhotos.forEach((dataUrl, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-tile';
+    if (i === 0 && uploadedPhotos.length > 0) div.style.gridColumn = 'span 2';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = 'Uploaded photo';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'tile-delete';
+    delBtn.textContent = '🗑️';
+    delBtn.title = 'Remove photo';
+    delBtn.onclick = function(e) {
+      e.stopPropagation();
+      if (confirm('Remove this photo?')) {
+        const photos = getStoredPhotos();
+        photos.splice(i, 1);
+        saveStoredPhotos(photos);
+        buildPhotoGrid();
+      }
+    };
+    div.appendChild(img);
+    div.appendChild(delBtn);
+    grid.appendChild(div);
+  });
+
+  // Render default placeholders
+  defaults.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-tile';
+    // Only first tile gets span 2 if no uploaded photos exist
+    if (i === 0 && uploadedPhotos.length === 0) div.style.gridColumn = 'span 2';
+    div.innerHTML = `<div class="tile-icon">${item.icon}</div><div class="tile-label">${item.label}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+function handlePhotoUpload(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  const photos = getStoredPhotos();
+  let processed = 0;
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      // Compress/resize using a canvas to save localStorage space
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+        else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        photos.push(dataUrl);
+        processed++;
+        if (processed === files.length) {
+          saveStoredPhotos(photos);
+          buildPhotoGrid();
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset input so same file can be re-uploaded if needed
+  event.target.value = '';
+}
+
+buildPhotoGrid();
+
+// ─── RSVP ────────────────────────────────────────────────
+function loadRSVP() {
+  return parseInt(localStorage.getItem('chitti_rsvp_count') || '0');
+}
+function renderRSVP() {
+  const count = loadRSVP();
+  const voted = localStorage.getItem('chitti_rsvp_voted') === 'true';
+  document.getElementById('rsvpCount').textContent = count;
+  const btn = document.getElementById('rsvpBtn');
+  const msg = document.getElementById('rsvpMsg');
+  if (voted) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>✅</span> You\'re on the list!';
+    msg.textContent = "You're counted in — see you there! 🥃🎉";
+  }
+}
+function handleRSVP() {
+  if (localStorage.getItem('chitti_rsvp_voted') === 'true') return;
+  const count = loadRSVP() + 1;
+  localStorage.setItem('chitti_rsvp_count', count);
+  localStorage.setItem('chitti_rsvp_voted', 'true');
+  renderRSVP();
+}
+renderRSVP();
+
+// ─── POLL ────────────────────────────────────────────────
+function getPollData() {
+  return JSON.parse(localStorage.getItem('chitti_poll') || '{"votes":[0,0],"voted":null}');
+}
+function savePollData(data) {
+  localStorage.setItem('chitti_poll', JSON.stringify(data));
+}
+function renderPoll() {
+  const data = getPollData();
+  const total = data.votes[0] + data.votes[1];
+  const hasVoted = data.voted !== null;
+  [0, 1].forEach(i => {
+    const pct = total > 0 ? Math.round((data.votes[i] / total) * 100) : 0;
+    const btn = document.getElementById('pollBtn' + i);
+    const barWrap = document.getElementById('barWrap' + i);
+    const bar = document.getElementById('bar' + i);
+    const pctEl = document.getElementById('pollPct' + i);
+    const pctInline = document.getElementById('pct' + i);
+    if (hasVoted) {
+      barWrap.style.display = 'block';
+      pctEl.style.display = 'block';
+      bar.style.width = pct + '%';
+      pctEl.textContent = pct + '% (' + data.votes[i] + ' vote' + (data.votes[i] !== 1 ? 's' : '') + ')';
+      pctInline.textContent = pct + '%';
+      btn.disabled = true;
+      if (data.voted === i) btn.classList.add('voted');
+    }
+  });
+  if (hasVoted) {
+    document.getElementById('pollTotal').textContent = total + ' total vote' + (total !== 1 ? 's' : '');
+  }
+}
+function castVote(option) {
+  const data = getPollData();
+  if (data.voted !== null) return;
+  data.votes[option]++;
+  data.voted = option;
+  savePollData(data);
+  renderPoll();
+}
+renderPoll();
+
+// ─── MESSAGE WALL ────────────────────────────────────────
+function getMessages() {
+  return JSON.parse(localStorage.getItem('chitti_messages') || '[]');
+}
+function saveMessages(msgs) {
+  localStorage.setItem('chitti_messages', JSON.stringify(msgs));
+}
+function formatDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function renderMessages() {
+  const msgs = getMessages();
+  const list = document.getElementById('msgList');
+  list.innerHTML = '';
+  if (msgs.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-light);font-size:0.85rem;text-align:center;padding:20px 0;">Be the first to leave a message for Chitti! 🎉</div>';
+    return;
+  }
+  [...msgs].reverse().forEach((msg, revIdx) => {
+    const idx = msgs.length - 1 - revIdx;
+    const card = document.createElement('div');
+    card.className = 'msg-card';
+    card.dataset.idx = idx;
+    card.innerHTML = `
+      <div class="msg-header">
+        <span class="msg-author">✨ ${escHtml(msg.name)}</span>
+        <span class="msg-date">${formatDate(msg.ts)}</span>
+      </div>
+      <div class="msg-body" id="msgBody-${idx}">${escHtml(msg.text)}</div>
+      <div class="msg-actions" id="msgActions-${idx}">
+        <button class="btn-edit" onclick="editMessage(${idx})">✏️ Edit</button>
+        <button class="btn-delete" onclick="deleteMessage(${idx})">🗑️ Delete</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function postMessage() {
+  const nameEl = document.getElementById('msgName');
+  const textEl = document.getElementById('msgText');
+  const name = nameEl.value.trim() || 'Anonymous Guest';
+  const text = textEl.value.trim();
+  if (!text) { textEl.focus(); return; }
+  const msgs = getMessages();
+  msgs.push({ name, text, ts: Date.now() });
+  saveMessages(msgs);
+  nameEl.value = '';
+  textEl.value = '';
+  renderMessages();
+}
+function deleteMessage(idx) {
+  if (!confirm('Delete this message?')) return;
+  const msgs = getMessages();
+  msgs.splice(idx, 1);
+  saveMessages(msgs);
+  renderMessages();
+}
+function editMessage(idx) {
+  const msgs = getMessages();
+  const msg = msgs[idx];
+  const bodyEl = document.getElementById('msgBody-' + idx);
+  const actionsEl = document.getElementById('msgActions-' + idx);
+  bodyEl.innerHTML = `<input class="edit-input" id="editInput-${idx}" type="text" value="${escHtml(msg.text)}" maxlength="280">`;
+  actionsEl.innerHTML = `
+    <button class="btn-save" onclick="saveMessage(${idx})">💾 Save</button>
+    <button class="btn-cancel" onclick="cancelEdit(${idx}, \`${escHtml(msg.text)}\`)">✕ Cancel</button>`;
+  const inp = document.getElementById('editInput-' + idx);
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+}
+function saveMessage(idx) {
+  const inp = document.getElementById('editInput-' + idx);
+  if (!inp) return;
+  const newText = inp.value.trim();
+  if (!newText) { inp.focus(); return; }
+  const msgs = getMessages();
+  msgs[idx].text = newText;
+  saveMessages(msgs);
+  renderMessages();
+}
+function cancelEdit(idx, originalText) {
+  const bodyEl = document.getElementById('msgBody-' + idx);
+  const actionsEl = document.getElementById('msgActions-' + idx);
+  if (bodyEl) bodyEl.innerHTML = escHtml(originalText);
+  if (actionsEl) actionsEl.innerHTML = `
+    <button class="btn-edit" onclick="editMessage(${idx})">✏️ Edit</button>
+    <button class="btn-delete" onclick="deleteMessage(${idx})">🗑️ Delete</button>`;
+}
+renderMessages();
+</script>
+</body>
+</html>

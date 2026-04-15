@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(curl -s http://localhost:3001/_next/static/chunks/main.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/_next/static/chunks/main.js)",
+      "Bash(node -e \"require\\('./node_modules/@stripe/stripe-js'\\); console.log\\('stripe-js ok'\\)\")",
+      "Bash(node -e \"require\\('./node_modules/@stripe/react-stripe-js'\\); console.log\\('react-stripe ok'\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(node -e ':*)",
+      "Read(//tmp/**)",
+      "Bash(cmd:*)",
+      "Bash(powershell -Command \"Stop-Process -Id 1856 -Force\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('version','?'\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:3001)",
+      "Bash(curl:*)",
+      "Bash(npm run:*)",
+      "Bash(cat /c/Users/kolaw/oneday/lib/*.js)",
+      "Bash(cat /c/Users/kolaw/oneday/lib/*.ts)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

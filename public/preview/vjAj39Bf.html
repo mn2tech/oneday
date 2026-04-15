@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nadia's Nalugu Celebration 💛</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Poppins:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --yellow: #F5C518;
+  --orange: #F28A2E;
+  --pink: #E84393;
+  --deep-pink: #C2185B;
+  --green: #2E7D32;
+  --cream: #FFF8E7;
+  --text: #3E2723;
+  --light: #FFF3CD;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* ─── NAV ─── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: linear-gradient(135deg, #F5C518, #F28A2E);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+nav .brand { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: #fff; font-weight: 700; }
+nav ul { list-style: none; display: flex; gap: 14px; flex-wrap: wrap; }
+nav ul a { color: #fff; text-decoration: none; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.5px; }
+nav ul a:hover { text-decoration: underline; }
+
+/* ─── HERO ─── */
+#hero {
+  background: linear-gradient(160deg, #F5C518 0%, #F28A2E 40%, #E84393 80%, #C2185B 100%);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 80px 20px 60px;
+  position: relative;
+  overflow: hidden;
+}
+#hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='10' cy='10' r='3' fill='rgba(255,255,255,0.15)'/%3E%3Ccircle cx='40' cy='35' r='5' fill='rgba(255,255,255,0.1)'/%3E%3Ccircle cx='55' cy='10' r='2' fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E") repeat;
+}
+.hero-badge {
+  background: rgba(255,255,255,0.25);
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 50px;
+  padding: 6px 20px;
+  font-size: 0.8rem;
+  color: #fff;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  position: relative;
+}
+#hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.8rem, 8vw, 5rem);
+  color: #fff;
+  text-shadow: 2px 4px 12px rgba(0,0,0,0.25);
+  line-height: 1.1;
+  position: relative;
+}
+#hero h1 span { color: #FFF8E7; }
+.hero-sub {
+  font-size: 1.1rem; color: rgba(255,255,255,0.95);
+  margin: 16px 0 8px; position: relative;
+}
+.hero-loc {
+  font-size: 0.9rem; color: rgba(255,255,255,0.85);
+  margin-bottom: 36px; position: relative;
+}
+.hero-loc::before { content: '📍 '; }
+
+/* Countdown */
+.countdown {
+  display: flex; gap: 16px; justify-content: center;
+  flex-wrap: wrap; position: relative;
+}
+.cd-box {
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 16px;
+  padding: 16px 20px;
+  min-width: 80px;
+  color: #fff;
+}
+.cd-num { font-size: 2rem; font-weight: 700; line-height: 1; display: block; }
+.cd-label { font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.85; }
+.hero-deco { font-size: 2rem; position: relative; margin-top: 30px; letter-spacing: 8px; }
+
+/* ─── SECTIONS ─── */
+section { padding: 60px 20px; max-width: 900px; margin: 0 auto; }
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  text-align: center;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.section-title span { color: var(--orange); }
+.section-sub { text-align: center; color: #795548; font-size: 0.9rem; margin-bottom: 40px; }
+.divider {
+  width: 60px; height: 4px;
+  background: linear-gradient(90deg, var(--yellow), var(--orange));
+  border-radius: 2px; margin: 10px auto 20px;
+}
+
+/* ─── SCHEDULE ─── */
+#schedule { background: #fff; border-radius: 24px; padding: 50px 30px; max-width: 900px; margin: 0 auto 0; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+.timeline { position: relative; padding-left: 30px; }
+.timeline::before {
+  content: ''; position: absolute; left: 10px; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--yellow), var(--orange), var(--pink));
+  border-radius: 2px;
+}
+.t-item { position: relative; margin-bottom: 32px; }
+.t-item:last-child { margin-bottom: 0; }
+.t-dot {
+  position: absolute; left: -26px; top: 4px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--orange);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 3px var(--orange);
+}
+.t-time { font-size: 0.75rem; font-weight: 600; color: var(--orange); letter-spacing: 1px; text-transform: uppercase; }
+.t-title { font-size: 1rem; font-weight: 600; margin: 2px 0; }
+.t-desc { font-size: 0.85rem; color: #6D4C41; line-height: 1.5; }
+.t-emoji { margin-right: 6px; }
+
+/* ─── PHOTO WALL ─── */
+#photos { padding: 60px 20px; max-width: 900px; margin: 0 auto; }
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.photo-tile {
+  border-radius: 16px;
+  aspect-ratio: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 2rem;
+  color: #fff;
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.photo-tile .tile-label {
+  font-size: 0.65rem; font-weight: 500;
+  letter-spacing: 1px; text-transform: uppercase;
+  margin-top: 6px; opacity: 0.9;
+}
+.tile-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; color: #fff; opacity: 0;
+  transition: all 0.2s;
+  background: rgba(0,0,0,0.3);
+}
+.photo-tile:hover .tile-overlay { opacity: 1; }
+.upload-btn {
+  display: block; width: 100%; margin-top: 20px;
+  padding: 14px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--yellow), var(--orange));
+  color: #fff; font-weight: 600; font-size: 0.9rem;
+  border: none; cursor: pointer; text-align: center;
+}
+
+/* ─── RSVP ─── */
+#rsvp {
+  background: linear-gradient(135deg, #FFF8E7, #FFE082);
+  border-radius: 24px; text-align: center;
+  padding: 50px 30px; max-width: 900px; margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(245,197,24,0.3);
+}
+.rsvp-count {
+  font-size: 4rem; font-weight: 900;
+  font-family: 'Playfair Display', serif;
+  color: var(--orange);
+  line-height: 1;
+}
+.rsvp-label { color: #795548; margin: 8px 0 28px; font-size: 0.9rem; }
+.rsvp-btn {
+  background: linear-gradient(135deg, var(--orange), var(--pink));
+  color: #fff; border: none; border-radius: 50px;
+  padding: 16px 40px; font-size: 1rem; font-weight: 700;
+  cursor: pointer; letter-spacing: 0.5px;
+  box-shadow: 0 6px 20px rgba(232,67,147,0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.rsvp-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(232,67,147,0.4); }
+.rsvp-btn:active { transform: translateY(0); }
+.rsvp-gone { background: #ccc; box-shadow: none; }
+.rsvp-note { margin-top: 14px; font-size: 0.8rem; color: #8D6E63; }
+
+/* ─── POLL ─── */
+#poll {
+  background: #fff; border-radius: 24px;
+  padding: 50px 30px; max-width: 900px; margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.poll-options { display: flex; flex-direction: column; gap: 16px; margin-top: 10px; }
+.poll-option { cursor: pointer; border-radius: 14px; border: 2px solid #eee; padding: 14px 18px; transition: border-color 0.2s; }
+.poll-option:hover { border-color: var(--orange); }
+.poll-option.voted { border-color: var(--yellow); background: #FFF8E7; }
+.poll-opt-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.poll-opt-name { font-weight: 600; font-size: 0.95rem; }
+.poll-opt-count { font-size: 0.85rem; color: var(--orange); font-weight: 600; }
+.poll-bar-bg { height: 10px; background: #f0e6d3; border-radius: 10px; overflow: hidden; }
+.poll-bar { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--yellow), var(--orange)); transition: width 0.4s ease; }
+.poll-bar.pink { background: linear-gradient(90deg, var(--pink), var(--deep-pink)); }
+.poll-msg { text-align: center; margin-top: 18px; font-size: 0.85rem; color: #8D6E63; }
+
+/* ─── MESSAGE WALL ─── */
+#messages {
+  background: linear-gradient(135deg, #FFF0F5, #FFF8E7);
+  border-radius: 24px; padding: 50px 30px;
+  max-width: 900px; margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(232,67,147,0.1);
+}
+.msg-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+.msg-form input, .msg-form textarea {
+  border: 2px solid #FFD54F; border-radius: 12px;
+  padding: 12px 16px; font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem; background: #fff; color: var(--text);
+  outline: none; resize: none;
+}
+.msg-form input:focus, .msg-form textarea:focus { border-color: var(--orange); }
+.msg-form textarea { min-height: 90px; }
+.msg-submit {
+  background: linear-gradient(135deg, var(--pink), var(--deep-pink));
+  color: #fff; border: none; border-radius: 12px;
+  padding: 14px; font-weight: 600; font-size: 0.95rem;
+  cursor: pointer; transition: opacity 0.2s;
+}
+.msg-submit:hover { opacity: 0.9; }
+.msg-list { display: flex; flex-direction: column; gap: 14px; }
+.msg-card {
+  background: #fff; border-radius: 16px;
+  padding: 16px 18px;
+  border-left: 4px solid var(--yellow);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.msg-card.pink-border { border-left-color: var(--pink); }
+.msg-card.orange-border { border-left-color: var(--orange); }
+.msg-name { font-weight: 700; font-size: 0.9rem; color: var(--orange); margin-bottom: 4px; }
+.msg-text { font-size: 0.88rem; color: #5D4037; line-height: 1.5; }
+.msg-time { font-size: 0.72rem; color: #BCAAA4; margin-top: 6px; }
+.no-msgs { text-align: center; color: #BCAAA4; font-size: 0.9rem; padding: 20px; }
+
+/* ─── FOOTER ─── */
+footer {
+  background: linear-gradient(135deg, var(--text), #4E342E);
+  color: rgba(255,255,255,0.8);
+  text-align: center;
+  padding: 36px 20px;
+  font-size: 0.85rem;
+  margin-top: 60px;
+}
+footer .footer-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; color: var(--yellow);
+  margin-bottom: 8px;
+}
+footer .footer-emoji { font-size: 1.4rem; letter-spacing: 6px; margin: 10px 0; }
+
+/* RESPONSIVE */
+@media(max-width: 600px) {
+  nav ul { gap: 10px; }
+  .photo-grid { grid-template-columns: repeat(3, 1fr); }
+  #schedule { padding: 30px 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="brand">🌼 Nadia's Nalugu</div>
+  <ul>
+    <li><a href="#hero">Home</a></li>
+    <li><a href="#schedule">Schedule</a></li>
+    <li><a href="#photos">Gallery</a></li>
+    <li><a href="#rsvp">RSVP</a></li>
+    <li><a href="#poll">Poll</a></li>
+    <li><a href="#messages">Messages</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-badge">✨ Traditional Turmeric Ceremony ✨</div>
+  <h1>Nadia's<br><span>Nalugu</span></h1>
+  <p class="hero-sub">Saturday, April 25th, 2026 · Afternoon Celebration</p>
+  <p class="hero-loc">Marigold & Banana Leaf Decorated Venue</p>
+
+  <div class="countdown">
+    <div class="cd-box"><span class="cd-num" id="cd-days">--</span><span class="cd-label">Days</span></div>
+    <div class="cd-box"><span class="cd-num" id="cd-hrs">--</span><span class="cd-label">Hours</span></div>
+    <div class="cd-box"><span class="cd-num" id="cd-min">--</span><span class="cd-label">Mins</span></div>
+    <div class="cd-box"><span class="cd-num" id="cd-sec">--</span><span class="cd-label">Secs</span></div>
+  </div>
+
+  <div class="hero-deco">🌸🌼🌺🌻🌼🌸</div>
+</section>
+
+<!-- SCHEDULE -->
+<div style="padding: 60px 20px 0; max-width:900px; margin:0 auto;">
+<section id="schedule">
+  <div class="section-title">Day <span>Schedule</span></div>
+  <div class="divider"></div>
+  <p class="section-sub">An afternoon full of joy, tradition, and love 💛</p>
+
+  <div class="timeline">
+    <div class="t-item">
+      <div class="t-dot" style="background:var(--yellow); box-shadow:0 0 0 3px var(--yellow);"></div>
+      <div class="t-time">12:00 PM</div>
+      <div class="t-title"><span class="t-emoji">🚪</span>Guests Arrive & Welcome</div>
+      <div class="t-desc">Arrive and be welcomed with flower garlands. Enjoy traditional refreshments and mingling with family and friends.</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:var(--orange); box-shadow:0 0 0 3px var(--orange);"></div>
+      <div class="t-time">12:30 PM</div>
+      <div class="t-title"><span class="t-emoji">🙏</span>Opening Ceremony & Prayers</div>
+      <div class="t-desc">Traditional prayers and blessings led by the elders of the family to mark the auspicious beginning of the Nalugu ceremony.</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:#E8A020; box-shadow:0 0 0 3px #E8A020;"></div>
+      <div class="t-time">1:00 PM</div>
+      <div class="t-title"><span class="t-emoji">🎶</span>Traditional Music Begins</div>
+      <div class="t-desc">Live folk music and songs fill the venue as preparations begin. Feel free to clap and sing along!</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:var(--pink); box-shadow:0 0 0 3px var(--pink);"></div>
+      <div class="t-time">1:30 PM</div>
+      <div class="t-title"><span class="t-emoji">💛</span>Turmeric Paste Ceremony</div>
+      <div class="t-desc">The heartbeat of the celebration! Family and close friends lovingly apply turmeric paste to the bride, showering her with blessings and well-wishes.</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:var(--deep-pink); box-shadow:0 0 0 3px var(--deep-pink);"></div>
+      <div class="t-time">2:30 PM</div>
+      <div class="t-title"><span class="t-emoji">💃</span>Dance & Celebration</div>
+      <div class="t-desc">Joyful group dances and performances by family members. Everyone is invited to join the dance floor!</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:var(--green); box-shadow:0 0 0 3px var(--green);"></div>
+      <div class="t-time">3:30 PM</div>
+      <div class="t-title"><span class="t-emoji">🍛</span>Festive Traditional Feast</div>
+      <div class="t-desc">A grand spread of traditional dishes served on banana leaves — biryanis, curries, sweets, and more. A true feast to celebrate Nadia!</div>
+    </div>
+    <div class="t-item">
+      <div class="t-dot" style="background:#8D6E63; box-shadow:0 0 0 3px #8D6E63;"></div>
+      <div class="t-time">5:00 PM</div>
+      <div class="t-title"><span class="t-emoji">🌅</span>Farewell & Blessings</div>
+      <div class="t-desc">Closing blessings for the bride. Guests depart with sweet treats and beautiful memories from this magical day.</div>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- DRESS CODE BANNER -->
+<div style="max-width:900px; margin:30px auto; padding:0 20px;">
+  <div style="background:linear-gradient(135deg,#F5C518,#F28A2E,#E84393); border-radius:20px; padding:28px 24px; text-align:center; color:#fff;">
+    <div style="font-size:1.8rem; margin-bottom:10px;">👗 Dress Code</div>
+    <div style="font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:700; margin-bottom:8px;">Bright Traditional Attire</div>
+    <div style="font-size:0.9rem; opacity:0.95; line-height:1.6;">Yellows, Oranges, and Pinks are encouraged! 🌼<br>Wear your most vibrant traditional outfit and help make Nadia's day even more colorful!</div>
+  </div>
+</div>
+
+<!-- PHOTO WALL -->
+<section id="photos" style="max-width:900px; margin:0 auto; padding:60px 20px;">
+  <div class="section-title">Photo <span>Wall</span></div>
+  <div class="divider"></div>
+  <p class="section-sub">Snapshots & Memories from Nadia's Nalugu 📸</p>
+  <div class="photo-grid" id="photoGrid"></div>
+  <button class="upload-btn" onclick="addPhotoTile()">📷 Add Your Photo Memory</button>
+</section>
+
+<!-- RSVP -->
+<div style="padding: 0 20px; max-width:900px; margin:0 auto 60px;">
+<section id="rsvp">
+  <div class="section-title">Are You <span>Coming?</span></div>
+  <div class="divider"></div>
+  <p class="section-sub">Let Nadia know you'll be there to celebrate! 🎉</p>
+  <div class="rsvp-count" id="rsvpCount">0</div>
+  <div class="rsvp-label">guests are attending</div>
+  <button class="rsvp-btn" id="rsvpBtn" onclick="handleRSVP()">💛 +1 I'm Going!</button>
+  <p class="rsvp-note" id="rsvpNote">Click to confirm your attendance</p>
+</section>
+</div>
+
+<!-- POLL -->
+<div style="padding: 0 20px; max-width:900px; margin:0 auto 60px;">
+<section id="poll">
+  <div class="section-title">Quick <span>Poll</span></div>
+  <div class="divider"></div>
+  <p class="section-sub">Share your thoughts! 🗳️</p>
+  <p style="text-align:center; font-weight:600; font-size:1rem; margin-bottom:20px;">Which part of the Nalugu are you most excited about?</p>
+
+  <div class="poll-options">
+    <div class="poll-option" id="pollOpt0" onclick="vote(0)">
+      <div class="poll-opt-top">
+        <span class="poll-opt-name">💛 The Turmeric Ceremony</span>
+        <span class="poll-opt-count" id="pollCount0">0 votes</span>
+      </div>
+      <div class="poll-bar-bg"><div class="poll-bar" id="pollBar0" style="width:0%"></div></div>
+    </div>
+    <div class="poll-option" id="pollOpt1" onclick="vote(1)">
+      <div class="poll-opt-top">
+        <span class="poll-opt-name">🍛 The Festive Feast</span>
+        <span class="poll-opt-count" id="pollCount1">0 votes</span>
+      </div>
+      <div class="poll-bar-bg"><div class="poll-bar pink" id="pollBar1" style="width:0%"></div></div>
+    </div>
+  </div>
+  <p class="poll-msg" id="pollMsg">Tap an option to cast your vote!</p>
+</section>
+</div>
+
+<!-- MESSAGE WALL -->
+<div style="padding: 0 20px; max-width:900px; margin:0 auto 60px;">
+<section id="messages">
+  <div class="section-title">Guest <span>Messages</span></div>
+  <div class="divider"></div>
+  <p class="section-sub">Leave your love and blessings for Nadia 💌</p>
+
+  <div class="msg-form">
+    <input type="text" id="msgName" placeholder="Your Name 🌸" maxlength="50">
+    <textarea id="msgText" placeholder="Write your heartfelt message or blessing for Nadia..."></textarea>
+    <button class="msg-submit" onclick="submitMessage()">Send Blessings 💛</button>
+  </div>
+
+  <div class="msg-list" id="msgList">
+    <div class="no-msgs" id="noMsgsNote">Be the first to leave a blessing! 🌼</div>
+  </div>
+</section>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-title">Nadia's Nalugu 💛</div>
+  <div class="footer-emoji">🌸🌼🌺🌻🌼🌸</div>
+  <p>Saturday, April 25th, 2026 · Traditional Turmeric Ceremony</p>
+  <p style="margin-top:8px; opacity:0.6;">With love & turmeric ✨</p>
+</footer>
+
+<script>
+// ─── COUNTDOWN ───
+function updateCountdown() {
+  const target = new Date('2026-04-25T12:00:00');
+  const now = new Date();
+  const diff = target - now;
+  if (diff <= 0) {
+    document.getElementById('cd-days').textContent = '00';
+    document.getElementById('cd-hrs').textContent = '00';
+    document.getElementById('cd-min').textContent = '00';
+    document.getElementById('cd-sec').textContent = '00';
+    return;
+  }
+  const days = Math.floor(diff / 86400000);
+  const hrs = Math.floor((diff % 86400000) / 3600000);
+  const min = Math.floor((diff % 3600000) / 60000);
+  const sec = Math.floor((diff % 60000) / 1000);
+  document.getElementById('cd-days').textContent = String(days).padStart(2,'0');
+  document.getElementById('cd-hrs').textContent = String(hrs).padStart(2,'0');
+  document.getElementById('cd-min').textContent = String(min).padStart(2,'0');
+  document.getElementById('cd-sec').textContent = String(sec).padStart(2,'0');
+}
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
+// ─── PHOTO WALL ───
+const tileData = [
+  { emoji: '💛', label: 'Turmeric Joy', bg: 'linear-gradient(135deg,#F5C518,#F28A2E)' },
+  { emoji: '🌼', label: 'Marigold Bliss', bg: 'linear-gradient(135deg,#F28A2E,#E84393)' },
+  { emoji: '🌸', label: 'Floral Decor', bg: 'linear-gradient(135deg,#E84393,#C2185B)' },
+  { emoji: '💃', label: 'Dance & Joy', bg: 'linear-gradient(135deg,#C2185B,#E84393)' },
+  { emoji: '🍛', label: 'Festive Feast', bg: 'linear-gradient(135deg,#2E7D32,#558B2F)' },
+  { emoji: '🎶', label: 'Folk Music', bg: 'linear-gradient(135deg,#F5C518,#E84393)' },
+  { emoji: '👗', label: 'Vibrant Attire', bg: 'linear-gradient(135deg,#FF6F00,#F5C518)' },
+  { emoji: '🙏', label: 'Blessings', bg: 'linear-gradient(135deg,#6A1B9A,#C2185B)' },
+  { emoji: '🍃', label: 'Banana Leaves', bg: 'linear-gradient(135deg,#1B5E20,#2E7D32)' },
+];
+
+let extraTiles = 0;
+function buildPhotoGrid() {
+  const grid = document.getElementById('photoGrid');
+  grid.innerHTML = '';
+  tileData.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'photo-tile';
+    div.style.background = t.bg;
+    div.innerHTML = `<span>${t.emoji}</span><span class="tile-label">${t.label}</span><div class="tile-overlay">📸 Memory</div>`;
+    grid.appendChild(div);
+  });
+  const savedExtras = JSON.parse(localStorage.getItem('nadiaTiles') || '[]');
+  savedExtras.forEach(t => appendTile(t.emoji, t.label, t.bg));
+}
+
+function appendTile(emoji, label, bg) {
+  const grid = document.getElementById('photoGrid');
+  const div = document.createElement('div');
+  div.className = 'photo-tile';
+  div.style.background = bg;
+  div.innerHTML = `<span>${emoji}</span><span class="tile-label">${label}</span><div class="tile-overlay">📸 Memory</div>`;
+  grid.appendChild(div);
+}
+
+function addPhotoTile() {
+  const emojis = ['🌺','🎉','🥳','✨','🌟','💖','🎊','🥰','🌈'];
+  const bgs = [
+    'linear-gradient(135deg,#E91E63,#FF5722)',
+    'linear-gradient(135deg,#9C27B0,#E91E63)',
+    'linear-gradient(135deg,#FF9800,#FFEB3B)',
+    'linear-gradient(135deg,#00BCD4,#4CAF50)',
+  ];
+  const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+  const bg = bgs[Math.floor(Math.random() * bgs.length)];
+  const label = 'My Memory';
+  const saved = JSON.parse(localStorage.getItem('nadiaTiles') || '[]');
+  saved.push({ emoji, label, bg });
+  localStorage.setItem('nadiaTiles', JSON.stringify(saved));
+  appendTile(emoji, label, bg);
+}
+
+buildPhotoGrid();
+
+// ─── RSVP ───
+function initRSVP() {
+  const count = parseInt(localStorage.getItem('nadiaRsvpCount') || '0');
+  const voted = localStorage.getItem('nadiaRsvpVoted') === 'true';
+  document.getElementById('rsvpCount').textContent = count;
+  if (voted) {
+    document.getElementById('rsvpBtn').textContent = '✅ You\'re Going!';
+    document.getElementById('rsvpBtn').classList.add('rsvp-gone');
+    document.getElementById('rsvpNote').textContent = 'You\'ve already confirmed! See you there 🌼';
+  }
+}
+
+function handleRSVP() {
+  if (localStorage.getItem('nadiaRsvpVoted') === 'true') return;
+  let count = parseInt(localStorage.getItem('nadiaRsvpCount') || '0') + 1;
+  localStorage.setItem('nadiaRsvpCount', count);
+  localStorage.setItem('nadiaRsvpVoted', 'true');
+  document.getElementById('rsvpCount').textContent = count;
+  document.getElementById('rsvpBtn').textContent = '✅ You\'re Going!';
+  document.getElementById('rsvpBtn').classList.add('rsvp-gone');
+  document.getElementById('rsvpNote').textContent = 'You\'ve confirmed! Can\'t wait to celebrate with you 🌼';
+}
+
+initRSVP();
+
+// ─── POLL ───
+const pollLabels = ['The Turmeric Ceremony', 'The Festive Feast'];
+
+function initPoll() {
+  const votes = JSON.parse(localStorage.getItem('nadiaPollVotes') || '[0,0]');
+  const userVote = localStorage.getItem('nadiaPollUserVote');
+  renderPoll(votes, userVote !== null ? parseInt(userVote) : null);
+}
+
+function vote(idx) {
+  if (localStorage.getItem('nadiaPollUserVote') !== null) return;
+  const votes = JSON.parse(localStorage.getItem('nadiaPollVotes') || '[0,0]');
+  votes[idx]++;
+  localStorage.setItem('nadiaPollVotes', JSON.stringify(votes));
+  localStorage.setItem('nadiaPollUserVote', idx);
+  renderPoll(votes, idx);
+}
+
+function renderPoll(votes, userVote) {
+  const total = votes[0] + votes[1] || 1;
+  for (let i = 0; i < 2; i++) {
+    const pct = Math.round((votes[i] / total) * 100);
+    document.getElementById('pollCount' + i).textContent = votes[i] + ' vote' + (votes[i] !== 1 ? 's' : '');
+    document.getElementById('pollBar' + i).style.width = pct + '%';
+    if (userVote !== null) {
+      document.getElementById('pollOpt' + i).classList.add('voted');
+      document.getElementById('pollOpt' + i).style.cursor = 'default';
+    }
+  }
+  if (userVote !== null) {
+    document.getElementById('pollMsg').textContent = '✅ You voted for "' + (userVote === 0 ? '💛 The Turmeric Ceremony' : '🍛 The Festive Feast') + '"!';
+  }
+}
+
+initPoll();
+
+// ─── MESSAGE WALL ───
+const borderClasses = ['', 'pink-border', 'orange-border'];
+
+function initMessages() {
+  const msgs = JSON.parse(localStorage.getItem('nadiaMsgs') || '[]');
+  renderMessages(msgs);
+}
+
+function submitMessage() {
+  const nameEl = document.getElementById('msgName');
+  const textEl = document.getElementById('msgText');
+  const name = nameEl.value.trim();
+  const text = textEl.value.trim();
+  if (!name || !text) { alert('Please enter your name and a message! 🌸'); return; }
+
+  const msgs = JSON.parse(localStorage.getItem('nadiaMsgs') || '[]');
+  const now = new Date();
+  const timeStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) + ' · ' + now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+  msgs.unshift({ name, text, time: timeStr });
+  localStorage.setItem('nadiaMsgs', JSON.stringify(msgs));
+
+  nameEl.value = '';
+  textEl.value = '';
+  renderMessages(msgs);
+}
+
+function renderMessages(msgs) {
+  const list = document.getElementById('msgList');
+  const noNote = document.getElementById('noMsgsNote');
+  if (msgs.length === 0) {
+    list.innerHTML = '<div class="no-msgs" id="noMsgsNote">Be the first to leave a blessing! 🌼</div>';
+    return;
+  }
+  list.innerHTML = msgs.map((m, i) => `
+    <div class="msg-card ${borderClasses[i % 3]}">
+      <div class="msg-name">🌸 ${escHtml(m.name)}</div>
+      <div class="msg-text">${escHtml(m.text)}</div>
+      <div class="msg-time">${m.time}</div>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+initMessages();
+</script>
+</body>
+</html>
