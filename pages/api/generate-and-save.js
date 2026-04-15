@@ -73,6 +73,10 @@ function buildUserPrompt(prompt, plan) {
 
 const DEV_MODE = (id) => typeof id === 'string' && id.startsWith('dev_test_');
 
+export const config = {
+  maxDuration: 60,
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
