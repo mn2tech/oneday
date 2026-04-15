@@ -141,17 +141,7 @@ export default async function handler(req, res) {
     const title = prompt.split(/[.!?\n]/)[0].trim().slice(0, 60) || 'My Event';
     const id = nanoid(8);
 
-    if (isDev) {
-      // Dev mode: save HTML to public/preview folder, no Supabase needed
-      const fs = await import('fs');
-      const path = await import('path');
-      const previewDir = path.join(process.cwd(), 'public', 'preview');
-      if (!fs.existsSync(previewDir)) fs.mkdirSync(previewDir, { recursive: true });
-      fs.writeFileSync(path.join(previewDir, `${id}.html`), html, 'utf8');
-      return res.status(200).json({ id, url: `/preview/${id}.html` });
-    }
-
-    // 4. Save to Supabase (production)
+    // Save to Supabase in all environments (dev + production)
     const { error: insertError } = await supabase.from('event_apps').insert({
       id,
       payment_intent_id: paymentIntentId,
