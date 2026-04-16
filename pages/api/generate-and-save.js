@@ -28,58 +28,21 @@ function getMissingEnvVars() {
   return required.filter((key) => !process.env[key]);
 }
 
-const SYSTEM_PROMPT = `You are an expert web developer and event designer.
+const SYSTEM_PROMPT = `You are an expert web developer and event designer. Generate a COMPLETE single-page HTML event app.
 
-Generate a COMPLETE, single-page HTML event app. Keep the CSS concise — avoid excessive animations or decorative elements that waste tokens.
+RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
-STRICT RULES:
-- Return ONLY raw HTML starting with <!DOCTYPE html>
-- No markdown, no code fences, no explanation — just pure HTML
-- Use Google Fonts via @import inside a <style> tag
-- Mobile-first responsive design
-- All CSS inside <style> in <head>, all JS inside <script> before </body>
-- IMPORTANT: Always close all tags properly and end with </html>
+AUTO-LOCK: Parse the event date. At load, if today > eventDate + 7 days → isLocked=true. When locked: hide upload buttons and RSVP form, show "This event has ended — thank you for celebrating with us!" banner in each section. Uploaded photos and RSVPs stay visible.
 
-AUTO-LOCK AFTER EVENT ENDS:
-- Parse the event date from the content and store it as a JS Date object
-- At page load, check: if today > eventDate + 7 days, set a boolean isLocked = true
-- When isLocked is true:
-  - Hide all photo upload buttons and RSVP form inputs
-  - Show a warm banner at the top of each interactive section: "This event has ended — thank you for celebrating with us!"
-  - All previously uploaded photos and RSVPs remain visible
-  - Poll and message wall (premium) also become read-only
+SECTIONS:
+1. Hero — title, date, location, JS countdown timer, "Hosted by [name]" line
+2. Schedule — vertical timeline
+3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section: "Add Photos" button (hidden if locked), file input (accept="image/*" multiple), FileReader→base64→localStorage key "photos_[eventId]_[section]", imgs with object-fit:cover height:180px in CSS grid (repeat(auto-fill,minmax(150px,1fr))), × remove button per photo (hidden if locked), max 20 photos/3MB per section
+4. RSVP — form (hidden if locked): name, adults (min 1), kids (min 0), Submit button. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry.
 
-REQUIRED SECTIONS (keep each section's CSS minimal):
-1. Hero — title, date, location, countdown timer (JS), and a "Hosted by [name]" line styled warmly beneath the title
-2. Schedule — simple vertical timeline
-3. Photo Wall — organised into 2-3 sections with event-appropriate labels (e.g. for a wedding: Ceremony, Reception, Food; for a birthday: Celebration, Food, Fun; choose labels that fit the event type). Each section has:
-   - A section heading and its own "Add Photos" button (hidden when isLocked)
-   - File input: accept="image/*" multiple
-   - On file select: FileReader → base64 → stored in localStorage key "photos_[eventId]_[sectionKey]"
-   - Photos rendered as <img> tiles with object-fit: cover, fixed height (e.g. 180px), width 100%, in a responsive CSS grid (repeat(auto-fill, minmax(150px, 1fr)))
-   - Each tile has a subtle × remove button (top-right, hidden when isLocked)
-   - Limit: max 20 photos per section, max 3MB per photo — friendly alert if exceeded
-   - Show styled placeholder tiles when no photos uploaded yet
-   - Photos persist across page reloads via localStorage
-4. RSVP — a form (hidden when isLocked) with:
-   - Guest name field (text input)
-   - Adults count (number input, min 1)
-   - Kids count (number input, min 0)
-   - "Submit RSVP" button
-   - On submit: save entry to localStorage array "rsvps_[eventId]", re-render the list
-   - Display all submitted RSVPs as a list showing name, adults, kids
-   - Show running totals: "X adults, Y kids attending"
-   - Each RSVP entry has a × delete button
-
-FOR PREMIUM ALSO INCLUDE:
-5. Live Poll — 2 options, percentage bars, localStorage (read-only when isLocked)
-6. Guest Message Wall — input + message list, localStorage (input hidden when isLocked)
-   - Each message must show an Edit button and a Delete button
-   - Edit: clicking Edit replaces the message text with an inline <input> pre-filled with the current text, and swaps the Edit/Delete buttons for Save and Cancel
-   - Save: updates the message text in localStorage and re-renders
-   - Cancel: restores the original text without saving
-   - Delete: removes the message from localStorage and removes it from the DOM
-   - All message CRUD must persist via localStorage`;
+PREMIUM ONLY:
+5. Poll — 2 options, % bars, localStorage, read-only if locked
+6. Message Wall — input (hidden if locked) + list. Each message: Edit (inline input + Save/Cancel) and Delete. All CRUD persists via localStorage.`;
 
 function slugify(str) {
   return (str || '')
@@ -208,7 +171,7 @@ export default async function handler(req, res) {
     // Keep generation bounded so serverless runtime does not time out at the edge.
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 6000,
+      max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: buildUserPrompt(prompt, plan) },
