@@ -154,7 +154,7 @@ export default async function handler(req, res) {
     // 3. Call Anthropic API
     // Keep generation bounded so serverless runtime does not time out at the edge.
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 6000,
       system: SYSTEM_PROMPT,
       messages: [
