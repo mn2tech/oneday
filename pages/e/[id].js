@@ -62,20 +62,26 @@ export default function EventPage({ app, error }) {
 export async function getServerSideProps({ params }) {
   const { id } = params;
 
-  const { data, error } = await supabase
-    .from('event_apps')
-    .select('id, title, html, is_live, plan, created_at')
-    .eq('id', id)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('event_apps')
+      .select('id, title, html, is_live, plan, created_at')
+      .eq('id', id)
+      .single();
 
-  if (error || !data) {
+    if (error || !data) {
+      console.error('[EventPage] Supabase error or no data:', error?.message);
+      return { props: { app: null, error: true } };
+    }
+
+    return {
+      props: {
+        app: data,
+        error: false,
+      },
+    };
+  } catch (err) {
+    console.error('[EventPage] getServerSideProps threw:', err.message);
     return { props: { app: null, error: true } };
   }
-
-  return {
-    props: {
-      app: data,
-      error: false,
-    },
-  };
 }
