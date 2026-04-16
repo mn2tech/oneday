@@ -95,6 +95,16 @@ export default async function handler(req, res) {
 
   const isDev = DEV_MODE(paymentIntentId);
 
+  // Validate required env vars before doing anything
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('[generate-and-save] ANTHROPIC_API_KEY is not set');
+    return res.status(500).json({ error: 'AI service not configured. Please contact support.' });
+  }
+  if (!isDev && !process.env.STRIPE_SECRET_KEY) {
+    console.error('[generate-and-save] STRIPE_SECRET_KEY is not set');
+    return res.status(500).json({ error: 'Payment service not configured. Please contact support.' });
+  }
+
   try {
     const stripe = getStripe();
     const anthropic = getAnthropic();
