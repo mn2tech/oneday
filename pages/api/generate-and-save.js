@@ -40,21 +40,40 @@ STRICT RULES:
 - All CSS inside <style> in <head>, all JS inside <script> before </body>
 - IMPORTANT: Always close all tags properly and end with </html>
 
+AUTO-LOCK AFTER EVENT ENDS:
+- Parse the event date from the content and store it as a JS Date object
+- At page load, check: if today > eventDate + 7 days, set a boolean isLocked = true
+- When isLocked is true:
+  - Hide all photo upload buttons and RSVP form inputs
+  - Show a warm banner at the top of each interactive section: "This event has ended — thank you for celebrating with us!"
+  - All previously uploaded photos and RSVPs remain visible
+  - Poll and message wall (premium) also become read-only
+
 REQUIRED SECTIONS (keep each section's CSS minimal):
 1. Hero — title, date, location, countdown timer (JS), and a "Hosted by [name]" line styled warmly beneath the title
 2. Schedule — simple vertical timeline
-3. Photo Wall — CSS grid with the following features:
-   - "Add Photos" button that opens a hidden <input type="file" accept="image/*" multiple>
-   - On file select: read each file with FileReader, convert to base64, store array in localStorage key "photos_[eventId]"
-   - Render uploaded photos as <img> tiles in the grid; show styled placeholder tiles when no photos uploaded yet
-   - Each photo tile has a subtle × remove button (top-right corner) that deletes it from localStorage and removes from DOM
-   - Limit: max 20 photos, max 3MB per photo — show a friendly alert if exceeded
+3. Photo Wall — organised into 2-3 sections with event-appropriate labels (e.g. for a wedding: Ceremony, Reception, Food; for a birthday: Celebration, Food, Fun; choose labels that fit the event type). Each section has:
+   - A section heading and its own "Add Photos" button (hidden when isLocked)
+   - File input: accept="image/*" multiple
+   - On file select: FileReader → base64 → stored in localStorage key "photos_[eventId]_[sectionKey]"
+   - Photos rendered as <img> tiles with object-fit: cover, fixed height (e.g. 180px), width 100%, in a responsive CSS grid (repeat(auto-fill, minmax(150px, 1fr)))
+   - Each tile has a subtle × remove button (top-right, hidden when isLocked)
+   - Limit: max 20 photos per section, max 3MB per photo — friendly alert if exceeded
+   - Show styled placeholder tiles when no photos uploaded yet
    - Photos persist across page reloads via localStorage
-4. RSVP counter — "+1 Going" button, count in localStorage
+4. RSVP — a form (hidden when isLocked) with:
+   - Guest name field (text input)
+   - Adults count (number input, min 1)
+   - Kids count (number input, min 0)
+   - "Submit RSVP" button
+   - On submit: save entry to localStorage array "rsvps_[eventId]", re-render the list
+   - Display all submitted RSVPs as a list showing name, adults, kids
+   - Show running totals: "X adults, Y kids attending"
+   - Each RSVP entry has a × delete button
 
 FOR PREMIUM ALSO INCLUDE:
-5. Live Poll — 2 options, percentage bars, localStorage
-6. Guest Message Wall — input + message list, localStorage
+5. Live Poll — 2 options, percentage bars, localStorage (read-only when isLocked)
+6. Guest Message Wall — input + message list, localStorage (input hidden when isLocked)
    - Each message must show an Edit button and a Delete button
    - Edit: clicking Edit replaces the message text with an inline <input> pre-filled with the current text, and swaps the Edit/Delete buttons for Save and Cancel
    - Save: updates the message text in localStorage and re-renders
