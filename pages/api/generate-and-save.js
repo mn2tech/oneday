@@ -3,19 +3,19 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-});
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
-// Use service role key on server to bypass RLS
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// Lazily initialised inside the handler so env vars are always resolved at request time
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
+}
+function getAnthropic() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
 
 const SYSTEM_PROMPT = `You are an expert web developer and event designer.
 
@@ -96,6 +96,10 @@ export default async function handler(req, res) {
   const isDev = DEV_MODE(paymentIntentId);
 
   try {
+    const stripe = getStripe();
+    const anthropic = getAnthropic();
+    const supabase = getSupabase();
+
     // 1. Verify payment (skip in dev mode)
     if (!isDev) {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);

@@ -1,9 +1,5 @@
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-});
-
 const PRICES = {
   basic: 1900,    // $19.00 in cents
   premium: 3900,  // $39.00 in cents
@@ -13,6 +9,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    console.error('[create-payment-intent] STRIPE_SECRET_KEY is not set');
+    return res.status(500).json({ error: 'Payment service not configured. Please contact support.' });
+  }
+
+  const stripe = new Stripe(stripeKey, {
+    apiVersion: '2023-10-16',
+  });
 
   const { plan, email } = req.body;
 
