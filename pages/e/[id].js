@@ -1,17 +1,42 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { supabase } from '../../lib/supabase';
 import styles from '../../styles/EventPage.module.css';
 
-export default function EventPage({ app, error }) {
-  useEffect(() => {
-    if (app?.id) {
-      // Fire-and-forget view count increment
-      supabase.rpc('increment_view_count', { app_id: app.id }).catch(() => {});
-    }
-  }, [app?.id]);
+export default function EventPage() {
+  const router = useRouter();
+  const { id } = router.query;
+  const [app, setApp] = useState(null);
+  const [status, setStatus] = useState('loading'); // 'loading' | 'found' | 'notfound'
 
-  if (error) {
+  useEffect(() => {
+    if (!id) return;
+
+    fetch(`/api/event/${id}`)
+      .then((res) => {
+        if (!res.ok) { setStatus('notfound'); return null; }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        setApp(data);
+        setStatus('found');
+      })
+      .catch(() => setStatus('notfound'));
+  }, [id]);
+
+  if (status === 'loading') {
+    return (
+      <>
+        <Head><title>Loading… — OneDay</title></Head>
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSpinner} />
+        </div>
+      </>
+    );
+  }
+
+  if (status === 'notfound') {
     return (
       <>
         <Head><title>Event Not Found — OneDay</title></Head>
@@ -57,31 +82,4 @@ export default function EventPage({ app, error }) {
       </div>
     </>
   );
-}
-
-export async function getServerSideProps({ params }) {
-  const { id } = params;
-
-  try {
-    const { data, error } = await supabase
-      .from('event_apps')
-      .select('id, title, html, is_live, plan, created_at')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) {
-      console.error('[EventPage] Supabase error or no data:', error?.message);
-      return { props: { app: null, error: true } };
-    }
-
-    return {
-      props: {
-        app: data,
-        error: false,
-      },
-    };
-  } catch (err) {
-    console.error('[EventPage] getServerSideProps threw:', err.message);
-    return { props: { app: null, error: true } };
-  }
 }
