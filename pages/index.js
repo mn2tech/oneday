@@ -154,6 +154,7 @@ function CheckoutForm({ plan, email, prompt, onSuccess }) {
 export default function Home() {
   const [step, setStep] = useState(1); // 1=prompt, 2=plan, 3=payment, 4=loading
   const [prompt, setPrompt] = useState('');
+  const [eventMeta, setEventMeta] = useState({}); // { names, eventType, hostedBy }
   const [email, setEmail] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('premium');
   const [generationStatus, setGenerationStatus] = useState('');
@@ -198,6 +199,7 @@ export default function Home() {
           plan: selectedPlan,
           email,
           paymentIntentId,
+          eventMeta,
         }),
       });
 
@@ -317,9 +319,10 @@ export default function Home() {
               />
 
               <PromptBuilder
-                onComplete={(assembledPrompt) => {
+                onComplete={(assembledPrompt, meta) => {
                   if (!email.trim() || !email.includes('@')) return;
                   setPrompt(assembledPrompt);
+                  setEventMeta(meta || {});
                   setStep(2);
                 }}
               />

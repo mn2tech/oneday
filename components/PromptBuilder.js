@@ -338,7 +338,11 @@ export default function PromptBuilder({ onComplete }) {
       <button
         type="button"
         className={styles.primaryBtn}
-        onClick={() => onComplete(assembledPrompt)}
+        onClick={() => onComplete(assembledPrompt, {
+          names: form.names,
+          eventType: form.eventType === 'Other' ? form.customEventType : form.eventType,
+          hostedBy: form.hostedBy,
+        })}
         disabled={assembledPrompt.trim().length < 10}
       >
         Looks good — Choose Plan →

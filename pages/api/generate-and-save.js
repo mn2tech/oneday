@@ -62,6 +62,40 @@ FOR PREMIUM ALSO INCLUDE:
    - Delete: removes the message from localStorage and removes it from the DOM
    - All message CRUD must persist via localStorage`;
 
+function slugify(str) {
+  return (str || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 25);
+}
+
+function buildSlug(meta) {
+  const parts = [];
+  if (meta?.names) parts.push(slugify(meta.names));
+  if (meta?.eventType) parts.push(slugify(meta.eventType));
+  if (meta?.hostedBy) parts.push('by-' + slugify(meta.hostedBy));
+  return parts.filter(Boolean).join('-').slice(0, 70) || null;
+}
+
+async function getUniqueId(supabase, meta) {
+  const base = buildSlug(meta);
+  if (!base) return nanoid(8);
+
+  // Check for collision
+  const { data } = await supabase
+    .from('event_apps')
+    .select('id')
+    .eq('id', base)
+    .single();
+
+  if (!data) return base; // No collision — use clean slug
+  return `${base}-${nanoid(4)}`; // Collision — append short suffix
+}
+
 function extractHtml(raw) {
   // Remove markdown code fences if model wraps in them
   let html = raw.trim();
@@ -93,7 +127,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, plan, email, paymentIntentId } = req.body;
+  const { prompt, plan, email, paymentIntentId, eventMeta } = req.body;
 
   // Input validation
   if (!prompt || !plan || !email || !paymentIntentId) {
@@ -171,7 +205,7 @@ export default async function handler(req, res) {
     }
 
     const title = prompt.split(/[.!?\n]/)[0].trim().slice(0, 60) || 'My Event';
-    const id = nanoid(8);
+    const id = await getUniqueId(supabase, eventMeta);
 
     // Save to Supabase in all environments (dev + production)
     const { error: insertError } = await supabase.from('event_apps').insert({
