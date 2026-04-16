@@ -44,7 +44,7 @@ export default function EditPage() {
   const [error, setError] = useState('');
   const [previewKey, setPreviewKey] = useState(0); // increment to reload iframe
 
-  const previewUrl = id ? `/preview/${id}.html` : null;
+  const previewUrl = id ? `/e/${id}` : null;
 
   async function handleSubmit(e) {
     e.preventDefault();
