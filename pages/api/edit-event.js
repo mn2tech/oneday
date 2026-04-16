@@ -3,12 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+function getAnthropic() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
 
 const EDIT_SYSTEM_PROMPT = `You are an expert web developer. You will receive a complete HTML event page and a change request from the customer.
 
@@ -41,7 +44,7 @@ function extractHtml(raw) {
 
 const DEV_MODE_ID = () => true; // always try file first, fall back to Supabase
 
-async function loadHtml(id) {
+async function loadHtml(id, supabase) {
   // Try local file first (dev mode)
   const filePath = path.join(process.cwd(), 'public', 'preview', `${id}.html`);
   if (fs.existsSync(filePath)) {
@@ -57,7 +60,7 @@ async function loadHtml(id) {
   return { html: data.html, source: 'supabase' };
 }
 
-async function saveHtml(id, html, source, filePath) {
+async function saveHtml(id, html, source, filePath, supabase) {
   if (source === 'file') {
     fs.writeFileSync(filePath, html, 'utf8');
     return null;
@@ -89,8 +92,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    const anthropic = getAnthropic();
+    const supabase = getSupabase();
+
     // 1. Load existing HTML
-    const { html: existingHtml, source, filePath } = await loadHtml(id);
+    const { html: existingHtml, source, filePath } = await loadHtml(id, supabase);
 
     if (!existingHtml) {
       return res.status(404).json({ error: 'Event page not found.' });
@@ -98,8 +104,8 @@ export default async function handler(req, res) {
 
     // 2. Call Claude to apply the changes
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 16000,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 6000,
       system: EDIT_SYSTEM_PROMPT,
       messages: [
         {
@@ -117,7 +123,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Save updated HTML
-    const saveError = await saveHtml(id, updatedHtml, source, filePath);
+    const saveError = await saveHtml(id, updatedHtml, source, filePath, supabase);
     if (saveError) {
       console.error('[edit-event] Save error:', saveError.message);
       return res.status(500).json({ error: 'Failed to save changes.' });
