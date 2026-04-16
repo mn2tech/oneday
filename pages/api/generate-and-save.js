@@ -17,6 +17,17 @@ function getSupabase() {
   );
 }
 
+function getMissingEnvVars() {
+  const required = [
+    'STRIPE_SECRET_KEY',
+    'ANTHROPIC_API_KEY',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'NEXT_PUBLIC_APP_URL',
+  ];
+  return required.filter((key) => !process.env[key]);
+}
+
 const SYSTEM_PROMPT = `You are an expert web developer and event designer.
 
 Generate a COMPLETE, single-page HTML event app. Keep the CSS concise — avoid excessive animations or decorative elements that waste tokens.
@@ -93,6 +104,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid plan.' });
   }
 
+  const missingVars = getMissingEnvVars();
+  if (missingVars.length > 0) {
+    console.error('[generate-and-save] Missing env vars:', missingVars.join(', '));
+    return res.status(500).json({ error: 'Server configuration is incomplete. Please contact support.' });
+  }
+
   const isDev = DEV_MODE(paymentIntentId);
 
   // Validate required env vars before doing anything
@@ -135,9 +152,10 @@ export default async function handler(req, res) {
     }
 
     // 3. Call Anthropic API
+    // Keep generation bounded so serverless runtime does not time out at the edge.
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 16000,
+      max_tokens: 6000,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: buildUserPrompt(prompt, plan) },
@@ -177,7 +195,13 @@ export default async function handler(req, res) {
     return res.status(200).json({ id, url: appUrl });
 
   } catch (err) {
-    console.error('[generate-and-save] Unhandled error:', err.message);
+    console.error('[generate-and-save] Unhandled error:', err?.message || err);
+
+    const lowered = String(err?.message || '').toLowerCase();
+    if (lowered.includes('timeout') || lowered.includes('timed out')) {
+      return res.status(504).json({ error: 'Generation timed out. Please try again.' });
+    }
+
     return res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
   }
 }

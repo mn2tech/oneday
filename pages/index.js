@@ -186,9 +186,13 @@ export default function Home() {
     setErrorMsg('');
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+
       const res = await fetch('/api/generate-and-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           prompt,
           plan: selectedPlan,
@@ -197,10 +201,20 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      clearTimeout(timeoutId);
+
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {
+          error: `Server returned an invalid response (${res.status}). Please try again.`,
+        };
+      }
 
       if (!res.ok) {
-        setErrorMsg(data.error || 'Generation failed. Please contact support.');
+        setErrorMsg(data.error || `Generation failed (${res.status}). Please contact support.`);
         setGenerationStatus('');
         return;
       }
@@ -208,8 +222,12 @@ export default function Home() {
       setDoneUrl(data.url || `/e/${data.id}`);
       setGenerationStatus('done');
 
-    } catch {
-      setErrorMsg('Network error during generation. Please contact support.');
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        setErrorMsg('Generation is taking too long. Please try again.');
+      } else {
+        setErrorMsg('Network error during generation. Please contact support.');
+      }
       setGenerationStatus('');
     }
   }
