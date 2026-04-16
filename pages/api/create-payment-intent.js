@@ -36,6 +36,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
     console.error('[create-payment-intent]', err.message);
-    return res.status(500).json({ error: 'Failed to create payment intent.' });
+    return res.status(500).json({ error: err.message || 'Failed to create payment intent.' });
   }
 }

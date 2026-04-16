@@ -421,9 +421,7 @@ export default function Home() {
                     rel="noopener noreferrer"
                     className={styles.doneLink}
                   >
-                    {typeof window !== 'undefined'
-                      ? `${window.location.origin}${doneUrl.startsWith('/') ? doneUrl : `/${doneUrl}`}`
-                      : doneUrl}
+                    {doneUrl.startsWith('http') ? doneUrl : `${typeof window !== 'undefined' ? window.location.origin : ''}${doneUrl.startsWith('/') ? doneUrl : `/${doneUrl}`}`}
                   </a>
                   <a
                     href={doneUrl}
