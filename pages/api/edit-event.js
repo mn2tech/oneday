@@ -22,9 +22,7 @@ STRICT RULES:
 - No markdown, no code fences, no explanation — just pure HTML
 - Preserve all existing sections and functionality unless explicitly asked to remove them
 - CRITICAL JS RULE: NEVER use inline event handlers in HTML (no onclick="", no onchange="", no onsubmit=""). ALL event binding must be done in JavaScript using addEventListener or element.onclick = function(){}. This allows all code to safely live inside DOMContentLoaded. When fixing existing pages, replace ALL inline handlers with addEventListener equivalents.
-- If the Photo Wall exists and has no "Add Photos" button, add full photo upload:
-  File input (accept image/*, multiple), FileReader base64 conversion, localStorage persistence,
-  × remove button per photo, max 20 photos / 3MB per photo limit with friendly alerts
+- If the Photo Wall exists and has no working upload: use a <label for="photo-input-[n]"> styled as a button to trigger the file input natively (no JS needed to open picker). File input: id="photo-input-[n]" accept="image/*" multiple style="display:none". Attach change listener via addEventListener. FileReader base64, localStorage persistence, × remove button per photo, max 20 photos/3MB.
 - If the Guest Message Wall exists and has no edit/delete buttons, add them:
   Edit: inline input pre-filled with current text + Save / Cancel buttons
   Delete: removes message from DOM and localStorage
