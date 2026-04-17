@@ -92,6 +92,33 @@ async function getUniqueId(supabase, meta) {
   return `${base}-${nanoid(4)}`; // Collision — append short suffix
 }
 
+function fixInlineHandlerScoping(html) {
+  // Find all function names used in inline event handlers (onclick, onchange, onsubmit, etc.)
+  const funcNames = new Set();
+  for (const m of html.matchAll(/\bon\w+="([^"]+)"/g)) {
+    const fn = m[1].trim().match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
+    if (fn) funcNames.add(fn[1]);
+  }
+  if (!funcNames.size) return html;
+
+  // Build window assignment lines — safe no-ops if the fn isn't defined
+  const assignments = [...funcNames]
+    .map(n => `if(typeof ${n}==='function')window.${n}=${n};`)
+    .join('');
+
+  // Inject just before the last }); in the script — which is typically
+  // the closing of the DOMContentLoaded wrapper. Functions defined inside
+  // that wrapper are still in scope here, so window.X = X works.
+  const scriptEnd = html.lastIndexOf('</script>');
+  if (scriptEnd === -1) return html;
+
+  const beforeScript = html.slice(0, scriptEnd);
+  const lastClose = beforeScript.lastIndexOf('});');
+  if (lastClose === -1) return html;
+
+  return beforeScript.slice(0, lastClose) + assignments + '\n' + beforeScript.slice(lastClose) + html.slice(scriptEnd);
+}
+
 function extractHtml(raw) {
   let html = raw.trim();
   html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -207,7 +234,7 @@ export default async function handler(req, res) {
     });
 
     const rawHtml = message.content[0]?.text || '';
-    const html = extractHtml(rawHtml);
+    const html = fixInlineHandlerScoping(extractHtml(rawHtml));
 
     if (!html.toLowerCase().includes('<!doctype')) {
       console.error('[generate-and-save] AI did not return valid HTML');

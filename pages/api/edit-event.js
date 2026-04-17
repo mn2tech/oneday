@@ -33,6 +33,22 @@ STRICT RULES:
 - Only change what the customer asked to change
 - Always close all tags properly and end with </html>`;
 
+function fixInlineHandlerScoping(html) {
+  const funcNames = new Set();
+  for (const m of html.matchAll(/\bon\w+="([^"]+)"/g)) {
+    const fn = m[1].trim().match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
+    if (fn) funcNames.add(fn[1]);
+  }
+  if (!funcNames.size) return html;
+  const assignments = [...funcNames].map(n => `if(typeof ${n}==='function')window.${n}=${n};`).join('');
+  const scriptEnd = html.lastIndexOf('</script>');
+  if (scriptEnd === -1) return html;
+  const beforeScript = html.slice(0, scriptEnd);
+  const lastClose = beforeScript.lastIndexOf('});');
+  if (lastClose === -1) return html;
+  return beforeScript.slice(0, lastClose) + assignments + '\n' + beforeScript.slice(lastClose) + html.slice(scriptEnd);
+}
+
 function extractHtml(raw) {
   let html = raw.trim();
   html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -117,7 +133,7 @@ export default async function handler(req, res) {
     });
 
     const rawHtml = message.content[0]?.text || '';
-    const updatedHtml = extractHtml(rawHtml);
+    const updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
 
     if (!updatedHtml.toLowerCase().includes('<!doctype')) {
       return res.status(500).json({ error: 'AI returned invalid HTML. Please try again.' });
