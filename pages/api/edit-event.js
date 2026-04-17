@@ -32,53 +32,49 @@ STRICT RULES:
 - Always close all tags properly and end with </html>`;
 
 function injectPhotoUpload(html) {
-  const script = `
-<script>
-(function() {
-  document.addEventListener('DOMContentLoaded', function() {
-    var eventId = (window.location.pathname.split('/').pop() || 'event').slice(0, 30);
-    document.querySelectorAll('input[type="file"]').forEach(function(input, idx) {
-      var key = 'photos_' + eventId + '_' + idx;
-      var container = input.closest('section') || input.closest('[class*="photo"]') || input.closest('[id*="photo"]') || input.parentElement;
-      var grid = container.querySelector('[id*="grid"], [class*="grid"], [class*="photo-list"], [class*="photos"]');
-      if (!grid) {
-        grid = document.createElement('div');
-        grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px;';
-        input.parentElement.insertBefore(grid, input.nextSibling);
-      }
-      function render() {
-        var saved = []; try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
-        grid.innerHTML = '';
-        saved.forEach(function(src, i) {
-          var wrap = document.createElement('div'); wrap.style.cssText = 'position:relative;';
-          var img = document.createElement('img'); img.src = src;
-          img.style.cssText = 'width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;';
-          var btn = document.createElement('button'); btn.textContent = '×';
-          btn.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;cursor:pointer;line-height:1;';
-          btn.onclick = function() { var arr=[]; try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){} arr.splice(i,1); localStorage.setItem(key,JSON.stringify(arr)); render(); };
-          wrap.appendChild(img); wrap.appendChild(btn); grid.appendChild(wrap);
-        });
-      }
-      render();
-      input.addEventListener('change', function() {
-        var files = Array.from(this.files);
-        var arr = []; try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
-        if (arr.length + files.length > 20) { alert('Max 20 photos per section.'); this.value=''; return; }
-        var pending = files.length;
-        files.forEach(function(file) {
-          if (file.size > 3*1024*1024) { alert(file.name+' exceeds 3MB.'); pending--; return; }
-          var reader = new FileReader();
-          reader.onload = function(e) { arr.push(e.target.result); localStorage.setItem(key,JSON.stringify(arr)); pending--; if(pending<=0) render(); };
-          reader.readAsDataURL(file);
-        });
-        this.value = '';
-      });
-    });
-  });
-})();
-</script>
-</body>`;
-  return html.includes('</body>') ? html.replace('</body>', script) : html + script;
+  const injection = [
+    '<scr' + 'ipt>',
+    '(function(){',
+    'document.addEventListener("DOMContentLoaded",function(){',
+    'var eid=(window.location.pathname.split("/").pop()||"event").slice(0,30);',
+    'document.querySelectorAll("input[type=\\"file\\"]").forEach(function(inp,idx){',
+    'var key="photos_"+eid+"_"+idx;',
+    'var cont=inp.closest("section")||inp.closest("[class*=photo]")||inp.closest("[id*=photo]")||inp.parentElement;',
+    'var grid=cont.querySelector("[id*=grid],[class*=grid],[class*=photo-list],[class*=photos]");',
+    'if(!grid){grid=document.createElement("div");grid.style.display="grid";grid.style.gridTemplateColumns="repeat(auto-fill,minmax(150px,1fr))";grid.style.gap="8px";grid.style.marginTop="12px";inp.parentElement.insertBefore(grid,inp.nextSibling);}',
+    'function render(){',
+    'var saved=[];try{saved=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}',
+    'grid.innerHTML="";',
+    'saved.forEach(function(src,i){',
+    'var w=document.createElement("div");w.style.position="relative";',
+    'var im=document.createElement("img");im.src=src;im.style.cssText="width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;";',
+    'var b=document.createElement("button");b.textContent="\xD7";b.style.cssText="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;cursor:pointer;";',
+    'b.setAttribute("data-idx",i);b.setAttribute("data-key",key);',
+    'b.onclick=function(){var k=this.getAttribute("data-key");var n=parseInt(this.getAttribute("data-idx"));var a=[];try{a=JSON.parse(localStorage.getItem(k)||"[]");}catch(ex){}a.splice(n,1);localStorage.setItem(k,JSON.stringify(a));render();};',
+    'w.appendChild(im);w.appendChild(b);grid.appendChild(w);',
+    '});',
+    '}',
+    'render();',
+    'inp.addEventListener("change",function(){',
+    'var files=Array.from(this.files);var arr=[];try{arr=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}',
+    'if(arr.length+files.length>20){alert("Max 20 photos per section.");this.value="";return;}',
+    'var pending=files.length;',
+    'files.forEach(function(file){',
+    'if(file.size>3145728){alert(file.name+" exceeds 3MB.");pending--;return;}',
+    'var r=new FileReader();',
+    'r.onload=function(e){arr.push(e.target.result);localStorage.setItem(key,JSON.stringify(arr));pending--;if(pending<=0)render();};',
+    'r.readAsDataURL(file);',
+    '});',
+    'this.value="";',
+    '});',
+    '});',
+    '});',
+    '})();',
+    '<\/script>',
+  ].join('\n');
+  const bodyIdx = html.lastIndexOf('</body>');
+  if (bodyIdx === -1) return html + '\n' + injection;
+  return html.slice(0, bodyIdx) + '\n' + injection + '\n</body>' + html.slice(bodyIdx + 7);
 }
 
 function fixInlineHandlerScoping(html) {
