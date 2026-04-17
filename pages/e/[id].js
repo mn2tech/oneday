@@ -187,7 +187,7 @@ const PHOTO_ENGINE = `<script>
         a = a.trim();
         if (a === '') return undefined;
         if (!isNaN(a)) return Number(a);
-        return a.replace(/^['"`]|['"`]$/g, '');
+        return a.replace(/^['"]|['"]$/g, '');
       }).filter(function(a) { return a !== undefined; });
       fn.apply(null, args);
     });
