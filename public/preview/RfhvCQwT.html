@@ -404,7 +404,7 @@ footer span { color: var(--gold); }
     </button>
   </div>
   <div class="section-line"></div>
-  <input type="file" id="photoUploadInput" accept="image/*" multiple style="display:none;" onchange="handlePhotoUpload(event)">
+  <input type="file" id="photoUploadInput" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;" onchange="handlePhotoUpload(event)">
   <div class="photo-grid" id="photoGrid"></div>
 </section>
 
