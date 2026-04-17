@@ -178,7 +178,7 @@ export default function Home() {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      const timeoutId = setTimeout(() => controller.abort(), 270000); // 270s — matches Vercel Pro limit
 
       const res = await fetch('/api/generate-and-save', {
         method: 'POST',
