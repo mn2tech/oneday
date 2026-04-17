@@ -31,6 +31,56 @@ STRICT RULES:
 - Only change what the customer asked to change
 - Always close all tags properly and end with </html>`;
 
+function injectPhotoUpload(html) {
+  const script = `
+<script>
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var eventId = (window.location.pathname.split('/').pop() || 'event').slice(0, 30);
+    document.querySelectorAll('input[type="file"]').forEach(function(input, idx) {
+      var key = 'photos_' + eventId + '_' + idx;
+      var container = input.closest('section') || input.closest('[class*="photo"]') || input.closest('[id*="photo"]') || input.parentElement;
+      var grid = container.querySelector('[id*="grid"], [class*="grid"], [class*="photo-list"], [class*="photos"]');
+      if (!grid) {
+        grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px;';
+        input.parentElement.insertBefore(grid, input.nextSibling);
+      }
+      function render() {
+        var saved = []; try { saved = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+        grid.innerHTML = '';
+        saved.forEach(function(src, i) {
+          var wrap = document.createElement('div'); wrap.style.cssText = 'position:relative;';
+          var img = document.createElement('img'); img.src = src;
+          img.style.cssText = 'width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;';
+          var btn = document.createElement('button'); btn.textContent = '×';
+          btn.style.cssText = 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;cursor:pointer;line-height:1;';
+          btn.onclick = function() { var arr=[]; try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){} arr.splice(i,1); localStorage.setItem(key,JSON.stringify(arr)); render(); };
+          wrap.appendChild(img); wrap.appendChild(btn); grid.appendChild(wrap);
+        });
+      }
+      render();
+      input.addEventListener('change', function() {
+        var files = Array.from(this.files);
+        var arr = []; try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) {}
+        if (arr.length + files.length > 20) { alert('Max 20 photos per section.'); this.value=''; return; }
+        var pending = files.length;
+        files.forEach(function(file) {
+          if (file.size > 3*1024*1024) { alert(file.name+' exceeds 3MB.'); pending--; return; }
+          var reader = new FileReader();
+          reader.onload = function(e) { arr.push(e.target.result); localStorage.setItem(key,JSON.stringify(arr)); pending--; if(pending<=0) render(); };
+          reader.readAsDataURL(file);
+        });
+        this.value = '';
+      });
+    });
+  });
+})();
+</script>
+</body>`;
+  return html.includes('</body>') ? html.replace('</body>', script) : html + script;
+}
+
 function fixInlineHandlerScoping(html) {
   const funcNames = new Set();
   for (const m of html.matchAll(/\bon\w+="([^"]+)"/g)) {
@@ -156,7 +206,7 @@ export default async function handler(req, res) {
     });
 
     const rawHtml = message.content[0]?.text || '';
-    const updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
+    const updatedHtml = injectPhotoUpload(fixInlineHandlerScoping(extractHtml(rawHtml)));
 
     if (!updatedHtml.toLowerCase().includes('<!doctype')) {
       return res.status(500).json({ error: 'AI returned invalid HTML. Please try again.' });
