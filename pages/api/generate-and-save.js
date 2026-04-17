@@ -136,7 +136,7 @@ async function sendConfirmationEmail(resend, email, eventUrl) {
 const DEV_MODE = (id) => typeof id === 'string' && id.startsWith('dev_test_');
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 };
 
 export default async function handler(req, res) {
