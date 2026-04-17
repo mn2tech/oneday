@@ -37,3 +37,20 @@ create policy "Public can read live apps"
 
 -- Service role can do everything (used by API routes with service key)
 -- No extra policy needed when using service_role key on the server side
+
+-- Shared event photos (S3 keys + metadata; files live in AWS S3)
+create table if not exists event_photos (
+  id            uuid        primary key default gen_random_uuid(),
+  event_id      text        not null references event_apps (id) on delete cascade,
+  section_index integer     not null default 0,
+  s3_key        text        not null,
+  content_type  text,
+  byte_size     integer,
+  created_at    timestamptz default now()
+);
+
+create index if not exists idx_event_photos_event_section
+  on event_photos (event_id, section_index);
+
+alter table event_photos enable row level security;
+-- Inserts/reads happen only via Next.js API using the service role key (bypasses RLS).

@@ -1,5 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
+/** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
+function eventPhotosUseS3() {
+  return Boolean(
+    process.env.AWS_S3_BUCKET &&
+      process.env.AWS_REGION &&
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY
+  );
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -18,7 +28,7 @@ function getSupabase() {
 //  • data-oneday-managed prevents two buttons from sharing one grid
 //  • photos_<eid>_<idx> key is stable (button order = section order)
 // ─────────────────────────────────────────────────────────────────────────────
-const PHOTO_ENGINE = `<script>
+const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
   document.addEventListener('DOMContentLoaded', function(){
     var eid = (window.location.pathname.split('/').pop() || 'event').slice(0,30);
@@ -236,6 +246,207 @@ const PHOTO_ENGINE = `<script>
 })();
 <\/script>`;
 
+/** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
+const PHOTO_ENGINE_S3 = `<script>
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    var eid = (window.__ONEDAY_EID__ || window.location.pathname.split('/').pop() || 'event').slice(0,80);
+    var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;';
+    var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
+
+    ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+      if(typeof window[fn]==='function') window[fn]=function(){};
+    });
+
+    function findNextGrid(el){
+      var s=el.nextElementSibling;
+      while(s){
+        if(s.matches&&s.matches(GSEL)) return s;
+        var c=s.querySelector&&s.querySelector(GSEL);
+        if(c) return c;
+        s=s.nextElementSibling;
+      }
+      var p=el.parentElement;
+      if(p){
+        s=p.nextElementSibling;
+        while(s){
+          if(s.matches&&s.matches(GSEL)) return s;
+          var c2=s.querySelector&&s.querySelector(GSEL);
+          if(c2) return c2;
+          s=s.nextElementSibling;
+        }
+      }
+      return null;
+    }
+
+    function loadGrid(grid, si){
+      fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var photos = (d && d.photos) ? d.photos : [];
+          grid.innerHTML='';
+          photos.forEach(function(p){
+            var w=document.createElement('div');
+            w.style.cssText='position:relative;';
+            var im=document.createElement('img');
+            im.src=p.url;
+            im.alt='';
+            im.style.cssText='width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;';
+            var b=document.createElement('button');
+            b.innerHTML='&times;';
+            b.title='Remove photo';
+            b.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            b.onclick=function(ev){
+              ev.stopPropagation();
+              fetch('/api/event-photos/delete',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({photoId:p.id,eventId:eid})
+              }).then(function(r){
+                if(!r.ok) return r.json().then(function(j){ throw new Error(j.error||'Delete failed'); });
+                return loadGrid(grid, si);
+              }).catch(function(err){ alert(err.message||'Could not remove photo'); });
+            };
+            w.appendChild(im); w.appendChild(b); grid.appendChild(w);
+          });
+        })
+        .catch(function(){ grid.innerHTML=''; });
+    }
+
+    var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
+      var t=(el.textContent||'').replace(/\\s+/g,' ').trim();
+      var c=(el.getAttribute('class')||'').toLowerCase();
+      return t.indexOf('Add Photo')!==-1 || t.indexOf('Upload Photo')!==-1 || c.indexOf('btn-upload')!==-1 || c.indexOf('upload-btn')!==-1;
+    });
+
+    buttons.forEach(function(btn, si){
+      var fb=btn.cloneNode(true);
+      btn.parentNode.replaceChild(fb,btn);
+      fb.removeAttribute('onclick');
+      if(fb.tagName==='LABEL') fb.removeAttribute('for');
+
+      var inp=document.createElement('input');
+      inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+      inp.setAttribute('data-oneday-engine','1');
+      inp.style.cssText='position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;';
+      fb.parentNode.insertBefore(inp,fb.nextSibling);
+
+      var secHide=fb.closest('section')||fb.parentElement;
+      if(secHide){
+        secHide.querySelectorAll('input[type=file]').forEach(function(oldInp){
+          if(!oldInp.getAttribute('data-oneday-engine')){
+            oldInp.style.setProperty('display','none','important');
+            oldInp.setAttribute('aria-hidden','true');
+          }
+        });
+      }
+
+      fb.style.cursor='pointer';
+      fb.onclick=function(e){ e.preventDefault(); inp.click(); };
+
+      var grid=findNextGrid(fb);
+      if(!grid||grid.dataset.onedayManaged){
+        grid=document.createElement('div');
+        inp.parentNode.insertBefore(grid,inp.nextSibling);
+      }
+      grid.dataset.onedayManaged='1';
+      grid.style.cssText=GCSS;
+
+      loadGrid(grid, si);
+
+      inp.addEventListener('change', function(){
+        var files=Array.from(this.files||[]);
+        if(!files.length) return;
+        this.value='';
+        files.forEach(function(file){
+          var ct=file.type||'image/jpeg';
+          if(ct.indexOf('image/')!==0) return;
+          fetch('/api/event-photos/presign',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({eventId:eid,sectionIndex:si,contentType:ct})
+          })
+          .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'presign failed'); return j; }); })
+          .then(function(d){
+            return fetch(d.uploadUrl,{method:'PUT',headers:{'Content-Type':ct},body:file}).then(function(putRes){
+              if(!putRes.ok) throw new Error('Upload to storage failed');
+              return d;
+            });
+          })
+          .then(function(d){
+            return fetch('/api/event-photos/register',{
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:file.size,contentType:ct})
+            }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
+          })
+          .then(function(){ loadGrid(grid, si); })
+          .catch(function(err){ alert(err.message||'Upload failed'); });
+        });
+      });
+    });
+
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      function wireOnclickBtn(btn) {
+        if (btn.dataset.onedayWired) return;
+        btn.dataset.onedayWired = '1';
+        var oc = btn.getAttribute('onclick') || '';
+        if (!oc) return;
+        var m = oc.trim().match(/^([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(([^)]*)\\)/);
+        if (!m) return;
+        var fnName = m[1], rawArgs = m[2] || '';
+        btn.removeAttribute('onclick');
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var fn = window[fnName];
+          if (typeof fn !== 'function') return;
+          var args = rawArgs.split(',').map(function(a) {
+            a = a.trim();
+            if (a === '') return undefined;
+            if (!isNaN(a)) return Number(a);
+            return a.replace(/^['"]|['"]$/g, '');
+          }).filter(function(a) { return a !== undefined; });
+          fn.apply(null, args);
+        });
+      }
+      document.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+      var msgContainers = document.querySelectorAll(
+        '#msgList,#messageList,#msg-list,[class*="msg-list"],[class*="message-list"],[id*="messages"],[class*="message-wall"],[id*="message-wall"],[class*="guest-msg"],[id*="guest-msg"],section[class*="message"]'
+      );
+      msgContainers.forEach(function(container) {
+        container.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+        new MutationObserver(function(mutations) {
+          mutations.forEach(function(mut) {
+            mut.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              if (node.matches && node.matches('[onclick]')) wireOnclickBtn(node);
+              node.querySelectorAll && node.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+            });
+          });
+        }).observe(container, { childList: true, subtree: true });
+      });
+      var msgSubmitBtns = document.querySelectorAll(
+        '.btn-post,.btn-send,.btn-submit-msg,[class*="btn-post"],[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"],[id*="postMessage"],button[class*="post-message"]'
+      );
+      msgSubmitBtns.forEach(function(btn) {
+        if (btn.dataset.onedayWired) return;
+        var fn = window.submitMessage || window.sendMessage || window.addMessage ||
+                  window.submitGuestMessage || window.postGuestMessage;
+        if (typeof fn === 'function') {
+          btn.dataset.onedayWired = '1';
+          btn.addEventListener('click', function(e) { e.preventDefault(); fn(); });
+        }
+      });
+    }, 0);
+  });
+
+})();
+<\/script>`;
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getServerSideProps({ params, res }) {
@@ -254,7 +465,9 @@ export async function getServerSideProps({ params, res }) {
 
   const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
 
-  const injection = watermark + '\n' + PHOTO_ENGINE;
+  const useS3 = eventPhotosUseS3();
+  const eidScript = `<script>window.__ONEDAY_EID__=${JSON.stringify(id)};<\/script>`;
+  const injection = watermark + '\n' + eidScript + '\n' + (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
   const bodyIdx = data.html.lastIndexOf('</body>');
   const html = bodyIdx !== -1
     ? data.html.slice(0, bodyIdx) + injection + '\n</body>' + data.html.slice(bodyIdx + 7)
