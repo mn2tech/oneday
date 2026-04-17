@@ -267,7 +267,7 @@ async function sendConfirmationEmail(resend, email, eventUrl) {
     });
   } catch (err) {
     // Non-fatal — log but don't fail the request
-    console.error('[generate-and-save] Resend error:', err?.message);
+    console.error('[generate-and-save] Resend error:', err?.message, err?.statusCode, JSON.stringify(err?.body));
   }
 }
 
