@@ -36,14 +36,16 @@ const SYSTEM_PROMPT = `You are an expert web developer and event designer. Gener
 
 RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
-LIFECYCLE (parse the event date from the prompt):
+CRITICAL JS RULE: NEVER define functions inside DOMContentLoaded, window.onload, or any other wrapper. ALL functions must be declared at the TOP LEVEL of the <script> tag so inline handlers like onclick="fn()" and onchange="fn()" can access them. Use DOMContentLoaded ONLY for initialization code that doesn't define functions.
+
+LIFECYCLE (parse the actual event date from the prompt):
 - Before event day: RSVP open, Photos open, Messages open
 - On event day and after: RSVP closes (hide RSVP form, show "RSVP is now closed" message), Photos and Messages still open
-- After eventDate + 7 days: Everything locks (isLocked=true). Hide upload buttons, hide message input, show "This event has ended — thank you for celebrating with us!" banner in each section. Uploaded photos, RSVPs, and messages stay visible as memories.
+- After eventDate + 7 days: Everything locks (isLocked=true). Hide upload buttons, hide message input, show "This event has ended — thank you for celebrating with us!" banner. Uploaded photos, RSVPs, and messages stay visible.
 
-At page load run this JS logic:
+Run this at the top of <script> (outside any function):
 const today = new Date(); today.setHours(0,0,0,0);
-const eventDate = new Date('[EVENT_DATE]'); eventDate.setHours(0,0,0,0);
+const eventDate = new Date('ACTUAL_EVENT_DATE_FROM_PROMPT'); eventDate.setHours(0,0,0,0);
 const lockDate = new Date(eventDate); lockDate.setDate(lockDate.getDate() + 7);
 const rsvpClosed = today >= eventDate;
 const isLocked = today > lockDate;
@@ -54,7 +56,7 @@ SECTIONS:
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section: "Add Photos" button (hidden if locked), file input (accept="image/*" multiple), FileReader→base64→localStorage key "photos_[eventId]_[section]", imgs with object-fit:cover height:180px in CSS grid (repeat(auto-fill,minmax(150px,1fr))), × remove button per photo (hidden if locked), max 20 photos/3MB per section
 4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
-6. Message Wall — input (hidden if locked) + list. Each message: Edit (inline input + Save/Cancel) and Delete. All CRUD persists via localStorage.`;
+6. Message Wall — input + Submit button (hidden if locked). List of messages, each with Edit (inline) and Delete. All persists via localStorage key "messages_[eventId]".`;
 
 function slugify(str) {
   return (str || '')
