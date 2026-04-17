@@ -195,6 +195,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Change request is too short.' });
   }
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('[edit-event] ANTHROPIC_API_KEY is not set');
+    return res.status(500).json({ error: 'AI service not configured. Please contact support.' });
+  }
+
   try {
     const anthropic = getAnthropic();
     const supabase = getSupabase();
@@ -206,10 +211,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Event page not found.' });
     }
 
-    // 2. Call Claude to apply the changes
+    // 2. Call Claude to apply the changes (full HTML in + full HTML out — needs high max_tokens)
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: EDIT_SYSTEM_PROMPT,
       messages: [
         {
@@ -219,11 +224,24 @@ export default async function handler(req, res) {
       ],
     });
 
-    const rawHtml = message.content[0]?.text || '';
-    const updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
+    if (message.stop_reason === 'max_tokens') {
+      console.error('[edit-event] Truncated at max_tokens');
+      return res.status(500).json({
+        error:
+          'The update was cut off (page too large). Try a smaller change, or contact support.',
+      });
+    }
 
-    if (!updatedHtml.toLowerCase().includes('<!doctype')) {
+    const rawHtml = message.content[0]?.text || '';
+    let updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
+    updatedHtml = injectPhotoUpload(updatedHtml);
+
+    const lower = updatedHtml.toLowerCase();
+    if (!lower.includes('<!doctype')) {
       return res.status(500).json({ error: 'AI returned invalid HTML. Please try again.' });
+    }
+    if (!lower.includes('</body>') || !lower.includes('</html>')) {
+      return res.status(500).json({ error: 'Incomplete page from AI. Please try again.' });
     }
 
     // 3. Save updated HTML
@@ -236,7 +254,26 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
 
   } catch (err) {
-    console.error('[edit-event] Unhandled error:', err.message);
-    return res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
+    const status = err?.status ?? err?.statusCode;
+    const msg = String(err?.message || err?.error?.message || err || '');
+    console.error('[edit-event] Error:', msg, 'status=', status, err);
+
+    if (status === 401 || msg.includes('401') || msg.toLowerCase().includes('invalid x-api-key')) {
+      return res.status(500).json({ error: 'AI service key is invalid. Please contact support.' });
+    }
+    if (status === 429 || msg.includes('429') || msg.toLowerCase().includes('rate limit')) {
+      return res.status(429).json({ error: 'Too many requests. Wait a minute and try again.' });
+    }
+    if (status === 529 || msg.toLowerCase().includes('overloaded')) {
+      return res.status(503).json({ error: 'AI is busy. Please try again in a moment.' });
+    }
+    if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('timed out')) {
+      return res.status(504).json({ error: 'Request timed out. Try a shorter change and retry.' });
+    }
+
+    return res.status(500).json({
+      error:
+        'Could not apply changes. If this keeps happening, try a smaller edit or contact support.',
+    });
   }
 }

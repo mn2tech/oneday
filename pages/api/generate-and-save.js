@@ -332,22 +332,38 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. Call Anthropic API
+    // 3. Call Anthropic API (large single-page HTML; low max_tokens truncates mid-document)
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: buildUserPrompt(prompt) },
       ],
     });
 
-    const rawHtml = message.content[0]?.text || '';
-    const html = fixInlineHandlerScoping(extractHtml(rawHtml));
+    if (message.stop_reason === 'max_tokens') {
+      console.error('[generate-and-save] Truncated at max_tokens — page incomplete');
+      return res.status(500).json({
+        error:
+          'The page was cut off at the length limit. Shorten your event description slightly and try again, or contact support to regenerate.',
+      });
+    }
 
-    if (!html.toLowerCase().includes('<!doctype')) {
+    const rawHtml = message.content[0]?.text || '';
+    let html = fixInlineHandlerScoping(extractHtml(rawHtml));
+    html = injectPhotoUpload(html);
+
+    const lower = html.toLowerCase();
+    if (!lower.includes('<!doctype')) {
       console.error('[generate-and-save] AI did not return valid HTML');
       return res.status(500).json({ error: 'AI returned invalid HTML. Please try again.' });
+    }
+    if (!lower.includes('</body>') || !lower.includes('</html>')) {
+      console.error('[generate-and-save] Incomplete HTML (missing </body> or </html>)');
+      return res.status(500).json({
+        error: 'Incomplete page generated. Please try again.',
+      });
     }
 
     const title = prompt.split(/[.!?\n]/)[0].trim().slice(0, 60) || 'My Event';
@@ -380,13 +396,26 @@ export default async function handler(req, res) {
     return res.status(200).json({ id, url: appUrl });
 
   } catch (err) {
-    console.error('[generate-and-save] Unhandled error:', err?.message || err);
+    const status = err?.status ?? err?.statusCode;
+    const msg = String(err?.message || err?.error?.message || err || '');
+    console.error('[generate-and-save] Error:', msg, 'status=', status, err);
 
-    const lowered = String(err?.message || '').toLowerCase();
+    const lowered = msg.toLowerCase();
+    if (status === 401 || msg.includes('401') || lowered.includes('invalid x-api-key')) {
+      return res.status(500).json({ error: 'AI service key is invalid. Please contact support.' });
+    }
+    if (status === 429 || msg.includes('429') || lowered.includes('rate limit')) {
+      return res.status(429).json({ error: 'Too many requests. Wait a minute and try again.' });
+    }
+    if (status === 529 || lowered.includes('overloaded')) {
+      return res.status(503).json({ error: 'AI is busy. Please try again in a moment.' });
+    }
     if (lowered.includes('timeout') || lowered.includes('timed out')) {
       return res.status(504).json({ error: 'Generation timed out. Please try again.' });
     }
 
-    return res.status(500).json({ error: 'An unexpected error occurred. Please try again.' });
+    return res.status(500).json({
+      error: 'Generation failed. Please try again or contact support if it persists.',
+    });
   }
 }
