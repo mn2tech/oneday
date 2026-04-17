@@ -16,29 +16,19 @@ function getStripePromise() {
 
 const PLANS = [
   {
-    id: 'basic',
-    name: 'Basic',
-    price: '$19',
+    id: 'standard',
+    name: 'OneDay',
+    price: '$14',
+    popular: true,
     features: [
       'AI-generated event microsite',
       'Hero with countdown timer',
       'Schedule timeline',
-      'Photo wall',
-      'RSVP counter',
-      'Permanent shareable link',
-    ],
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    price: '$39',
-    popular: true,
-    features: [
-      'Everything in Basic',
+      'Photo wall (2 sections)',
+      'RSVP with adults & kids count',
       'Live poll with results',
       'Guest message wall',
-      'Priority AI generation',
-      'Enhanced design templates',
+      'Permanent memory page — forever',
     ],
   },
 ];
@@ -135,7 +125,7 @@ function CheckoutForm({ plan, email, prompt, onSuccess }) {
         {loading ? (
           <span className={styles.spinner} aria-label="Processing payment" />
         ) : (
-          `Pay ${plan === 'premium' ? '$39' : '$19'} & Generate`
+          `Pay $14 & Generate`
         )}
       </button>
 
@@ -396,22 +386,26 @@ export default function Home() {
                 </div>
               )}
               <p className={styles.cardSubtitle}>
-                {selectedPlan === 'premium' ? 'Premium Plan — $39' : 'Basic Plan — $19'} · One-time payment
+                OneDay Plan — $14 · One-time payment
               </p>
 
               <div className={styles.orderSummary}>
                 <div className={styles.orderRow}>
                   <span>Plan</span>
-                  <span>{selectedPlan === 'premium' ? 'Premium' : 'Basic'}</span>
+                  <span>OneDay</span>
                 </div>
                 <div className={styles.orderRow}>
                   <span>AI Event Microsite</span>
                   <span>✓ Included</span>
                 </div>
+                <div className={styles.orderRow}>
+                  <span>Permanent memory page</span>
+                  <span>✓ Included</span>
+                </div>
                 <div className={styles.orderDivider} />
                 <div className={[styles.orderRow, styles.orderTotal].join(' ')}>
                   <span>Total</span>
-                  <span>{selectedPlan === 'premium' ? '$39.00' : '$19.00'}</span>
+                  <span>$14.00</span>
                 </div>
               </div>
 

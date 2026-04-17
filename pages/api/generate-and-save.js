@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
+import { Resend } from 'resend';
 
 // Lazily initialised inside the handler so env vars are always resolved at request time
 function getStripe() {
@@ -15,6 +16,9 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
+}
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
 }
 
 function getMissingEnvVars() {
@@ -32,15 +36,23 @@ const SYSTEM_PROMPT = `You are an expert web developer and event designer. Gener
 
 RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
-AUTO-LOCK: Parse the event date. At load, if today > eventDate + 7 days → isLocked=true. When locked: hide upload buttons and RSVP form, show "This event has ended — thank you for celebrating with us!" banner in each section. Uploaded photos and RSVPs stay visible.
+LIFECYCLE (parse the event date from the prompt):
+- Before event day: RSVP open, Photos open, Messages open
+- On event day and after: RSVP closes (hide RSVP form, show "RSVP is now closed" message), Photos and Messages still open
+- After eventDate + 7 days: Everything locks (isLocked=true). Hide upload buttons, hide message input, show "This event has ended — thank you for celebrating with us!" banner in each section. Uploaded photos, RSVPs, and messages stay visible as memories.
+
+At page load run this JS logic:
+const today = new Date(); today.setHours(0,0,0,0);
+const eventDate = new Date('[EVENT_DATE]'); eventDate.setHours(0,0,0,0);
+const lockDate = new Date(eventDate); lockDate.setDate(lockDate.getDate() + 7);
+const rsvpClosed = today >= eventDate;
+const isLocked = today > lockDate;
 
 SECTIONS:
 1. Hero — title, date, location, JS countdown timer, "Hosted by [name]" line
 2. Schedule — vertical timeline
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section: "Add Photos" button (hidden if locked), file input (accept="image/*" multiple), FileReader→base64→localStorage key "photos_[eventId]_[section]", imgs with object-fit:cover height:180px in CSS grid (repeat(auto-fill,minmax(150px,1fr))), × remove button per photo (hidden if locked), max 20 photos/3MB per section
-4. RSVP — form (hidden if locked): name, adults (min 1), kids (min 0), Submit button. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry.
-
-PREMIUM ONLY:
+4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
 6. Message Wall — input (hidden if locked) + list. Each message: Edit (inline input + Save/Cancel) and Delete. All CRUD persists via localStorage.`;
 
@@ -56,11 +68,11 @@ function slugify(str) {
 }
 
 function buildSlug(meta) {
+  // Only honoree + eventType (no host)
   const parts = [];
   if (meta?.names) parts.push(slugify(meta.names));
   if (meta?.eventType) parts.push(slugify(meta.eventType));
-  if (meta?.hostedBy) parts.push('by-' + slugify(meta.hostedBy));
-  return parts.filter(Boolean).join('-').slice(0, 70) || null;
+  return parts.filter(Boolean).join('-').slice(0, 50) || null;
 }
 
 async function getUniqueId(supabase, meta) {
@@ -79,10 +91,8 @@ async function getUniqueId(supabase, meta) {
 }
 
 function extractHtml(raw) {
-  // Remove markdown code fences if model wraps in them
   let html = raw.trim();
   html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-  // Ensure it starts with doctype
   if (!html.toLowerCase().startsWith('<!doctype')) {
     const idx = html.toLowerCase().indexOf('<!doctype');
     if (idx !== -1) html = html.slice(idx);
@@ -90,12 +100,37 @@ function extractHtml(raw) {
   return html;
 }
 
-function buildUserPrompt(prompt, plan) {
-  const planNote = plan === 'premium'
-    ? '\n\nThis is a PREMIUM plan — include the Poll and Guest Message Wall sections.'
-    : '\n\nThis is a BASIC plan — include all core sections (hero, schedule, photo wall, RSVP counter).';
+function buildUserPrompt(prompt) {
+  return `Create a complete event app (with Poll and Message Wall included) for the following event:\n\n${prompt}`;
+}
 
-  return `Create an event app for the following event:\n\n${prompt}${planNote}`;
+async function sendConfirmationEmail(resend, email, eventUrl) {
+  if (!process.env.RESEND_API_KEY) return; // Skip if not configured
+  try {
+    await resend.emails.send({
+      from: 'OneDay <noreply@getoneday.com>',
+      to: email,
+      subject: 'Your OneDay event page is live 🎉',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#0a0a0f;color:#f0f0f5;border-radius:12px;">
+          <div style="margin-bottom:24px;">
+            <span style="font-size:1.4rem;font-weight:700;">◆ OneDay</span>
+          </div>
+          <h1 style="font-size:1.6rem;margin-bottom:8px;">Your event page is live! 🎉</h1>
+          <p style="color:#aaa;margin-bottom:24px;">Your AI-generated event microsite is ready to share with your guests.</p>
+          <a href="${eventUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;margin-bottom:24px;">View Your Event Page →</a>
+          <p style="color:#888;font-size:0.85rem;margin-bottom:8px;">Or copy this link to share:</p>
+          <p style="background:#1a1a2e;padding:12px 16px;border-radius:6px;font-size:0.9rem;word-break:break-all;color:#c084fc;">${eventUrl}</p>
+          <hr style="border:none;border-top:1px solid #333;margin:24px 0;" />
+          <p style="color:#666;font-size:0.8rem;">Your event page is permanent — it will live at this link forever as a memory page.</p>
+          <p style="color:#666;font-size:0.8rem;">Need changes? Visit your event page and use the edit link.</p>
+        </div>
+      `,
+    });
+  } catch (err) {
+    // Non-fatal — log but don't fail the request
+    console.error('[generate-and-save] Resend error:', err?.message);
+  }
 }
 
 const DEV_MODE = (id) => typeof id === 'string' && id.startsWith('dev_test_');
@@ -112,12 +147,8 @@ export default async function handler(req, res) {
   const { prompt, plan, email, paymentIntentId, eventMeta } = req.body;
 
   // Input validation
-  if (!prompt || !plan || !email || !paymentIntentId) {
+  if (!prompt || !email || !paymentIntentId) {
     return res.status(400).json({ error: 'Missing required fields.' });
-  }
-
-  if (!['basic', 'premium'].includes(plan)) {
-    return res.status(400).json({ error: 'Invalid plan.' });
   }
 
   const missingVars = getMissingEnvVars();
@@ -128,7 +159,6 @@ export default async function handler(req, res) {
 
   const isDev = DEV_MODE(paymentIntentId);
 
-  // Validate required env vars before doing anything
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error('[generate-and-save] ANTHROPIC_API_KEY is not set');
     return res.status(500).json({ error: 'AI service not configured. Please contact support.' });
@@ -142,16 +172,13 @@ export default async function handler(req, res) {
     const stripe = getStripe();
     const anthropic = getAnthropic();
     const supabase = getSupabase();
+    const resend = getResend();
 
     // 1. Verify payment (skip in dev mode)
     if (!isDev) {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       if (paymentIntent.status !== 'succeeded') {
         return res.status(402).json({ error: 'Payment has not been completed.' });
-      }
-      const paidPlan = paymentIntent.metadata?.plan;
-      if (paidPlan && paidPlan !== plan) {
-        return res.status(400).json({ error: 'Plan mismatch with payment.' });
       }
 
       // 2. Prevent duplicate generation
@@ -168,13 +195,12 @@ export default async function handler(req, res) {
     }
 
     // 3. Call Anthropic API
-    // Keep generation bounded so serverless runtime does not time out at the edge.
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 5000,
       system: SYSTEM_PROMPT,
       messages: [
-        { role: 'user', content: buildUserPrompt(prompt, plan) },
+        { role: 'user', content: buildUserPrompt(prompt) },
       ],
     });
 
@@ -188,15 +214,16 @@ export default async function handler(req, res) {
 
     const title = prompt.split(/[.!?\n]/)[0].trim().slice(0, 60) || 'My Event';
     const id = await getUniqueId(supabase, eventMeta);
+    const resolvedPlan = plan || 'standard';
 
-    // Save to Supabase in all environments (dev + production)
+    // Save to Supabase
     const { error: insertError } = await supabase.from('event_apps').insert({
       id,
       payment_intent_id: paymentIntentId,
       title,
       html,
       prompt,
-      plan,
+      plan: resolvedPlan,
       email,
       is_live: true,
       generation_status: 'complete',
@@ -208,6 +235,10 @@ export default async function handler(req, res) {
     }
 
     const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${id}`;
+
+    // 4. Send confirmation email (non-blocking)
+    await sendConfirmationEmail(resend, email, appUrl);
+
     return res.status(200).json({ id, url: appUrl });
 
   } catch (err) {

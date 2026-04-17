@@ -1,8 +1,7 @@
 import Stripe from 'stripe';
 
 const PRICES = {
-  basic: 1900,    // $19.00 in cents
-  premium: 3900,  // $39.00 in cents
+  standard: 1400,  // $14.00 in cents
 };
 
 export default async function handler(req, res) {
@@ -22,8 +21,11 @@ export default async function handler(req, res) {
 
   const { plan, email } = req.body;
 
-  if (!plan || !PRICES[plan]) {
-    return res.status(400).json({ error: 'Invalid plan. Must be "basic" or "premium".' });
+  // Accept 'standard' or legacy 'basic'/'premium' gracefully
+  const resolvedPlan = (plan === 'basic' || plan === 'premium') ? 'standard' : plan;
+
+  if (!resolvedPlan || !PRICES[resolvedPlan]) {
+    return res.status(400).json({ error: 'Invalid plan.' });
   }
 
   if (!email || !email.includes('@')) {
@@ -32,11 +34,11 @@ export default async function handler(req, res) {
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: PRICES[plan],
+      amount: PRICES[resolvedPlan],
       currency: 'usd',
-      metadata: { plan, email },
+      metadata: { plan: resolvedPlan, email },
       receipt_email: email,
-      description: `OneDay — ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+      description: `OneDay — Event Microsite`,
     });
 
     return res.status(200).json({ clientSecret: paymentIntent.client_secret });
