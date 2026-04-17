@@ -52,6 +52,15 @@ function assemblePrompt(f) {
   return parts.join(' ');
 }
 
+// ── Date parsing helper ───────────────────────────────────────────────────────
+function parseEventDate(dateStr) {
+  if (!dateStr) return null;
+  // Strip ordinal suffixes: 1st → 1, 2nd → 2, etc.
+  const cleaned = dateStr.replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+  const d = new Date(cleaned);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // ── Completeness checks ───────────────────────────────────────────────────────
 function getChecks(f) {
   const checks = [];
@@ -59,7 +68,17 @@ function getChecks(f) {
 
   if (!type) checks.push({ level: 'error', field: 'eventType', message: 'Event type is required' });
   if (!f.names.trim()) checks.push({ level: 'error', field: 'names', message: 'Add the name(s) of the honoree(s)' });
-  if (!f.date.trim()) checks.push({ level: 'error', field: 'date', message: 'Event date is required' });
+  if (!f.date.trim()) {
+    checks.push({ level: 'error', field: 'date', message: 'Event date is required' });
+  } else {
+    const parsed = parseEventDate(f.date);
+    if (parsed) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (parsed < today) {
+        checks.push({ level: 'error', field: 'date', message: '⚠️ This date is in the past — guests won\'t be able to RSVP or upload photos. Please enter a future date.' });
+      }
+    }
+  }
   if (!f.venue.trim()) checks.push({ level: 'warning', field: 'venue', message: 'No venue — AI will invent one. Add a real venue for accuracy.' });
   if (!f.time.trim()) checks.push({ level: 'suggestion', field: 'time', message: 'Adding a start time makes the countdown more precise' });
   if (f.scheduleItems.filter(s => s.description.trim()).length === 0)
