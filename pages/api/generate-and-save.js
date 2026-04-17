@@ -36,7 +36,14 @@ const SYSTEM_PROMPT = `You are an expert web developer and event designer. Gener
 
 RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
-CRITICAL JS RULE: NEVER use inline event handlers in HTML (no onclick="", no onchange="", no onsubmit=""). ALL event binding must be done in JavaScript using addEventListener or element.onclick = function(){}. This allows all code to safely live inside DOMContentLoaded.
+CRITICAL JS RULES:
+1. NEVER use inline event handlers in HTML attributes (no onclick="", no onchange="", no onsubmit=""). Bind ALL events with addEventListener() or element.onclick = fn inside DOMContentLoaded.
+2. Any function called from dynamically-generated innerHTML (e.g. edit/delete buttons built inside renderMessages) MUST be assigned to window so it is globally accessible:
+   window.editMsg = function editMsg(idx) { ... };
+   window.deleteMsg = function deleteMsg(idx) { ... };
+   window.saveMsg = function saveMsg(idx) { ... };
+   window.cancelEdit = function cancelEdit(idx) { ... };
+   NEVER name a function "postMessage" — it conflicts with the browser's built-in window.postMessage API. Use "submitMessage" or "sendMessage" instead.
 
 LIFECYCLE (parse the actual event date from the prompt):
 - Before event day: RSVP open, Photos open, Messages open
@@ -58,7 +65,7 @@ SECTIONS:
    JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤3MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:cover height:180px in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
 4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
-6. Message Wall — input + Submit button (hidden if locked). List of messages, each with Edit (inline) and Delete. All persists via localStorage key "messages_[eventId]".`;
+6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). List of messages, each with Edit (inline textarea) and Delete buttons. All persists via localStorage key "messages_[eventId]". Name field optional (default "Guest"). IMPORTANT: the edit/delete/save/cancel functions MUST be on window (see JS RULES above).`;
 
 function slugify(str) {
   return (str || '')
