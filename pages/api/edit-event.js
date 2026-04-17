@@ -37,16 +37,41 @@ function fixInlineHandlerScoping(html) {
   const funcNames = new Set();
   for (const m of html.matchAll(/\bon\w+="([^"]+)"/g)) {
     const fn = m[1].trim().match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
-    if (fn) funcNames.add(fn[1]);
+    if (fn && fn[1] !== 'event' && fn[1] !== 'return') funcNames.add(fn[1]);
   }
   if (!funcNames.size) return html;
-  const assignments = [...funcNames].map(n => `if(typeof ${n}==='function')window.${n}=${n};`).join('');
-  const scriptEnd = html.lastIndexOf('</script>');
-  if (scriptEnd === -1) return html;
-  const beforeScript = html.slice(0, scriptEnd);
-  const lastClose = beforeScript.lastIndexOf('});');
-  if (lastClose === -1) return html;
-  return beforeScript.slice(0, lastClose) + assignments + '\n' + beforeScript.slice(lastClose) + html.slice(scriptEnd);
+  let scriptContentStart = -1, scriptContentEnd = -1;
+  const scriptTagRe = /<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi;
+  let sm;
+  while ((sm = scriptTagRe.exec(html)) !== null) {
+    const openEnd = html.indexOf('>', sm.index) + 1;
+    const closeStart = sm.index + sm[0].lastIndexOf('<');
+    if (html.slice(openEnd, closeStart).includes('DOMContentLoaded')) {
+      scriptContentStart = openEnd;
+      scriptContentEnd = closeStart;
+    }
+  }
+  if (scriptContentStart === -1) return html;
+  const sc = html.slice(scriptContentStart, scriptContentEnd);
+  const dclRe = /document\.addEventListener\s*\(\s*['"]DOMContentLoaded['"]\s*,\s*(?:function\s*\([^)]*\)|\([^)]*\)\s*=>)\s*\{/;
+  const dclMatch = dclRe.exec(sc);
+  if (!dclMatch) return html;
+  let depth = 1;
+  let i = dclMatch.index + dclMatch[0].length;
+  while (i < sc.length && depth > 0) {
+    const ch = sc[i];
+    if (ch === '{') { depth++; }
+    else if (ch === '}') { depth--; if (depth === 0) break; }
+    else if (ch === '/' && sc[i + 1] === '/') { const nl = sc.indexOf('\n', i); i = nl === -1 ? sc.length - 1 : nl; }
+    else if (ch === '/' && sc[i + 1] === '*') { const end = sc.indexOf('*/', i + 2); i = end === -1 ? sc.length - 1 : end + 1; }
+    else if (ch === '"' || ch === "'") { const q = ch; i++; while (i < sc.length && sc[i] !== q) { if (sc[i] === '\\') i++; i++; } }
+    else if (ch === '`') { i++; while (i < sc.length && sc[i] !== '`') { if (sc[i] === '\\') i++; i++; } }
+    i++;
+  }
+  i--;
+  const assignments = '\n' + [...funcNames].map(n => `  if(typeof ${n}==='function')window.${n}=${n};`).join('\n') + '\n';
+  const newSc = sc.slice(0, i) + assignments + sc.slice(i);
+  return html.slice(0, scriptContentStart) + newSc + html.slice(scriptContentEnd);
 }
 
 function extractHtml(raw) {

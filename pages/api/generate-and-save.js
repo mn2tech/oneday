@@ -93,30 +93,63 @@ async function getUniqueId(supabase, meta) {
 }
 
 function fixInlineHandlerScoping(html) {
-  // Find all function names used in inline event handlers (onclick, onchange, onsubmit, etc.)
+  // 1. Collect function names from inline event handlers
   const funcNames = new Set();
   for (const m of html.matchAll(/\bon\w+="([^"]+)"/g)) {
     const fn = m[1].trim().match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/);
-    if (fn) funcNames.add(fn[1]);
+    if (fn && fn[1] !== 'event' && fn[1] !== 'return') funcNames.add(fn[1]);
   }
   if (!funcNames.size) return html;
 
-  // Build window assignment lines — safe no-ops if the fn isn't defined
-  const assignments = [...funcNames]
-    .map(n => `if(typeof ${n}==='function')window.${n}=${n};`)
-    .join('');
+  // 2. Find the script block that contains DOMContentLoaded
+  let scriptContentStart = -1, scriptContentEnd = -1;
+  const scriptTagRe = /<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi;
+  let sm;
+  while ((sm = scriptTagRe.exec(html)) !== null) {
+    const openEnd = html.indexOf('>', sm.index) + 1;
+    const closeStart = sm.index + sm[0].lastIndexOf('<');
+    if (html.slice(openEnd, closeStart).includes('DOMContentLoaded')) {
+      scriptContentStart = openEnd;
+      scriptContentEnd = closeStart;
+    }
+  }
+  if (scriptContentStart === -1) return html;
+  const sc = html.slice(scriptContentStart, scriptContentEnd);
 
-  // Inject just before the last }); in the script — which is typically
-  // the closing of the DOMContentLoaded wrapper. Functions defined inside
-  // that wrapper are still in scope here, so window.X = X works.
-  const scriptEnd = html.lastIndexOf('</script>');
-  if (scriptEnd === -1) return html;
+  // 3. Find the DOMContentLoaded opening { using a regex
+  const dclRe = /document\.addEventListener\s*\(\s*['"]DOMContentLoaded['"]\s*,\s*(?:function\s*\([^)]*\)|\([^)]*\)\s*=>)\s*\{/;
+  const dclMatch = dclRe.exec(sc);
+  if (!dclMatch) return html;
 
-  const beforeScript = html.slice(0, scriptEnd);
-  const lastClose = beforeScript.lastIndexOf('});');
-  if (lastClose === -1) return html;
+  // 4. Walk forward with brace counting to find the matching closing }
+  let depth = 1;
+  let i = dclMatch.index + dclMatch[0].length; // first char after opening {
+  while (i < sc.length && depth > 0) {
+    const ch = sc[i];
+    if (ch === '{') { depth++; }
+    else if (ch === '}') { depth--; if (depth === 0) break; }
+    else if (ch === '/' && sc[i + 1] === '/') { // line comment
+      const nl = sc.indexOf('\n', i); i = nl === -1 ? sc.length - 1 : nl;
+    } else if (ch === '/' && sc[i + 1] === '*') { // block comment
+      const end = sc.indexOf('*/', i + 2); i = end === -1 ? sc.length - 1 : end + 1;
+    } else if (ch === '"' || ch === "'") { // string literal
+      const q = ch; i++;
+      while (i < sc.length && sc[i] !== q) { if (sc[i] === '\\') i++; i++; }
+    } else if (ch === '`') { // template literal (simplified)
+      i++;
+      while (i < sc.length && sc[i] !== '`') { if (sc[i] === '\\') i++; i++; }
+    }
+    i++;
+  }
+  i--; // i now points to the closing }
 
-  return beforeScript.slice(0, lastClose) + assignments + '\n' + beforeScript.slice(lastClose) + html.slice(scriptEnd);
+  // 5. Inject window.X = X assignments just before the closing }
+  const assignments = '\n' + [...funcNames]
+    .map(n => `  if(typeof ${n}==='function')window.${n}=${n};`)
+    .join('\n') + '\n';
+
+  const newSc = sc.slice(0, i) + assignments + sc.slice(i);
+  return html.slice(0, scriptContentStart) + newSc + html.slice(scriptContentEnd);
 }
 
 function extractHtml(raw) {
