@@ -36,14 +36,19 @@ const SYSTEM_PROMPT = `You are an expert web developer and event designer. Gener
 
 RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
+STORAGE KEYS (must match the live URL path — use this exact pattern everywhere in your script):
+const eventId = (location.pathname.split('/').pop() || 'event').slice(0, 30);
+localStorage: photos_\${eventId}_0 and photos_\${eventId}_1 for the two photo sections (0-based index), rsvps_\${eventId}, messages_\${eventId}, poll_\${eventId}. Never use a hardcoded fake id.
+
 CRITICAL JS RULES:
 1. NEVER use inline event handlers in HTML attributes (no onclick="", no onchange="", no onsubmit=""). Bind ALL events with addEventListener() or element.onclick = fn inside DOMContentLoaded.
-2. Any function called from dynamically-generated innerHTML (e.g. edit/delete buttons built inside renderMessages) MUST be assigned to window so it is globally accessible:
+2. RSVP form: use form.addEventListener('submit', function(e){ e.preventDefault(); ... }) — never onsubmit="".
+3. Any function called from dynamically-generated innerHTML (e.g. edit/delete buttons built inside renderMessages) MUST be assigned to window so it is globally accessible:
    window.editMsg = function editMsg(idx) { ... };
    window.deleteMsg = function deleteMsg(idx) { ... };
    window.saveMsg = function saveMsg(idx) { ... };
    window.cancelEdit = function cancelEdit(idx) { ... };
-   NEVER name a function "postMessage" — it conflicts with the browser's built-in window.postMessage API. Use "submitMessage" or "sendMessage" instead.
+   NEVER name a function "postMessage" — it conflicts with the browser's built-in window.postMessage API. Use "submitMessage" or "sendMessage" instead, and assign them to window (e.g. window.submitMessage = function submitMessage() { ... }).
 
 LIFECYCLE (parse the actual event date from the prompt):
 - Before event day: RSVP open, Photos open, Messages open
@@ -185,8 +190,9 @@ function injectPhotoUpload(html) {
     '});',
     '}',
     '});',
-    // Step 3: Attach our change handlers + render
+    // Step 3: Attach our change handlers + render (skip if already wired — avoids double-save with serve-time engine)
     'document.querySelectorAll("input[type=\\"file\\"]").forEach(function(inp,idx){',
+    'if(inp.dataset.onedayInjected)return;inp.dataset.onedayInjected="1";',
     'var key="photos_"+eid+"_"+idx;',
     'var cont=inp.closest("section")||inp.closest("[class*=photo]")||inp.closest("[id*=photo]")||inp.parentElement;',
     'var grid=cont.querySelector("[id*=grid],[class*=grid],[class*=photo-list],[class*=photos]");',

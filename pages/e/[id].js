@@ -82,8 +82,21 @@ const PHOTO_ENGINE = `<script>
       // Create a hidden file input right after the button
       var inp=document.createElement('input');
       inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+      inp.setAttribute('data-oneday-engine','1');
       inp.style.cssText='position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;';
       fb.parentNode.insertBefore(inp,fb.nextSibling);
+
+      // Hide Claude's original file inputs in this section so only our picker + keys are used
+      var secHide=fb.closest('section')||fb.parentElement;
+      if(secHide){
+        secHide.querySelectorAll('input[type=file]').forEach(function(oldInp){
+          if(!oldInp.getAttribute('data-oneday-engine')){
+            oldInp.style.setProperty('display','none','important');
+            oldInp.setAttribute('aria-hidden','true');
+            oldInp.setAttribute('tabindex','-1');
+          }
+        });
+      }
 
       // Button click → open our picker
       fb.style.cursor='pointer';
@@ -161,79 +174,65 @@ const PHOTO_ENGINE = `<script>
   });
 
   // ── RSVP + Message Wall rescue ───────────────────────────────────────────
-  // Runs AFTER Claude's DOMContentLoaded (ours fires second).
-  // Fixes two failure modes:
-  //   1. window.postMessage was not overridden (native API called instead of Claude's submit fn)
-  //   2. edit/delete/save/cancel fns inside DOMContentLoaded closure not exposed on window
-
-  // Generic onclick dispatcher: intercepts any [onclick] button whose function
-  // is not yet callable, and calls the matching window.fn if it exists.
-  function wireOnclickBtn(btn) {
-    if (btn.dataset.onedayWired) return;
-    btn.dataset.onedayWired = '1';
-    var oc = btn.getAttribute('onclick') || '';
-    if (!oc) return;
-    var m = oc.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)/);
-    if (!m) return;
-    var fnName = m[1], rawArgs = m[2] || '';
-    // Replace inline onclick with a proper addEventListener so it works
-    // even if the function wasn't on window at HTML-parse time
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var fn = window[fnName];
-      if (typeof fn !== 'function') return;
-      var args = rawArgs.split(',').map(function(a) {
-        a = a.trim();
-        if (a === '') return undefined;
-        if (!isNaN(a)) return Number(a);
-        return a.replace(/^['"]|['"]$/g, '');
-      }).filter(function(a) { return a !== undefined; });
-      fn.apply(null, args);
-    });
-  }
-
-  // Wire existing static buttons with onclick attributes
-  document.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
-
-  // Watch for dynamically-rendered buttons (message edit/delete/save/cancel)
-  var msgContainers = document.querySelectorAll(
-    '#msgList,#messageList,#msg-list,[class*="msg-list"],[class*="message-list"],[id*="messages"]'
-  );
-  msgContainers.forEach(function(container) {
-    // Wire any buttons already inside
-    container.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
-    // Watch for new ones added by renderMessages()
-    new MutationObserver(function(mutations) {
-      mutations.forEach(function(mut) {
-        mut.addedNodes.forEach(function(node) {
-          if (node.nodeType !== 1) return;
-          if (node.matches && node.matches('[onclick]')) wireOnclickBtn(node);
-          node.querySelectorAll && node.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+  // Must run AFTER other DOMContentLoaded handlers (Claude's) so window.submitMessage / editMsg exist.
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      function wireOnclickBtn(btn) {
+        if (btn.dataset.onedayWired) return;
+        btn.dataset.onedayWired = '1';
+        var oc = btn.getAttribute('onclick') || '';
+        if (!oc) return;
+        var m = oc.trim().match(/^([A-Za-z_$][A-Za-z0-9_$]*)\\s*\\(([^)]*)\\)/);
+        if (!m) return;
+        var fnName = m[1], rawArgs = m[2] || '';
+        btn.removeAttribute('onclick');
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var fn = window[fnName];
+          if (typeof fn !== 'function') return;
+          var args = rawArgs.split(',').map(function(a) {
+            a = a.trim();
+            if (a === '') return undefined;
+            if (!isNaN(a)) return Number(a);
+            return a.replace(/^['"]|['"]$/g, '');
+          }).filter(function(a) { return a !== undefined; });
+          fn.apply(null, args);
         });
+      }
+
+      document.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+
+      var msgContainers = document.querySelectorAll(
+        '#msgList,#messageList,#msg-list,[class*="msg-list"],[class*="message-list"],[id*="messages"],[class*="message-wall"],[id*="message-wall"],[class*="guest-msg"],[id*="guest-msg"],section[class*="message"]'
+      );
+      msgContainers.forEach(function(container) {
+        container.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+        new MutationObserver(function(mutations) {
+          mutations.forEach(function(mut) {
+            mut.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              if (node.matches && node.matches('[onclick]')) wireOnclickBtn(node);
+              node.querySelectorAll && node.querySelectorAll('[onclick]').forEach(wireOnclickBtn);
+            });
+          });
+        }).observe(container, { childList: true, subtree: true });
       });
-    }).observe(container, { childList: true, subtree: true });
+
+      var msgSubmitBtns = document.querySelectorAll(
+        '.btn-post,.btn-send,.btn-submit-msg,[class*="btn-post"],[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"],[id*="postMessage"],button[class*="post-message"]'
+      );
+      msgSubmitBtns.forEach(function(btn) {
+        if (btn.dataset.onedayWired) return;
+        var fn = window.submitMessage || window.sendMessage || window.addMessage ||
+                  window.submitGuestMessage || window.postGuestMessage;
+        if (typeof fn === 'function') {
+          btn.dataset.onedayWired = '1';
+          btn.addEventListener('click', function(e) { e.preventDefault(); fn(); });
+        }
+      });
+    }, 0);
   });
 
-  // Fix postMessage conflict: if Claude named their submit fn "postMessage"
-  // and put it in DOMContentLoaded, window.postMessage is still the native API.
-  // Detect: if there's a Post/Send button whose click does nothing, find the fn.
-  // We can't recover the closed-over fn, but we can try common alternatives.
-  var msgSubmitBtns = document.querySelectorAll(
-    '.btn-post,.btn-send,.btn-submit-msg,[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"]'
-  );
-  msgSubmitBtns.forEach(function(btn) {
-    if (btn.dataset.onedayWired) return;
-    // Check if a submit-style function exists on window under common names
-    var fn = window.submitMessage || window.sendMessage || window.addMessage ||
-              window.submitGuestMessage || window.postGuestMessage;
-    if (typeof fn === 'function') {
-      btn.dataset.onedayWired = '1';
-      btn.addEventListener('click', function(e) { e.preventDefault(); fn(); });
-    }
-  });
-
-});
 })();
 <\/script>`;
 
