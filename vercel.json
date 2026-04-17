@@ -1,10 +1,10 @@
 {
   "functions": {
     "pages/api/generate-and-save.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "pages/api/edit-event.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

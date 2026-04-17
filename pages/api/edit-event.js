@@ -105,7 +105,7 @@ export default async function handler(req, res) {
     // 2. Call Claude to apply the changes
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 5000,
+      max_tokens: 8000,
       system: EDIT_SYSTEM_PROMPT,
       messages: [
         {
