@@ -54,7 +54,14 @@ export default async function handler(req, res) {
 
   if (countErr) {
     console.error('[event-photos/register] count', countErr);
-    return res.status(500).json({ error: 'Database error.' });
+    const msg = String(countErr.message || countErr);
+    if (msg.includes('does not exist') || msg.includes('schema cache')) {
+      return res.status(500).json({
+        error: 'Database table missing. Run the event_photos SQL in Supabase (see supabase-setup.sql).',
+        code: 'TABLE_MISSING',
+      });
+    }
+    return res.status(500).json({ error: 'Database error.', code: 'DB_COUNT' });
   }
 
   if ((count ?? 0) >= MAX_PER_SECTION) {
@@ -75,7 +82,34 @@ export default async function handler(req, res) {
 
   if (insErr) {
     console.error('[event-photos/register] insert', insErr);
-    return res.status(500).json({ error: 'Failed to save photo metadata.' });
+    const code = insErr.code;
+    const msg = String(insErr.message || insErr);
+    if (msg.includes('does not exist') || msg.includes('schema cache')) {
+      return res.status(500).json({
+        error: 'Database table missing. Run the event_photos SQL in Supabase (see supabase-setup.sql).',
+        code: 'TABLE_MISSING',
+      });
+    }
+    if (code === '23503' || msg.includes('foreign key')) {
+      return res.status(400).json({
+        error: 'Event id is not in the database. Regenerate or save the event, then try again.',
+        code: 'EVENT_FK',
+      });
+    }
+    if (msg.includes('permission denied') || msg.includes('row-level security')) {
+      return res.status(500).json({
+        error:
+          'Database blocked the insert. Set SUPABASE_SERVICE_ROLE_KEY in Vercel (not only the anon key).',
+        code: 'RLS_OR_KEY',
+      });
+    }
+    return res.status(500).json({
+      error: 'Failed to save photo metadata.',
+      code: 'INSERT_FAILED',
+      postgresCode: insErr.code,
+      hint: insErr.hint || null,
+      message: msg.slice(0, 240),
+    });
   }
 
   let url = objectPublicUrl(key);
