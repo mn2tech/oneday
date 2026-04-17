@@ -50,7 +50,7 @@ const CARD_ELEMENT_OPTIONS = {
 };
 
 // Inner form component (needs Stripe hooks)
-function CheckoutForm({ plan, email, prompt, onSuccess }) {
+function CheckoutForm({ plan, email, onSuccess }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -146,7 +146,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState('');
   const [eventMeta, setEventMeta] = useState({}); // { names, eventType, hostedBy }
   const [email, setEmail] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('premium');
+  const [selectedPlan, setSelectedPlan] = useState('standard');
   const [generationStatus, setGenerationStatus] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [doneUrl, setDoneUrl] = useState('');
@@ -295,7 +295,7 @@ export default function Home() {
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Build your event</h2>
               <p className={styles.cardSubtitle}>
-                Fill in the details below — we'll check for anything missing before you continue.
+                Fill in the details below — we&apos;ll check for anything missing before you continue.
               </p>
 
               <input
@@ -413,7 +413,6 @@ export default function Home() {
                 <CheckoutForm
                   plan={selectedPlan}
                   email={email}
-                  prompt={prompt}
                   onSuccess={handlePaymentSuccess}
                 />
               </Elements>

@@ -103,7 +103,7 @@ export default function EditPage() {
         <div style={styles.card}>
           <h1 style={styles.title}>Edit your event</h1>
           <p style={styles.subtitle}>
-            Describe what you'd like to change — AI will update your page instantly.
+            Describe what you&apos;d like to change — AI will update your page instantly.
           </p>
 
           <form onSubmit={handleSubmit}>
