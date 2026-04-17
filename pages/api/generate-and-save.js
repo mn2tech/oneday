@@ -36,7 +36,7 @@ const SYSTEM_PROMPT = `You are an expert web developer and event designer. Gener
 
 RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explanation. Google Fonts via @import. Mobile-first. All CSS in <style>, all JS in <script> before </body>. Close all tags, end with </html>. Keep CSS minimal.
 
-CRITICAL JS RULE: NEVER define functions inside DOMContentLoaded, window.onload, or any other wrapper. ALL functions must be declared at the TOP LEVEL of the <script> tag so inline handlers like onclick="fn()" and onchange="fn()" can access them. Use DOMContentLoaded ONLY for initialization code that doesn't define functions.
+CRITICAL JS RULE: NEVER use inline event handlers in HTML (no onclick="", no onchange="", no onsubmit=""). ALL event binding must be done in JavaScript using addEventListener or element.onclick = function(){}. This allows all code to safely live inside DOMContentLoaded.
 
 LIFECYCLE (parse the actual event date from the prompt):
 - Before event day: RSVP open, Photos open, Messages open
