@@ -336,7 +336,7 @@ export default async function handler(req, res) {
     });
 
     const rawHtml = message.content[0]?.text || '';
-    const html = injectPhotoUpload(fixInlineHandlerScoping(extractHtml(rawHtml)));
+    const html = fixInlineHandlerScoping(extractHtml(rawHtml));
 
     if (!html.toLowerCase().includes('<!doctype')) {
       console.error('[generate-and-save] AI did not return valid HTML');

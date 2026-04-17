@@ -221,7 +221,7 @@ export default async function handler(req, res) {
     });
 
     const rawHtml = message.content[0]?.text || '';
-    const updatedHtml = injectPhotoUpload(fixInlineHandlerScoping(extractHtml(rawHtml)));
+    const updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
 
     if (!updatedHtml.toLowerCase().includes('<!doctype')) {
       return res.status(500).json({ error: 'AI returned invalid HTML. Please try again.' });
