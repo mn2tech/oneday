@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { INTERACTIONS_CLOUD } from './interactionsCloudHtml';
+import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
 
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
