@@ -208,6 +208,14 @@ const PHOTO_ENGINE_LEGACY = `<script>
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(bootPhotoLegacy, 0);
     setTimeout(bootPhotoLegacy, 200);
+    setTimeout(bootPhotoLegacy, 500);
+    setTimeout(bootPhotoLegacy, 1200);
+    var n=0;
+    var iv=setInterval(function(){
+      bootPhotoLegacy();
+      n++;
+      if(n>=30) clearInterval(iv);
+    }, 200);
   });
   window.addEventListener('load', function(){ setTimeout(bootPhotoLegacy, 0); });
 
@@ -450,6 +458,14 @@ const PHOTO_ENGINE_S3 = `<script>
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(bootPhotoS3, 0);
     setTimeout(bootPhotoS3, 200);
+    setTimeout(bootPhotoS3, 500);
+    setTimeout(bootPhotoS3, 1200);
+    var n=0;
+    var iv=setInterval(function(){
+      bootPhotoS3();
+      n++;
+      if(n>=30) clearInterval(iv);
+    }, 200);
   });
   window.addEventListener('load', function(){ setTimeout(bootPhotoS3, 0); });
 
