@@ -39,7 +39,7 @@ function getSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
-  document.addEventListener('DOMContentLoaded', function(){
+  function bootPhotoLegacy(){
     var eid = (window.location.pathname.split('/').pop() || 'event').slice(0,30);
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
@@ -90,9 +90,16 @@ const PHOTO_ENGINE_LEGACY = `<script>
         c.indexOf('upload-btn')!==-1
       );
     }
+    function alreadyWired(el){
+      var n=el.nextElementSibling;
+      return n&&n.getAttribute&&n.getAttribute('data-oneday-engine')==='1';
+    }
     var buttons=Array.from(
       document.querySelectorAll('button,label,a,[role="button"]')
-    ).filter(isPhotoUploadControl);
+    ).filter(function(el){
+      if(alreadyWired(el)) return false;
+      return isPhotoUploadControl(el);
+    });
 
     // 4. Wire each button
     buttons.forEach(function(btn, si){
@@ -196,7 +203,13 @@ const PHOTO_ENGINE_LEGACY = `<script>
       });
     });
 
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(bootPhotoLegacy, 0);
+    setTimeout(bootPhotoLegacy, 200);
   });
+  window.addEventListener('load', function(){ setTimeout(bootPhotoLegacy, 0); });
 
   // ── RSVP + Message Wall rescue ───────────────────────────────────────────
   // Must run AFTER other DOMContentLoaded handlers (Claude's) so window.submitMessage / editMsg exist.
@@ -264,7 +277,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 /** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
-  document.addEventListener('DOMContentLoaded', function(){
+  function bootPhotoS3(){
     var eid = (window.__ONEDAY_EID__ || window.location.pathname.split('/').pop() || 'event').slice(0,80);
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
@@ -356,7 +369,14 @@ const PHOTO_ENGINE_S3 = `<script>
         c.indexOf('upload-btn')!==-1
       );
     }
-    var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoUploadControl);
+    function alreadyWired(el){
+      var n=el.nextElementSibling;
+      return n&&n.getAttribute&&n.getAttribute('data-oneday-engine')==='1';
+    }
+    var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
+      if(alreadyWired(el)) return false;
+      return isPhotoUploadControl(el);
+    });
 
     buttons.forEach(function(btn, si){
       var fb=btn.cloneNode(true);
@@ -425,7 +445,13 @@ const PHOTO_ENGINE_S3 = `<script>
       });
     });
 
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(bootPhotoS3, 0);
+    setTimeout(bootPhotoS3, 200);
   });
+  window.addEventListener('load', function(){ setTimeout(bootPhotoS3, 0); });
 
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(function(){
