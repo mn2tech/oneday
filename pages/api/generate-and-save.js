@@ -43,7 +43,7 @@ RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explan
 
 STORAGE KEYS (must match the live URL path — use this exact pattern everywhere in your script):
 const eventId = (location.pathname.split('/').pop() || 'event').slice(0, 30);
-localStorage: photos_\${eventId}_0 and photos_\${eventId}_1 for the two photo sections (0-based index), rsvps_\${eventId}, poll_\${eventId}. Do NOT read or write localStorage for the message wall on OneDay — the host syncs messages via Supabase (event_messages); keep #msgList empty on first paint and assign window.submitMessage / editMsg / deleteMsg only (no messages_* localStorage). Never use a hardcoded fake id.
+localStorage: photos_\${eventId}_0 and photos_\${eventId}_1 for the two photo sections (0-based index) only. Do NOT use localStorage for messages, RSVP, or poll on OneDay — the host syncs via Supabase (event_messages, event_rsvps, event_poll_votes). Keep #msgList empty on first paint; wire submitMessage / editMsg / deleteMsg. For RSVP use #rsvp with name/adults/kids and window.handleRSVP; for poll use #pollOpt0.. and window.vote — no rsvps_* / poll_* localStorage. Never use a hardcoded fake id.
 
 CRITICAL JS RULES:
 1. NEVER use inline event handlers in HTML attributes (no onclick="", no onchange="", no onsubmit=""). Bind ALL events with addEventListener() or element.onclick = fn inside DOMContentLoaded.
@@ -73,8 +73,8 @@ SECTIONS:
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
    HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
    JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤5MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
-4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
-5. Poll — 2 options, % bars, localStorage, read-only if locked
+4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Do NOT use localStorage for RSVP on OneDay (host uses event_rsvps). Wire window.handleRSVP; show live totals in #rsvpCount when the host injects sync.
+5. Poll — 2+ options with #pollOpt0, pollCount0, pollBar0, etc. Do NOT use localStorage for poll on OneDay (host uses event_poll_votes). Wire window.vote(0), window.vote(1), … read-only UI after vote if locked.
 6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). Container #messages with #msgText, #msgName, #msgList (start empty). Do NOT use localStorage for messages. Assign window.submitMessage to post (host replaces with shared API), window.editMsg / deleteMsg / saveMsg / cancelEdit for row actions. Name field optional (default "Guest"). IMPORTANT: edit/delete/save/cancel MUST be on window (see JS RULES above).`;
 
 function slugify(str) {

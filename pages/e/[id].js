@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
-import { MESSAGE_WALL_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
+import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
 
 function injectAfterBodyOpen(html, snippet) {
@@ -628,7 +628,7 @@ export async function getServerSideProps({ params, res }) {
 
   let html = data.html;
   if (useCloudIx) {
-    html = injectAfterBodyOpen(html, MESSAGE_WALL_LOCALSTORAGE_BLOCK);
+    html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
   }
   const bodyIdx = html.lastIndexOf('</body>');
   html =
