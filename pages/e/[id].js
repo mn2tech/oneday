@@ -1,6 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
+import { MESSAGE_WALL_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
+
+function injectAfterBodyOpen(html, snippet) {
+  const lower = html.toLowerCase();
+  const idx = lower.indexOf('<body');
+  if (idx === -1) return html;
+  const gt = html.indexOf('>', idx);
+  if (gt === -1) return html;
+  const insertAt = gt + 1;
+  return html.slice(0, insertAt) + snippet + html.slice(insertAt);
+}
 
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
@@ -614,10 +625,16 @@ export async function getServerSideProps({ params, res }) {
     '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
-  const bodyIdx = data.html.lastIndexOf('</body>');
-  const html = bodyIdx !== -1
-    ? data.html.slice(0, bodyIdx) + injection + '\n</body>' + data.html.slice(bodyIdx + 7)
-    : data.html + injection;
+
+  let html = data.html;
+  if (useCloudIx) {
+    html = injectAfterBodyOpen(html, MESSAGE_WALL_LOCALSTORAGE_BLOCK);
+  }
+  const bodyIdx = html.lastIndexOf('</body>');
+  html =
+    bodyIdx !== -1
+      ? html.slice(0, bodyIdx) + injection + '\n</body>' + html.slice(bodyIdx + 7)
+      : html + injection;
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');

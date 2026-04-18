@@ -18,7 +18,12 @@ function getSupabase() {
   );
 }
 function getResend() {
-  return new Resend(process.env.RESEND_API_KEY);
+  const key = process.env.RESEND_API_KEY;
+  return key ? new Resend(key) : null;
+}
+
+function confirmationFromAddress() {
+  return process.env.RESEND_FROM || 'OneDay <noreply@getoneday.com>';
 }
 
 function getMissingEnvVars() {
@@ -38,7 +43,7 @@ RULES: Return ONLY raw HTML starting with <!DOCTYPE html>. No markdown or explan
 
 STORAGE KEYS (must match the live URL path — use this exact pattern everywhere in your script):
 const eventId = (location.pathname.split('/').pop() || 'event').slice(0, 30);
-localStorage: photos_\${eventId}_0 and photos_\${eventId}_1 for the two photo sections (0-based index), rsvps_\${eventId}, messages_\${eventId}, poll_\${eventId}. Never use a hardcoded fake id.
+localStorage: photos_\${eventId}_0 and photos_\${eventId}_1 for the two photo sections (0-based index), rsvps_\${eventId}, poll_\${eventId}. Do NOT read or write localStorage for the message wall on OneDay — the host syncs messages via Supabase (event_messages); keep #msgList empty on first paint and assign window.submitMessage / editMsg / deleteMsg only (no messages_* localStorage). Never use a hardcoded fake id.
 
 CRITICAL JS RULES:
 1. NEVER use inline event handlers in HTML attributes (no onclick="", no onchange="", no onsubmit=""). Bind ALL events with addEventListener() or element.onclick = fn inside DOMContentLoaded.
@@ -70,7 +75,7 @@ SECTIONS:
    JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤5MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
 4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
-6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). List of messages, each with Edit (inline textarea) and Delete buttons. All persists via localStorage key "messages_[eventId]". Name field optional (default "Guest"). IMPORTANT: the edit/delete/save/cancel functions MUST be on window (see JS RULES above).`;
+6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). Container #messages with #msgText, #msgName, #msgList (start empty). Do NOT use localStorage for messages. Assign window.submitMessage to post (host replaces with shared API), window.editMsg / deleteMsg / saveMsg / cancelEdit for row actions. Name field optional (default "Guest"). IMPORTANT: edit/delete/save/cancel MUST be on window (see JS RULES above).`;
 
 function slugify(str) {
   return (str || '')
@@ -262,10 +267,13 @@ function anthropicModel() {
 }
 
 async function sendConfirmationEmail(resend, email, eventUrl) {
-  if (!process.env.RESEND_API_KEY) return; // Skip if not configured
+  if (!process.env.RESEND_API_KEY || !resend) {
+    console.warn('[generate-and-save] Confirmation email skipped: set RESEND_API_KEY in production.');
+    return;
+  }
   try {
     await resend.emails.send({
-      from: 'OneDay <noreply@getoneday.com>',
+      from: confirmationFromAddress(),
       to: email,
       subject: 'Your OneDay event page is live 🎉',
       html: `
@@ -355,6 +363,7 @@ export default async function handler(req, res) {
 
       if (existing) {
         const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${existing.id}`;
+        await sendConfirmationEmail(getResend(), email, appUrl);
         return res.status(200).json({ id: existing.id, url: appUrl });
       }
     }
