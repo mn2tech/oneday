@@ -70,11 +70,11 @@ create index if not exists idx_event_messages_event_created
 
 alter table event_messages enable row level security;
 
--- Poll: one row per voter per event (choice 0 or 1). Counts derived in the API.
+-- Poll: one row per voter per event (choice index 0 .. MAX-1). Counts derived in the API.
 create table if not exists event_poll_votes (
   event_id  text        not null references event_apps (id) on delete cascade,
   voter_id  text        not null,
-  choice    smallint    not null check (choice in (0, 1)),
+  choice    smallint    not null check (choice >= 0 and choice < 12),
   created_at timestamptz default now(),
   primary key (event_id, voter_id)
 );

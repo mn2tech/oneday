@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
+import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
 
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
@@ -11,7 +12,7 @@ function eventPhotosUseS3() {
   );
 }
 
-/** Shared message wall via Supabase when service role is set (poll/RSVP stay in page HTML). */
+/** Shared messages + poll + RSVPs via Supabase when service role is set (same as shared photos). */
 function eventInteractionsUseCloud() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -35,13 +36,13 @@ function getSupabase() {
 //  • cloneNode() strips old addEventListener listeners → no double-picker problem
 //  • Forward DOM scan (next siblings) finds each section's OWN grid correctly
 //  • data-oneday-managed prevents two buttons from sharing one grid
-//  • photos_<eid>_<idx> key is stable (button order = section order)
+//  • photos_<eid>_global key for single-gallery mode
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
   function bootPhotoLegacy(){
     var eid = (window.location.pathname.split('/').pop() || 'event').slice(0,30);
-    var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;';
+    var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
@@ -84,6 +85,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
       var c=(el.getAttribute('class')||'').toLowerCase();
       return (
+        ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
@@ -101,9 +103,35 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return isPhotoUploadControl(el);
     });
 
+    // Fallback for templates that have a photo grid but no detectable upload control text/class.
+    if(!buttons.length){
+      Array.from(document.querySelectorAll(GSEL)).forEach(function(grid){
+        var host = grid.closest('section') || grid.parentElement;
+        if(!host) return;
+        var existing = host.querySelector('button[class*="upload"],label[class*="upload"],button[class*="photo"],label[class*="photo"]');
+        var ctl = existing;
+        if(!ctl){
+          ctl = document.createElement('button');
+          ctl.type = 'button';
+          ctl.className = 'upload-btn oneday-upload-fallback';
+          ctl.textContent = 'Add Photos';
+          grid.parentNode.insertBefore(ctl, grid.nextSibling);
+        }
+        if(!alreadyWired(ctl)) buttons.push(ctl);
+      });
+    }
+
     // 4. Wire each button
-    buttons.forEach(function(btn, si){
-      var key='photos_'+eid+'_'+si;
+    if (!buttons.length) return;
+
+    var primaryBtn = buttons[0];
+    buttons.slice(1).forEach(function(extraBtn){
+      extraBtn.style.setProperty('display', 'none', 'important');
+      extraBtn.setAttribute('aria-hidden', 'true');
+    });
+
+    [primaryBtn].forEach(function(btn){
+      var key='photos_'+eid+'_global';
 
       // Clone to wipe ALL existing event listeners (prevents double file-picker)
       var fb=btn.cloneNode(true);
@@ -132,6 +160,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
       // Button click → open our picker
       fb.style.cursor='pointer';
+      fb.textContent = 'Add Photos';
       fb.onclick=function(e){ e.preventDefault(); inp.click(); };
 
       // Find or create this section's grid
@@ -151,10 +180,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
         grid.innerHTML='';
         saved.forEach(function(src,i){
           var w=document.createElement('div');
-          w.style.cssText='position:relative;min-height:120px;max-height:420px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;padding:6px;box-sizing:border-box;';
+          w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;box-sizing:border-box;';
           var im=document.createElement('img');
           im.src=src;
-          im.style.cssText='width:100%;max-width:100%;max-height:360px;height:auto;object-fit:contain;object-position:center;border-radius:6px;display:block;';
+          im.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;border-radius:10px;display:block;';
           var b=document.createElement('button');
           b.innerHTML='&times;';
           b.title='Remove photo';
@@ -181,13 +210,13 @@ const PHOTO_ENGINE_LEGACY = `<script>
         if(!files.length) return;
         var arr=[];
         try{ arr=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
-        if(arr.length+files.length>20){
-          alert('Max 20 photos per section.'); this.value=''; return;
+        if(arr.length+files.length>${MAX_EVENT_PHOTOS}){
+          alert('Max ${MAX_EVENT_PHOTOS} photos per event.'); this.value=''; return;
         }
         var pending=files.length;
         files.forEach(function(file){
-          if(file.size>3145728){
-            alert(file.name+' exceeds 3 MB — please resize it first.');
+          if(file.size>${MAX_PHOTO_BYTES}){
+            alert(file.name+' exceeds 5 MB — please resize it first.');
             pending--; if(pending<=0) render(); return;
           }
           var r=new FileReader();
@@ -287,7 +316,7 @@ const PHOTO_ENGINE_S3 = `<script>
 (function(){
   function bootPhotoS3(){
     var eid = (window.__ONEDAY_EID__ || window.location.pathname.split('/').pop() || 'event').slice(0,80);
-    var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;';
+    var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
@@ -335,11 +364,11 @@ const PHOTO_ENGINE_S3 = `<script>
           grid.innerHTML='';
           photos.forEach(function(p){
             var w=document.createElement('div');
-            w.style.cssText='position:relative;min-height:120px;max-height:420px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;padding:6px;box-sizing:border-box;';
+            w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;box-sizing:border-box;';
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
-            im.style.cssText='width:100%;max-width:100%;max-height:360px;height:auto;object-fit:contain;object-position:center;border-radius:6px;display:block;';
+            im.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;border-radius:10px;display:block;';
             var b=document.createElement('button');
             b.innerHTML='&times;';
             b.title='Remove photo';
@@ -371,6 +400,7 @@ const PHOTO_ENGINE_S3 = `<script>
       var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
       var c=(el.getAttribute('class')||'').toLowerCase();
       return (
+        ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
@@ -386,7 +416,33 @@ const PHOTO_ENGINE_S3 = `<script>
       return isPhotoUploadControl(el);
     });
 
-    buttons.forEach(function(btn, si){
+    if(!buttons.length){
+      Array.from(document.querySelectorAll(GSEL)).forEach(function(grid){
+        var host = grid.closest('section') || grid.parentElement;
+        if(!host) return;
+        var existing = host.querySelector('button[class*="upload"],label[class*="upload"],button[class*="photo"],label[class*="photo"]');
+        var ctl = existing;
+        if(!ctl){
+          ctl = document.createElement('button');
+          ctl.type = 'button';
+          ctl.className = 'upload-btn oneday-upload-fallback';
+          ctl.textContent = 'Add Photos';
+          grid.parentNode.insertBefore(ctl, grid.nextSibling);
+        }
+        if(!alreadyWired(ctl)) buttons.push(ctl);
+      });
+    }
+
+    if (!buttons.length) return;
+
+    var primaryBtn = buttons[0];
+    buttons.slice(1).forEach(function(extraBtn){
+      extraBtn.style.setProperty('display', 'none', 'important');
+      extraBtn.setAttribute('aria-hidden', 'true');
+    });
+
+    [primaryBtn].forEach(function(btn){
+      var si = 0;
       var fb=btn.cloneNode(true);
       btn.parentNode.replaceChild(fb,btn);
       fb.removeAttribute('onclick');
@@ -409,6 +465,7 @@ const PHOTO_ENGINE_S3 = `<script>
       }
 
       fb.style.cursor='pointer';
+      fb.textContent = 'Add Photos';
       fb.onclick=function(e){ e.preventDefault(); inp.click(); };
 
       var grid=findNextGrid(fb);
@@ -428,6 +485,7 @@ const PHOTO_ENGINE_S3 = `<script>
         files.forEach(function(file){
           var ct=file.type||'image/jpeg';
           if(ct.indexOf('image/')!==0) return;
+          if(file.size>${MAX_PHOTO_BYTES}){ alert(file.name+' exceeds 5 MB — please resize it first.'); return; }
           fetch('/api/event-photos/presign',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
@@ -548,7 +606,7 @@ export async function getServerSideProps({ params, res }) {
   const useS3 = eventPhotosUseS3();
   const useCloudIx = eventInteractionsUseCloud();
   const eidScript = `<script>window.__ONEDAY_EID__=${JSON.stringify(id)};<\/script>`;
-  // Cloud message script runs before photo engine so window.submitMessage is set before the photo rescue wires buttons.
+  // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
     '\n' +

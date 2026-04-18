@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { MIN_POLL_OPTIONS, MAX_POLL_OPTIONS } from '../../../lib/pollLimits';
 
 function getSupabase() {
   return createClient(
@@ -13,15 +14,27 @@ function cloudConfigured() {
   );
 }
 
+function parseOptionCount(raw) {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return MIN_POLL_OPTIONS;
+  return Math.min(MAX_POLL_OPTIONS, Math.max(MIN_POLL_OPTIONS, n));
+}
+
+function emptyCounts(n) {
+  return Array.from({ length: n }, () => 0);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const fallback = emptyCounts(MIN_POLL_OPTIONS);
+
   if (!cloudConfigured()) {
     return res.status(503).json({
       error: 'Shared poll is not configured.',
-      counts: [0, 0],
+      counts: fallback,
       myChoice: null,
     });
   }
@@ -30,6 +43,8 @@ export default async function handler(req, res) {
   if (!eventId || typeof eventId !== 'string' || eventId.length > 80) {
     return res.status(400).json({ error: 'Invalid eventId.' });
   }
+
+  const optionCount = parseOptionCount(req.query.optionCount);
 
   const voterId =
     typeof req.query.voterId === 'string' && req.query.voterId.length <= 128
@@ -50,23 +65,26 @@ export default async function handler(req, res) {
       return res.status(500).json({
         error: 'Database table missing. Run event_poll_votes SQL in Supabase (see supabase-setup.sql).',
         code: 'TABLE_MISSING',
-        counts: [0, 0],
+        counts: emptyCounts(optionCount),
         myChoice: null,
       });
     }
-    return res.status(500).json({ error: 'Database error.', counts: [0, 0], myChoice: null });
+    return res.status(500).json({ error: 'Database error.', counts: emptyCounts(optionCount), myChoice: null });
   }
 
-  let c0 = 0;
-  let c1 = 0;
+  const counts = emptyCounts(optionCount);
   let myChoice = null;
 
   for (const r of rows || []) {
-    if (r.choice === 0) c0 += 1;
-    else if (r.choice === 1) c1 += 1;
-    if (voterId && r.voter_id === voterId) myChoice = r.choice;
+    const c = Number(r.choice);
+    if (Number.isInteger(c) && c >= 0 && c < optionCount) {
+      counts[c] += 1;
+    }
+    if (voterId && r.voter_id === voterId) {
+      myChoice = Number.isInteger(c) && c >= 0 && c < optionCount ? c : null;
+    }
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ counts: [c0, c1], myChoice });
+  return res.status(200).json({ counts, myChoice, optionCount });
 }

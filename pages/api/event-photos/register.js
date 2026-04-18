@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
+import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../../lib/photoLimits';
 
 function getSupabase() {
   return createClient(
@@ -40,8 +41,8 @@ export default async function handler(req, res) {
   }
 
   const size = Number(byteSize);
-  if (!Number.isFinite(size) || size < 1 || size > 10 * 1024 * 1024) {
-    return res.status(400).json({ error: 'Invalid file size (max 10MB).' });
+  if (!Number.isFinite(size) || size < 1 || size > MAX_PHOTO_BYTES) {
+    return res.status(400).json({ error: 'Invalid file size (max 5MB).' });
   }
 
   const supabase = getSupabase();
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
   }
 
   if ((count ?? 0) >= MAX_PER_SECTION) {
-    return res.status(400).json({ error: `Maximum ${MAX_PER_SECTION} photos per section.` });
+    return res.status(400).json({ error: `Maximum ${MAX_PER_SECTION} photos per event.` });
   }
 
   const { data: inserted, error: insErr } = await supabase

@@ -67,7 +67,7 @@ SECTIONS:
 2. Schedule — vertical timeline
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
    HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
-   JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤3MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
+   JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤5MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
 4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
 6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). List of messages, each with Edit (inline textarea) and Delete buttons. All persists via localStorage key "messages_[eventId]". Name field optional (default "Guest"). IMPORTANT: the edit/delete/save/cancel functions MUST be on window (see JS RULES above).`;
@@ -212,10 +212,10 @@ function injectPhotoUpload(html) {
     'render();',
     'inp.addEventListener("change",function(){',
     'var files=Array.from(this.files);var arr=[];try{arr=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}',
-    'if(arr.length+files.length>20){alert("Max 20 photos per section.");this.value="";return;}',
+    'if(arr.length+files.length>200){alert("Max 200 photos per event.");this.value="";return;}',
     'var pending=files.length;',
     'files.forEach(function(file){',
-    'if(file.size>3145728){alert(file.name+" exceeds 3MB.");pending--;return;}',
+    'if(file.size>5242880){alert(file.name+" exceeds 5MB.");pending--;return;}',
     'var r=new FileReader();',
     'r.onload=function(e){arr.push(e.target.result);localStorage.setItem(key,JSON.stringify(arr));pending--;if(pending<=0)render();};',
     'r.readAsDataURL(file);',

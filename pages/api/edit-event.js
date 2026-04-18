@@ -25,7 +25,7 @@ STRICT RULES:
 - Preserve localStorage key pattern: eventId = (location.pathname.split('/').pop()||'event').slice(0,30); keys photos_\${eventId}_0, photos_\${eventId}_1, rsvps_\${eventId}, messages_\${eventId}, poll_\${eventId}.
 - NEVER name a function "postMessage" — it conflicts with the browser's built-in window.postMessage API. Use "submitMessage" or "sendMessage" instead.
 - Any function called from dynamically-generated innerHTML (e.g. edit/delete buttons created inside renderMessages) MUST be assigned to window: window.editMsg = function editMsg(idx){...}; window.deleteMsg = function deleteMsg(idx){...}; window.saveMsg = function saveMsg(idx){...}; window.cancelEdit = function cancelEdit(idx){...};
-- If the Photo Wall exists and has no working upload: use a <label for="photo-input-[n]"> styled as a button to trigger the file input natively. File input: id="photo-input-[n]" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;" — NEVER use display:none on file inputs as it blocks change events. Attach change listener via addEventListener. FileReader base64, localStorage persistence, × remove button per photo, max 20 photos/3MB.
+- If the Photo Wall exists and has no working upload: use a <label for="photo-input-[n]"> styled as a button to trigger the file input natively. File input: id="photo-input-[n]" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;" — NEVER use display:none on file inputs as it blocks change events. Attach change listener via addEventListener. FileReader base64, localStorage persistence, × remove button per photo, max 200 photos/5MB.
 - If the Guest Message Wall exists and has no edit/delete buttons, add them with window.editMsg / window.deleteMsg pattern above.
 - Keep all existing styles, fonts, and design intact
 - Only change what the customer asked to change
@@ -76,10 +76,10 @@ function injectPhotoUpload(html) {
     'render();',
     'inp.addEventListener("change",function(){',
     'var files=Array.from(this.files);var arr=[];try{arr=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}',
-    'if(arr.length+files.length>20){alert("Max 20 photos per section.");this.value="";return;}',
+    'if(arr.length+files.length>200){alert("Max 200 photos per event.");this.value="";return;}',
     'var pending=files.length;',
     'files.forEach(function(file){',
-    'if(file.size>3145728){alert(file.name+" exceeds 3MB.");pending--;return;}',
+    'if(file.size>5242880){alert(file.name+" exceeds 5MB.");pending--;return;}',
     'var r=new FileReader();',
     'r.onload=function(e){arr.push(e.target.result);localStorage.setItem(key,JSON.stringify(arr));pending--;if(pending<=0)render();};',
     'r.readAsDataURL(file);',
