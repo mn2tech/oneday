@@ -11,7 +11,7 @@ function eventPhotosUseS3() {
   );
 }
 
-/** Shared message wall + poll via Supabase (same service role as photo metadata). */
+/** Shared message wall via Supabase when service role is set (poll/RSVP stay in page HTML). */
 function eventInteractionsUseCloud() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -548,8 +548,7 @@ export async function getServerSideProps({ params, res }) {
   const useS3 = eventPhotosUseS3();
   const useCloudIx = eventInteractionsUseCloud();
   const eidScript = `<script>window.__ONEDAY_EID__=${JSON.stringify(id)};<\/script>`;
-  // Cloud interactions run before photo engine so setTimeout(0) runs first and
-  // window.submitMessage / window.vote are replaced before the photo rescue wires buttons.
+  // Cloud message script runs before photo engine so window.submitMessage is set before the photo rescue wires buttons.
   const injection =
     watermark +
     '\n' +
