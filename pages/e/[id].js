@@ -76,16 +76,30 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return null;
     }
 
-    // 3. Find all "Add Photos" upload buttons
+    function isPhotoUploadTrigger(el){
+      var fo=(el.getAttribute('for')||'');
+      if(el.tagName==='LABEL'&&/^photo-input/i.test(fo)) return true;
+      var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+      var c=(el.getAttribute('class')||'').toLowerCase();
+      var ar=(el.getAttribute('aria-label')||'').toLowerCase();
+      var title=(el.getAttribute('title')||'').toLowerCase();
+      var s=t+' '+c+' '+ar+' '+title;
+      if(c.indexOf('poll-option')!==-1||c.indexOf('poll-option-btn')!==-1) return false;
+      return s.indexOf('add photo')!==-1||s.indexOf('upload photo')!==-1||
+        s.indexOf('add image')!==-1||s.indexOf('choose photo')!==-1||
+        s.indexOf('add pictures')!==-1||s.indexOf('tap to add')!==-1||
+        (s.indexOf('+ add')!==-1&&s.indexOf('photo')!==-1)||
+        c.indexOf('btn-upload')!==-1||c.indexOf('upload-btn')!==-1||
+        c.indexOf('photo-upload')!==-1||c.indexOf('add-photo')!==-1;
+    }
+    // 3. Find all photo upload controls (wording varies by generated HTML)
     var buttons=Array.from(
       document.querySelectorAll('button,label,a,[role="button"]')
     ).filter(function(el){
-      var t=(el.textContent||'').replace(/\\s+/g,' ').trim();
-      var c=(el.getAttribute('class')||'').toLowerCase();
-      return t.indexOf('Add Photo')!==-1 ||
-             t.indexOf('Upload Photo')!==-1 ||
-             c.indexOf('btn-upload')!==-1 ||
-             c.indexOf('upload-btn')!==-1;
+      if(!isPhotoUploadTrigger(el)) return false;
+      var p=el.closest&&el.closest('#poll');
+      if(p) return false;
+      return true;
     });
 
     // 4. Wire each button
@@ -338,10 +352,26 @@ const PHOTO_ENGINE_S3 = `<script>
         });
     }
 
-    var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
-      var t=(el.textContent||'').replace(/\\s+/g,' ').trim();
+    function isPhotoUploadTrigger(el){
+      var fo=(el.getAttribute('for')||'');
+      if(el.tagName==='LABEL'&&/^photo-input/i.test(fo)) return true;
+      var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
       var c=(el.getAttribute('class')||'').toLowerCase();
-      return t.indexOf('Add Photo')!==-1 || t.indexOf('Upload Photo')!==-1 || c.indexOf('btn-upload')!==-1 || c.indexOf('upload-btn')!==-1;
+      var ar=(el.getAttribute('aria-label')||'').toLowerCase();
+      var title=(el.getAttribute('title')||'').toLowerCase();
+      var s=t+' '+c+' '+ar+' '+title;
+      if(c.indexOf('poll-option')!==-1||c.indexOf('poll-option-btn')!==-1) return false;
+      return s.indexOf('add photo')!==-1||s.indexOf('upload photo')!==-1||
+        s.indexOf('add image')!==-1||s.indexOf('choose photo')!==-1||
+        s.indexOf('add pictures')!==-1||s.indexOf('tap to add')!==-1||
+        (s.indexOf('+ add')!==-1&&s.indexOf('photo')!==-1)||
+        c.indexOf('btn-upload')!==-1||c.indexOf('upload-btn')!==-1||
+        c.indexOf('photo-upload')!==-1||c.indexOf('add-photo')!==-1;
+    }
+    var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
+      if(!isPhotoUploadTrigger(el)) return false;
+      if(el.closest&&el.closest('#poll')) return false;
+      return true;
     });
 
     buttons.forEach(function(btn, si){
