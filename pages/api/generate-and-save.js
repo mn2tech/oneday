@@ -67,7 +67,7 @@ SECTIONS:
 2. Schedule — vertical timeline
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
    HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
-   JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤3MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:cover height:180px in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
+   JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤3MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
 4. RSVP — form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Save to localStorage "rsvps_[eventId]". Show list with totals "X adults Y kids". × delete per entry (hidden if locked).
 5. Poll — 2 options, % bars, localStorage, read-only if locked
 6. Message Wall — textarea + name input + "Post Message" Submit button (hidden if locked). List of messages, each with Edit (inline textarea) and Delete buttons. All persists via localStorage key "messages_[eventId]". Name field optional (default "Guest"). IMPORTANT: the edit/delete/save/cancel functions MUST be on window (see JS RULES above).`;
@@ -201,8 +201,8 @@ function injectPhotoUpload(html) {
     'var saved=[];try{saved=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}',
     'grid.innerHTML="";',
     'saved.forEach(function(src,i){',
-    'var w=document.createElement("div");w.style.position="relative";',
-    'var im=document.createElement("img");im.src=src;im.style.cssText="width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;";',
+    'var w=document.createElement("div");w.style.cssText="position:relative;min-height:120px;max-height:420px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;padding:6px;box-sizing:border-box;";',
+    'var im=document.createElement("img");im.src=src;im.style.cssText="width:100%;max-width:100%;max-height:360px;height:auto;object-fit:contain;object-position:center;border-radius:6px;display:block;";',
     'var b=document.createElement("button");b.textContent="\xD7";b.style.cssText="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.65);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:16px;cursor:pointer;";',
     'b.setAttribute("data-idx",i);b.setAttribute("data-key",key);',
     'b.onclick=function(){var k=this.getAttribute("data-key");var n=parseInt(this.getAttribute("data-idx"));var a=[];try{a=JSON.parse(localStorage.getItem(k)||"[]");}catch(ex){}a.splice(n,1);localStorage.setItem(k,JSON.stringify(a));render();};',
@@ -246,6 +246,19 @@ function extractHtml(raw) {
 
 function buildUserPrompt(prompt) {
   return `Create a complete event app (with Poll and Message Wall included) for the following event:\n\n${prompt}`;
+}
+
+/** Anthropic returns an array of content blocks; the first block is not always text. */
+function extractAnthropicText(message) {
+  if (!message?.content?.length) return '';
+  for (const block of message.content) {
+    if (block.type === 'text' && typeof block.text === 'string') return block.text;
+  }
+  return '';
+}
+
+function anthropicModel() {
+  return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 }
 
 async function sendConfirmationEmail(resend, email, eventUrl) {
@@ -320,7 +333,15 @@ export default async function handler(req, res) {
 
     // 1. Verify payment (skip in dev mode)
     if (!isDev) {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      let paymentIntent;
+      try {
+        paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      } catch (stripeErr) {
+        console.error('[generate-and-save] Stripe retrieve:', stripeErr?.message || stripeErr);
+        return res.status(502).json({
+          error: 'Could not verify payment. Please refresh the page and try again, or contact support.',
+        });
+      }
       if (paymentIntent.status !== 'succeeded') {
         return res.status(402).json({ error: 'Payment has not been completed.' });
       }
@@ -339,14 +360,54 @@ export default async function handler(req, res) {
     }
 
     // 3. Call Anthropic API (large single-page HTML; low max_tokens truncates mid-document)
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        { role: 'user', content: buildUserPrompt(prompt) },
-      ],
-    });
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: anthropicModel(),
+        max_tokens: 16000,
+        system: SYSTEM_PROMPT,
+        messages: [
+          { role: 'user', content: buildUserPrompt(prompt) },
+        ],
+      });
+    } catch (aiErr) {
+      const s = aiErr?.status ?? aiErr?.statusCode;
+      const m = String(
+        aiErr?.message || aiErr?.error?.message || aiErr?.error?.error?.message || aiErr || ''
+      );
+      console.error('[generate-and-save] Anthropic API error:', s, m, aiErr);
+      if (s === 400 || m.toLowerCase().includes('invalid_request')) {
+        return res.status(500).json({
+          error:
+            'The AI could not process this request. Try shortening your event description, or contact support.',
+        });
+      }
+      if (
+        m.toLowerCase().includes('model') &&
+        (m.toLowerCase().includes('not found') || m.toLowerCase().includes('does not exist'))
+      ) {
+        return res.status(500).json({
+          error:
+            'AI model is misconfigured on the server (ANTHROPIC_MODEL). Contact support.',
+        });
+      }
+      if (
+        m.toLowerCase().includes('credit') ||
+        m.toLowerCase().includes('billing') ||
+        m.toLowerCase().includes('quota') ||
+        m.toLowerCase().includes('balance')
+      ) {
+        return res.status(503).json({
+          error: 'AI service quota or billing issue. Please try again later or contact support.',
+        });
+      }
+      if (m.toLowerCase().includes('context') && m.toLowerCase().includes('length')) {
+        return res.status(400).json({
+          error: 'Your event description is too long for one generation. Remove some detail and try again.',
+        });
+      }
+      throw aiErr;
+    }
 
     if (message.stop_reason === 'max_tokens') {
       console.error('[generate-and-save] Truncated at max_tokens — page incomplete');
@@ -356,9 +417,24 @@ export default async function handler(req, res) {
       });
     }
 
-    const rawHtml = message.content[0]?.text || '';
-    let html = fixInlineHandlerScoping(extractHtml(rawHtml));
-    html = injectPhotoUpload(html);
+    const rawHtml = extractAnthropicText(message);
+    if (!rawHtml.trim()) {
+      console.error('[generate-and-save] Empty AI response text');
+      return res.status(500).json({
+        error: 'AI returned no page content. Please try again.',
+      });
+    }
+
+    let html;
+    try {
+      html = fixInlineHandlerScoping(extractHtml(rawHtml));
+      html = injectPhotoUpload(html);
+    } catch (processErr) {
+      console.error('[generate-and-save] HTML post-process error:', processErr?.message || processErr);
+      return res.status(500).json({
+        error: 'Processing the generated page failed. Please try again.',
+      });
+    }
 
     const lower = html.toLowerCase();
     if (!lower.includes('<!doctype')) {
@@ -403,7 +479,9 @@ export default async function handler(req, res) {
 
   } catch (err) {
     const status = err?.status ?? err?.statusCode;
-    const msg = String(err?.message || err?.error?.message || err || '');
+    const msg = String(
+      err?.message || err?.error?.message || err?.error?.error?.message || err || ''
+    );
     console.error('[generate-and-save] Error:', msg, 'status=', status, err);
 
     const lowered = msg.toLowerCase();
@@ -419,9 +497,16 @@ export default async function handler(req, res) {
     if (lowered.includes('timeout') || lowered.includes('timed out')) {
       return res.status(504).json({ error: 'Generation timed out. Please try again.' });
     }
+    if (lowered.includes('fetch failed') || lowered.includes('econnreset') || lowered.includes('socket')) {
+      return res.status(503).json({ error: 'Network error talking to AI. Please try again in a moment.' });
+    }
+    if (lowered.includes('stripe') && lowered.includes('payment')) {
+      return res.status(502).json({ error: 'Payment verification failed. Please refresh and try again.' });
+    }
 
     return res.status(500).json({
-      error: 'Generation failed. Please try again or contact support if it persists.',
+      error:
+        'Generation failed. Please try again. If it keeps happening, contact support with the time you tried (we log details on the server).',
     });
   }
 }
