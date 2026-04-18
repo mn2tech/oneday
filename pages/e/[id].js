@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { INTERACTIONS_CLOUD } from './interactionsCloudHtml';
 
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
@@ -7,6 +8,14 @@ function eventPhotosUseS3() {
       process.env.AWS_REGION &&
       process.env.AWS_ACCESS_KEY_ID &&
       process.env.AWS_SECRET_ACCESS_KEY
+  );
+}
+
+/** Shared message wall + poll via Supabase (same service role as photo metadata). */
+function eventInteractionsUseCloud() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 }
 
@@ -129,10 +138,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
         grid.innerHTML='';
         saved.forEach(function(src,i){
           var w=document.createElement('div');
-          w.style.cssText='position:relative;';
+          w.style.cssText='position:relative;min-height:120px;max-height:420px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;padding:6px;box-sizing:border-box;';
           var im=document.createElement('img');
           im.src=src;
-          im.style.cssText='width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;';
+          im.style.cssText='width:100%;max-width:100%;max-height:360px;height:auto;object-fit:contain;object-position:center;border-radius:6px;display:block;';
           var b=document.createElement('button');
           b.innerHTML='&times;';
           b.title='Remove photo';
@@ -280,6 +289,17 @@ const PHOTO_ENGINE_S3 = `<script>
       return null;
     }
 
+    function hideEmptyPhotoCopy(grid, hasPhotos){
+      if(!hasPhotos) return;
+      var root = grid.closest('section') || grid.parentElement;
+      if(!root) return;
+      Array.prototype.slice.call(root.querySelectorAll('p,div,span,em,strong,small,i')).forEach(function(el){
+        if(grid.contains(el)) return;
+        var tx = (el.textContent || '').toLowerCase();
+        if(tx.indexOf('no photo') !== -1 || tx.indexOf('be the first') !== -1 || (tx.indexOf('share') !== -1 && tx.indexOf('first') !== -1)) el.style.display = 'none';
+      });
+    }
+
     function loadGrid(grid, si){
       fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si)
         .then(function(r){ return r.json(); })
@@ -288,11 +308,11 @@ const PHOTO_ENGINE_S3 = `<script>
           grid.innerHTML='';
           photos.forEach(function(p){
             var w=document.createElement('div');
-            w.style.cssText='position:relative;';
+            w.style.cssText='position:relative;min-height:120px;max-height:420px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;padding:6px;box-sizing:border-box;';
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
-            im.style.cssText='width:100%;height:180px;object-fit:cover;border-radius:8px;display:block;';
+            im.style.cssText='width:100%;max-width:100%;max-height:360px;height:auto;object-fit:contain;object-position:center;border-radius:6px;display:block;';
             var b=document.createElement('button');
             b.innerHTML='&times;';
             b.title='Remove photo';
@@ -310,8 +330,12 @@ const PHOTO_ENGINE_S3 = `<script>
             };
             w.appendChild(im); w.appendChild(b); grid.appendChild(w);
           });
+          hideEmptyPhotoCopy(grid, photos.length > 0);
         })
-        .catch(function(){ grid.innerHTML=''; });
+        .catch(function(err){
+          console.error('[OneDay] event-photos/list', err);
+          grid.innerHTML='';
+        });
     }
 
     var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
@@ -466,8 +490,17 @@ export async function getServerSideProps({ params, res }) {
   const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
 
   const useS3 = eventPhotosUseS3();
+  const useCloudIx = eventInteractionsUseCloud();
   const eidScript = `<script>window.__ONEDAY_EID__=${JSON.stringify(id)};<\/script>`;
-  const injection = watermark + '\n' + eidScript + '\n' + (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
+  // Cloud interactions run before photo engine so setTimeout(0) runs first and
+  // window.submitMessage / window.vote are replaced before the photo rescue wires buttons.
+  const injection =
+    watermark +
+    '\n' +
+    eidScript +
+    '\n' +
+    (useCloudIx ? INTERACTIONS_CLOUD : '') +
+    (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
   const bodyIdx = data.html.lastIndexOf('</body>');
   const html = bodyIdx !== -1
     ? data.html.slice(0, bodyIdx) + injection + '\n</body>' + data.html.slice(bodyIdx + 7)

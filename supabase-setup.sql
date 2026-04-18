@@ -54,3 +54,46 @@ create index if not exists idx_event_photos_event_section
 
 alter table event_photos enable row level security;
 -- Inserts/reads happen only via Next.js API using the service role key (bypasses RLS).
+
+-- Shared guest messages (all visitors see the same wall when NEXT uses cloud injection)
+create table if not exists event_messages (
+  id          uuid        primary key default gen_random_uuid(),
+  event_id    text        not null references event_apps (id) on delete cascade,
+  author_name text        not null default 'Guest',
+  body        text        not null,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create index if not exists idx_event_messages_event_created
+  on event_messages (event_id, created_at);
+
+alter table event_messages enable row level security;
+
+-- Poll: one row per voter per event (choice 0 or 1). Counts derived in the API.
+create table if not exists event_poll_votes (
+  event_id  text        not null references event_apps (id) on delete cascade,
+  voter_id  text        not null,
+  choice    smallint    not null check (choice in (0, 1)),
+  created_at timestamptz default now(),
+  primary key (event_id, voter_id)
+);
+
+create index if not exists idx_event_poll_votes_event on event_poll_votes (event_id);
+
+alter table event_poll_votes enable row level security;
+
+-- Shared RSVPs (name + adults + kids per row; all guests see the same list)
+create table if not exists event_rsvps (
+  id          uuid        primary key default gen_random_uuid(),
+  event_id    text        not null references event_apps (id) on delete cascade,
+  guest_name  text        not null default 'Guest',
+  adults      integer     not null default 1 check (adults >= 1 and adults <= 100),
+  kids        integer     not null default 0 check (kids >= 0 and kids <= 100),
+  created_at  timestamptz default now()
+);
+
+create index if not exists idx_event_rsvps_event_created
+  on event_rsvps (event_id, created_at);
+
+alter table event_rsvps enable row level security;
