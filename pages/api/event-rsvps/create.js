@@ -20,6 +20,12 @@ function legacyRsvpId() {
   return `rsvp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function isParentIdFkViolation(err) {
+  if (!err || String(err.code) !== '23503') return false;
+  const s = `${err.message || ''} ${err.details || ''} ${err.hint || ''}`;
+  return /parent_id/i.test(s);
+}
+
 /** Legacy tables only have id, event_id, parent_id, attendees_count, notes, created_at */
 function shouldTryLegacyInsertOnly(insErr) {
   if (!insErr) return false;
@@ -83,6 +89,20 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
 
+  const { data: eventRow, error: eventLookupErr } = await supabase
+    .from('event_apps')
+    .select('id')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (eventLookupErr) {
+    console.error('[event-rsvps/create] event lookup', eventLookupErr);
+    return res.status(500).json({ error: 'Database error.' });
+  }
+  if (!eventRow) {
+    return res.status(400).json({ error: 'Event not found.', code: 'NO_EVENT' });
+  }
+
   const { count, error: countErr } = await supabase
     .from('event_rsvps')
     .select('id', { count: 'exact', head: true })
@@ -111,18 +131,30 @@ export default async function handler(req, res) {
     .single();
 
   if (insErr && shouldTryLegacyInsertOnly(insErr)) {
-    const legacyInsert = {
-      id: legacyRsvpId(),
+    const baseLegacy = {
       event_id: eventId,
-      parent_id: 'guest',
       attendees_count: ad + kd,
       notes: name,
     };
-    const retry = await supabase
-      .from('event_rsvps')
-      .insert(legacyInsert)
-      .select('id, event_id, parent_id, attendees_count, notes, created_at')
-      .single();
+    const legacyVariants = [
+      { ...baseLegacy, parent_id: 'guest' },
+      { ...baseLegacy, parent_id: null },
+      { ...baseLegacy },
+    ];
+    let retry = { data: null, error: null };
+    for (const body of legacyVariants) {
+      const payload = { id: legacyRsvpId(), ...body };
+      if (!Object.prototype.hasOwnProperty.call(body, 'parent_id')) {
+        delete payload.parent_id;
+      }
+      retry = await supabase
+        .from('event_rsvps')
+        .insert(payload)
+        .select('id, event_id, parent_id, attendees_count, notes, created_at')
+        .single();
+      if (!retry.error) break;
+      if (!isParentIdFkViolation(retry.error)) break;
+    }
     inserted = retry.data;
     insErr = retry.error;
   }
@@ -137,6 +169,9 @@ export default async function handler(req, res) {
       });
     }
     if (insErr.code === '23503' || msg.includes('foreign key')) {
+      if (isParentIdFkViolation(insErr)) {
+        return res.status(500).json({ error: 'Could not save RSVP.', code: 'RSVP_PARENT_FK' });
+      }
       return res.status(400).json({ error: 'Event not found.', code: 'EVENT_FK' });
     }
     return res.status(500).json({ error: 'Could not save RSVP.' });
