@@ -47,12 +47,14 @@ function getSupabase() {
 //  • cloneNode() strips old addEventListener listeners → no double-picker problem
 //  • Forward DOM scan (next siblings) finds each section's OWN grid correctly
 //  • data-oneday-managed prevents two buttons from sharing one grid
-//  • photos_<eid>_global key for single-gallery mode
+//  • photos_<eid>_global key for single-gallery mode (eid from __ONEDAY_EID__ or last URL segment, max 80 chars)
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
   function bootPhotoLegacy(){
-    var eid = (window.location.pathname.split('/').pop() || 'event').slice(0,30);
+    var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
+    var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
+    var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
@@ -326,7 +328,9 @@ const PHOTO_ENGINE_LEGACY = `<script>
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
   function bootPhotoS3(){
-    var eid = (window.__ONEDAY_EID__ || window.location.pathname.split('/').pop() || 'event').slice(0,80);
+    var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
+    var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
+    var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
@@ -369,7 +373,12 @@ const PHOTO_ENGINE_S3 = `<script>
 
     function loadGrid(grid, si){
       fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si)
-        .then(function(r){ return r.json(); })
+        .then(function(r){
+          return r.json().then(function(d){
+            if(!r.ok) throw new Error((d && d.error) || 'Could not load photos');
+            return d;
+          });
+        })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
           grid.innerHTML='';
