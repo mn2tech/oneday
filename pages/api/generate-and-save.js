@@ -269,7 +269,7 @@ function anthropicModel() {
 async function sendConfirmationEmail(resend, email, eventUrl) {
   if (!process.env.RESEND_API_KEY || !resend) {
     console.warn('[generate-and-save] Confirmation email skipped: set RESEND_API_KEY in production.');
-    return;
+    return { status: 'skipped', reason: 'RESEND_NOT_CONFIGURED' };
   }
   try {
     await resend.emails.send({
@@ -292,9 +292,11 @@ async function sendConfirmationEmail(resend, email, eventUrl) {
         </div>
       `,
     });
+    return { status: 'sent' };
   } catch (err) {
     // Non-fatal — log but don't fail the request
     console.error('[generate-and-save] Resend error:', err?.message, err?.statusCode, JSON.stringify(err?.body));
+    return { status: 'failed', reason: err?.message || 'RESEND_SEND_FAILED' };
   }
 }
 
@@ -363,8 +365,13 @@ export default async function handler(req, res) {
 
       if (existing) {
         const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${existing.id}`;
-        await sendConfirmationEmail(getResend(), email, appUrl);
-        return res.status(200).json({ id: existing.id, url: appUrl });
+        const emailResult = await sendConfirmationEmail(getResend(), email, appUrl);
+        return res.status(200).json({
+          id: existing.id,
+          url: appUrl,
+          emailStatus: emailResult?.status || 'failed',
+          emailReason: emailResult?.reason || null,
+        });
       }
     }
 
@@ -482,9 +489,14 @@ export default async function handler(req, res) {
     const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${id}`;
 
     // 4. Send confirmation email (non-blocking)
-    await sendConfirmationEmail(resend, email, appUrl);
+    const emailResult = await sendConfirmationEmail(resend, email, appUrl);
 
-    return res.status(200).json({ id, url: appUrl });
+    return res.status(200).json({
+      id,
+      url: appUrl,
+      emailStatus: emailResult?.status || 'failed',
+      emailReason: emailResult?.reason || null,
+    });
 
   } catch (err) {
     const status = err?.status ?? err?.statusCode;
