@@ -13,6 +13,28 @@ function cloudConfigured() {
   );
 }
 
+function normalizeRow(r) {
+  if (!r) return r;
+  if (r.guest_name != null && r.adults != null) {
+    return {
+      id: r.id,
+      guest_name: r.guest_name,
+      adults: r.adults,
+      kids: r.kids ?? 0,
+      created_at: r.created_at,
+    };
+  }
+  const total = Number(r.attendees_count);
+  const adults = Number.isFinite(total) && total >= 1 ? total : 1;
+  return {
+    id: r.id,
+    guest_name: r.notes && String(r.notes).trim() ? String(r.notes).trim() : 'Guest',
+    adults,
+    kids: 0,
+    created_at: r.created_at,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -36,7 +58,7 @@ export default async function handler(req, res) {
 
   const { data: rows, error } = await supabase
     .from('event_rsvps')
-    .select('id, guest_name, adults, kids, created_at')
+    .select('*')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -53,7 +75,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Database error.', rsvps: [] });
   }
 
-  const rsvps = rows || [];
+  const rsvps = (rows || []).map(normalizeRow);
   let totalAdults = 0;
   let totalKids = 0;
   for (const r of rsvps) {
