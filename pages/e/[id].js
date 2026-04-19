@@ -47,7 +47,7 @@ function getSupabase() {
 //  • cloneNode() strips old addEventListener listeners → no double-picker problem
 //  • Forward DOM scan (next siblings) finds each section's OWN grid correctly
 //  • data-oneday-managed prevents two buttons from sharing one grid
-//  • photos_<eid>_global key for single-gallery mode (eid from __ONEDAY_EID__ or last URL segment, max 80 chars)
+//  • photos_<eid>_<sectionIndex> per gallery (eid from __ONEDAY_EID__ or last URL segment, max 80 chars; sectionIndex 0–10)
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
@@ -134,17 +134,13 @@ const PHOTO_ENGINE_LEGACY = `<script>
       });
     }
 
-    // 4. Wire each button
+    // 4. Wire every photo section (must not hide extras: later boot() passes would wire section 2 with si=0 and duplicate section 0).
     if (!buttons.length) return;
 
-    var primaryBtn = buttons[0];
-    buttons.slice(1).forEach(function(extraBtn){
-      extraBtn.style.setProperty('display', 'none', 'important');
-      extraBtn.setAttribute('aria-hidden', 'true');
-    });
-
-    [primaryBtn].forEach(function(btn){
-      var key='photos_'+eid+'_global';
+    var MAX_SECTIONS = 11;
+    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
+      var si = idx;
+      var key='photos_'+eid+'_'+si;
 
       // Clone to wipe ALL existing event listeners (prevents double file-picker)
       var fb=btn.cloneNode(true);
@@ -455,14 +451,9 @@ const PHOTO_ENGINE_S3 = `<script>
 
     if (!buttons.length) return;
 
-    var primaryBtn = buttons[0];
-    buttons.slice(1).forEach(function(extraBtn){
-      extraBtn.style.setProperty('display', 'none', 'important');
-      extraBtn.setAttribute('aria-hidden', 'true');
-    });
-
-    [primaryBtn].forEach(function(btn){
-      var si = 0;
+    var MAX_SECTIONS = 11;
+    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
+      var si = idx;
       var fb=btn.cloneNode(true);
       btn.parentNode.replaceChild(fb,btn);
       fb.removeAttribute('onclick');
