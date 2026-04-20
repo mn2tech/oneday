@@ -6,3 +6,6 @@ alter table public.event_apps
 
 alter table public.event_apps
   add column if not exists admin_token_hash text;
+
+alter table public.event_apps
+  add column if not exists guest_list_hidden boolean default false;

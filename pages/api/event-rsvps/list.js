@@ -44,6 +44,23 @@ export default async function handler(req, res) {
     adminToken: hostToken,
   });
 
+  const { data: eventRow, error: eventErr } = await supabase
+    .from('event_apps')
+    .select('guest_list_hidden')
+    .eq('id', eventId)
+    .maybeSingle();
+  let guestListHidden = false;
+  if (eventErr) {
+    const msg = String(eventErr.message || eventErr);
+    if (msg.includes('guest_list_hidden') && msg.includes('column')) {
+      guestListHidden = false;
+    } else {
+    console.error('[event-rsvps/list] event', eventErr);
+    return res.status(500).json({ error: 'Database error.', rsvps: [] });
+    }
+  }
+  if (eventRow) guestListHidden = Boolean(eventRow.guest_list_hidden);
+
   const { data: rows, error } = await supabase
     .from('event_rsvps')
     .select('id, guest_name, adults, kids, created_at, owner_device_id')
@@ -79,5 +96,11 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ rsvps, totalAdults, totalKids, is_host: isHost });
+  return res.status(200).json({
+    rsvps,
+    totalAdults,
+    totalKids,
+    is_host: isHost,
+    guest_list_hidden: guestListHidden,
+  });
 }

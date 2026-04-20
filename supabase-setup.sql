@@ -13,6 +13,7 @@ create table if not exists event_apps (
   generation_status  text        default 'pending',
   creator_device_id  text,
   admin_token_hash   text,
+  guest_list_hidden  boolean     default false,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
 );
