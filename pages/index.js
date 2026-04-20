@@ -49,6 +49,26 @@ const CARD_ELEMENT_OPTIONS = {
   },
 };
 
+/** Same key as event pages — used as creator_device_id for host actions on this browser. */
+function getOrCreateBrowserDeviceId() {
+  if (typeof window === 'undefined') return '';
+  const k = 'onet_device_global_v1';
+  let v = localStorage.getItem(k);
+  if (v && v.length >= 16) return v;
+  v = '';
+  if (window.crypto && window.crypto.getRandomValues) {
+    const a = new Uint8Array(16);
+    window.crypto.getRandomValues(a);
+    for (let i = 0; i < 16; i++) v += ('0' + a[i].toString(16)).slice(-2);
+  } else {
+    v = ('00000000000000000000000000000000' + Math.random().toString(16).replace(/[^a-f0-9]/g, '')).slice(-32);
+  }
+  v = String(v).toLowerCase().replace(/[^a-f0-9]/g, '');
+  if (v.length < 32) v = (v + '0'.repeat(32)).slice(0, 32);
+  localStorage.setItem(k, v);
+  return v;
+}
+
 // Inner form component (needs Stripe hooks)
 function CheckoutForm({ plan, email, onSuccess }) {
   const stripe = useStripe();
@@ -190,6 +210,7 @@ export default function Home() {
           email,
           paymentIntentId,
           eventMeta,
+          deviceId: getOrCreateBrowserDeviceId(),
         }),
       });
 
@@ -211,7 +232,7 @@ export default function Home() {
         return;
       }
 
-      setDoneUrl(data.url || `/e/${data.id}`);
+      setDoneUrl(data.manageUrl || data.url || `/e/${data.id}`);
       setGenerationStatus('done');
 
     } catch (err) {

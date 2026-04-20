@@ -560,6 +560,40 @@ const PHOTO_ENGINE_S3 = `<script>
       return null;
     }
 
+    function getDeviceId(){
+      var k='onet_device_global_v1';
+      var v=localStorage.getItem(k);
+      if(!v||v.length<16){
+        v='';
+        if(window.crypto&&crypto.getRandomValues){
+          var a=new Uint8Array(16);
+          crypto.getRandomValues(a);
+          for(var i=0;i<16;i++) v+=('0'+a[i].toString(16)).slice(-2);
+        } else {
+          v=('00000000000000000000000000000000'+Math.random().toString(16).replace(/[^a-f0-9]/g,'')).slice(-32);
+        }
+        v=String(v).toLowerCase().replace(/[^a-f0-9]/g,'');
+        if(v.length<32){
+          var pad=32-v.length;
+          for(var j=0;j<pad;j++) v+='0';
+        }
+        v=v.slice(0,32);
+        localStorage.setItem(k,v);
+      }
+      return v;
+    }
+
+    function getHostToken(){
+      try{
+        return sessionStorage.getItem('oneday_host_'+eid)||'';
+      }catch(e){ return ''; }
+    }
+
+    function hostQs(){
+      var t=getHostToken();
+      return t ? '&hostToken='+encodeURIComponent(t) : '';
+    }
+
     function ensurePhotoViewer(){
       if(window.__onedayPhotoViewer) return window.__onedayPhotoViewer;
       var state={items:[],idx:0,zoom:1,playing:false,timer:null,touchX:0,pinchStartDist:0,pinchStartZoom:1};
@@ -763,7 +797,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     function loadGrid(grid, si){
-      fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si)
+      fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
         .then(function(r){
           return r.json().then(function(d){
             if(!r.ok) throw new Error((d && d.error) || 'Could not load photos');
@@ -796,12 +830,18 @@ const PHOTO_ENGINE_S3 = `<script>
             b.innerHTML='&times;';
             b.title='Remove photo';
             b.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            if(!p.owned_by_me){
+              b.style.display='none';
+            }
             b.onclick=function(ev){
               ev.stopPropagation();
+              var delBody={photoId:p.id,eventId:eid,deviceId:getDeviceId()};
+              var ht=getHostToken();
+              if(ht) delBody.adminToken=ht;
               fetch('/api/event-photos/delete',{
                 method:'POST',
                 headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({photoId:p.id,eventId:eid})
+                body:JSON.stringify(delBody)
               }).then(function(r){
                 if(!r.ok) return r.json().then(function(j){ throw new Error(j.error||'Delete failed'); });
                 return loadGrid(grid, si);
@@ -921,7 +961,7 @@ const PHOTO_ENGINE_S3 = `<script>
             return fetch('/api/event-photos/register',{
               method:'POST',
               headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:file.size,contentType:ct})
+              body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:file.size,contentType:ct,deviceId:getDeviceId()})
             }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
           })
           .then(function(){ loadGrid(grid, si); })
@@ -1024,7 +1064,21 @@ export async function getServerSideProps({ params, res }) {
 
   const useS3 = eventPhotosUseS3();
   const useCloudIx = eventInteractionsUseCloud();
-  const eidScript = `<script>window.__ONEDAY_EID__=${JSON.stringify(id)};<\/script>`;
+  const eidScript = `<script>
+(function(){
+  window.__ONEDAY_EID__=${JSON.stringify(id)};
+  try{
+    var u=new URL(window.location.href);
+    var tok=u.searchParams.get('admin');
+    if(tok&&tok.length>=32){
+      var eid=(window.__ONEDAY_EID__||'').slice(0,80);
+      sessionStorage.setItem('oneday_host_'+eid, tok);
+      u.searchParams.delete('admin');
+      window.history.replaceState({},'', u.pathname+u.search+u.hash);
+    }
+  }catch(e){}
+})();
+<\/script>`;
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +

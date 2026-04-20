@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { Resend } from 'resend';
+import { generateAdminToken, hashAdminToken } from '../../lib/eventAdminAuth';
+import { normalizeDeviceId } from '../../lib/deviceOwnership';
 
 // Lazily initialised inside the handler so env vars are always resolved at request time
 function getStripe() {
@@ -266,11 +268,16 @@ function anthropicModel() {
   return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 }
 
-async function sendConfirmationEmail(resend, email, eventUrl) {
+async function sendConfirmationEmail(resend, email, eventUrl, manageUrl) {
   if (!process.env.RESEND_API_KEY || !resend) {
     console.warn('[generate-and-save] Confirmation email skipped: set RESEND_API_KEY in production.');
     return { status: 'skipped', reason: 'RESEND_NOT_CONFIGURED' };
   }
+  const manageBlock =
+    manageUrl &&
+    `<p style="color:#aaa;margin-bottom:12px;">Host tools (moderate messages, photos, RSVPs — keep this link private):</p>
+          <a href="${manageUrl}" style="display:inline-block;background:rgba(168,85,247,0.25);border:1px solid #a855f7;color:#e9d5ff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;margin-bottom:16px;">Open host link →</a>
+          <p style="background:#1a1a2e;padding:12px 16px;border-radius:6px;font-size:0.8rem;word-break:break-all;color:#94a3b8;">${manageUrl}</p>`;
   try {
     await resend.emails.send({
       from: confirmationFromAddress(),
@@ -286,9 +293,10 @@ async function sendConfirmationEmail(resend, email, eventUrl) {
           <a href="${eventUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;margin-bottom:24px;">View Your Event Page →</a>
           <p style="color:#888;font-size:0.85rem;margin-bottom:8px;">Or copy this link to share:</p>
           <p style="background:#1a1a2e;padding:12px 16px;border-radius:6px;font-size:0.9rem;word-break:break-all;color:#c084fc;">${eventUrl}</p>
+          ${manageBlock || ''}
           <hr style="border:none;border-top:1px solid #333;margin:24px 0;" />
           <p style="color:#666;font-size:0.8rem;">Your event page is permanent — it will live at this link forever as a memory page.</p>
-          <p style="color:#666;font-size:0.8rem;">Need changes? Visit your event page and use the edit link.</p>
+          <p style="color:#666;font-size:0.8rem;">Anyone with the host link can moderate guest content. Do not share it publicly.</p>
         </div>
       `,
     });
@@ -311,7 +319,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, plan, email, paymentIntentId, eventMeta } = req.body;
+  const { prompt, plan, email, paymentIntentId, eventMeta, deviceId } = req.body || {};
+  const creatorDeviceId = normalizeDeviceId(deviceId);
 
   // Input validation
   if (!prompt || !email || !paymentIntentId) {
@@ -364,11 +373,24 @@ export default async function handler(req, res) {
         .single();
 
       if (existing) {
+        const adminToken = generateAdminToken();
+        const admin_token_hash = hashAdminToken(adminToken);
+        const patch = { admin_token_hash };
+        if (creatorDeviceId) patch.creator_device_id = creatorDeviceId;
+        const { error: dupUpdErr } = await supabase
+          .from('event_apps')
+          .update(patch)
+          .eq('id', existing.id);
+        if (dupUpdErr) {
+          console.error('[generate-and-save] duplicate event update:', dupUpdErr.message);
+        }
         const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${existing.id}`;
-        const emailResult = await sendConfirmationEmail(getResend(), email, appUrl);
+        const manageUrl = `${appUrl}?admin=${adminToken}`;
+        const emailResult = await sendConfirmationEmail(getResend(), email, appUrl, manageUrl);
         return res.status(200).json({
           id: existing.id,
           url: appUrl,
+          manageUrl,
           emailStatus: emailResult?.status || 'failed',
           emailReason: emailResult?.reason || null,
         });
@@ -467,6 +489,8 @@ export default async function handler(req, res) {
     const title = prompt.split(/[.!?\n]/)[0].trim().slice(0, 60) || 'My Event';
     const id = await getUniqueId(supabase, eventMeta);
     const resolvedPlan = plan || 'standard';
+    const adminToken = generateAdminToken();
+    const admin_token_hash = hashAdminToken(adminToken);
 
     // Save to Supabase
     const { error: insertError } = await supabase.from('event_apps').insert({
@@ -479,6 +503,8 @@ export default async function handler(req, res) {
       email,
       is_live: true,
       generation_status: 'complete',
+      creator_device_id: creatorDeviceId,
+      admin_token_hash,
     });
 
     if (insertError) {
@@ -487,13 +513,15 @@ export default async function handler(req, res) {
     }
 
     const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/e/${id}`;
+    const manageUrl = `${appUrl}?admin=${adminToken}`;
 
     // 4. Send confirmation email (non-blocking)
-    const emailResult = await sendConfirmationEmail(resend, email, appUrl);
+    const emailResult = await sendConfirmationEmail(resend, email, appUrl, manageUrl);
 
     return res.status(200).json({
       id,
       url: appUrl,
+      manageUrl,
       emailStatus: emailResult?.status || 'failed',
       emailReason: emailResult?.reason || null,
     });

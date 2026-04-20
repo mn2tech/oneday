@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { canMutateGuestOrHost } from '../../../lib/eventAdminAuth';
 
 function getSupabase() {
   return createClient(
@@ -25,7 +27,13 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Shared messages are not configured.' });
   }
 
-  const { eventId, id, body, authorName } = req.body || {};
+  const { eventId, id, body, authorName, deviceId, adminToken } = req.body || {};
+
+  const dev = normalizeDeviceId(deviceId);
+  const rawAdmin = typeof adminToken === 'string' ? adminToken.trim() : '';
+  if (!dev && !rawAdmin) {
+    return res.status(400).json({ error: 'Missing deviceId or adminToken.' });
+  }
 
   if (!eventId || typeof eventId !== 'string' || eventId.length > 80) {
     return res.status(400).json({ error: 'Invalid eventId.' });
@@ -48,6 +56,24 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from('event_messages')
+    .select('id, owner_device_id')
+    .eq('id', id)
+    .eq('event_id', eventId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    console.error('[event-messages/update] fetch', fetchErr);
+    return res.status(500).json({ error: 'Could not load message.' });
+  }
+  if (!existing) {
+    return res.status(404).json({ error: 'Message not found.' });
+  }
+  if (!(await canMutateGuestOrHost(supabase, eventId, existing.owner_device_id, dev, rawAdmin))) {
+    return res.status(403).json({ error: 'Only the author or host can edit this.', code: 'NOT_OWNER' });
+  }
 
   const patch = { body: text, updated_at: new Date().toISOString() };
   if (name !== undefined) patch.author_name = name;

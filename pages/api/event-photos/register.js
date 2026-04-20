@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../../lib/photoLimits';
+import { normalizeDeviceId } from '../../../lib/deviceOwnership';
 
 function getSupabase() {
   return createClient(
@@ -20,7 +21,12 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Shared photo storage is not configured.' });
   }
 
-  const { eventId, sectionIndex, key, byteSize, contentType } = req.body || {};
+  const { eventId, sectionIndex, key, byteSize, contentType, deviceId } = req.body || {};
+
+  const dev = normalizeDeviceId(deviceId);
+  if (!dev) {
+    return res.status(400).json({ error: 'Missing or invalid deviceId (16–128 hex chars).' });
+  }
 
   if (!eventId || typeof eventId !== 'string' || eventId.length > 80) {
     return res.status(400).json({ error: 'Invalid eventId.' });
@@ -77,6 +83,7 @@ export default async function handler(req, res) {
       s3_key: key,
       content_type: contentType || 'image/jpeg',
       byte_size: Math.round(size),
+      owner_device_id: dev,
     })
     .select('id')
     .single();

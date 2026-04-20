@@ -11,6 +11,8 @@ create table if not exists event_apps (
   view_count         integer     default 0,
   is_live            boolean     default true,
   generation_status  text        default 'pending',
+  creator_device_id  text,
+  admin_token_hash   text,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
 );
@@ -40,13 +42,14 @@ create policy "Public can read live apps"
 
 -- Shared event photos (S3 keys + metadata; files live in AWS S3)
 create table if not exists event_photos (
-  id            uuid        primary key default gen_random_uuid(),
-  event_id      text        not null references event_apps (id) on delete cascade,
-  section_index integer     not null default 0,
-  s3_key        text        not null,
-  content_type  text,
-  byte_size     integer,
-  created_at    timestamptz default now()
+  id               uuid        primary key default gen_random_uuid(),
+  event_id         text        not null references event_apps (id) on delete cascade,
+  section_index    integer     not null default 0,
+  s3_key           text        not null,
+  content_type     text,
+  byte_size        integer,
+  owner_device_id  text,
+  created_at       timestamptz default now()
 );
 
 create index if not exists idx_event_photos_event_section
@@ -57,12 +60,13 @@ alter table event_photos enable row level security;
 
 -- Shared guest messages (all visitors see the same wall when NEXT uses cloud injection)
 create table if not exists event_messages (
-  id          uuid        primary key default gen_random_uuid(),
-  event_id    text        not null references event_apps (id) on delete cascade,
-  author_name text        not null default 'Guest',
-  body        text        not null,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+  id                uuid        primary key default gen_random_uuid(),
+  event_id          text        not null references event_apps (id) on delete cascade,
+  author_name       text        not null default 'Guest',
+  body              text        not null,
+  owner_device_id   text,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now()
 );
 
 create index if not exists idx_event_messages_event_created
@@ -85,12 +89,13 @@ alter table event_poll_votes enable row level security;
 
 -- Shared RSVPs (name + adults + kids per row; all guests see the same list)
 create table if not exists event_rsvps (
-  id          uuid        primary key default gen_random_uuid(),
-  event_id    text        not null references event_apps (id) on delete cascade,
-  guest_name  text        not null default 'Guest',
-  adults      integer     not null default 1 check (adults >= 1 and adults <= 100),
-  kids        integer     not null default 0 check (kids >= 0 and kids <= 100),
-  created_at  timestamptz default now()
+  id                uuid        primary key default gen_random_uuid(),
+  event_id          text        not null references event_apps (id) on delete cascade,
+  guest_name        text        not null default 'Guest',
+  adults            integer     not null default 1 check (adults >= 1 and adults <= 100),
+  kids              integer     not null default 0 check (kids >= 0 and kids <= 100),
+  owner_device_id   text,
+  created_at        timestamptz default now()
 );
 
 create index if not exists idx_event_rsvps_event_created

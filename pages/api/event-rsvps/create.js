@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { normalizeDeviceId } from '../../../lib/deviceOwnership';
 
 function getSupabase() {
   return createClient(
@@ -25,7 +26,12 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Shared RSVPs are not configured.' });
   }
 
-  const { guestName, adults, kids } = req.body || {};
+  const { guestName, adults, kids, deviceId } = req.body || {};
+
+  const dev = normalizeDeviceId(deviceId);
+  if (!dev) {
+    return res.status(400).json({ error: 'Missing or invalid deviceId (16–128 hex chars).' });
+  }
 
   const rawEventId = req.body && req.body.eventId;
   const eventId =
@@ -78,11 +84,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'RSVP limit reached for this event.' });
   }
 
+  const { data: existingMine, error: mineErr } = await supabase
+    .from('event_rsvps')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('owner_device_id', dev)
+    .maybeSingle();
+
+  if (mineErr) {
+    console.error('[event-rsvps/create] existing device', mineErr);
+    return res.status(500).json({ error: 'Database error.' });
+  }
+  if (existingMine) {
+    return res.status(400).json({
+      error: 'This device already submitted an RSVP. Use Update to change it.',
+      code: 'RSVP_EXISTS',
+      existingId: existingMine.id,
+    });
+  }
+
   const payload = {
     event_id: eventId,
     guest_name: name,
     adults: ad,
     kids: kd,
+    owner_device_id: dev,
   };
 
   const { data: inserted, error: insErr } = await supabase

@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { isOwnerRow, normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { isEventHost } from '../../../lib/eventAdminAuth';
 
 function getSupabase() {
   return createClient(
@@ -32,11 +34,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid eventId.' });
   }
 
+  const viewerDevice = normalizeDeviceId(req.query.deviceId);
+  const hostToken = typeof req.query.hostToken === 'string' ? req.query.hostToken.trim() : '';
+
   const supabase = getSupabase();
+
+  const isHost = await isEventHost(supabase, eventId, {
+    deviceId: viewerDevice,
+    adminToken: hostToken,
+  });
 
   const { data: rows, error } = await supabase
     .from('event_rsvps')
-    .select('id, guest_name, adults, kids, created_at')
+    .select('id, guest_name, adults, kids, created_at, owner_device_id')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -53,7 +63,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Database error.', rsvps: [] });
   }
 
-  const rsvps = rows || [];
+  const rsvps = (rows || []).map((r) => ({
+    id: r.id,
+    guest_name: r.guest_name,
+    adults: r.adults,
+    kids: r.kids,
+    created_at: r.created_at,
+    owned_by_me: isOwnerRow(r.owner_device_id, viewerDevice),
+  }));
   let totalAdults = 0;
   let totalKids = 0;
   for (const r of rsvps) {
@@ -62,5 +79,5 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ rsvps, totalAdults, totalKids });
+  return res.status(200).json({ rsvps, totalAdults, totalKids, is_host: isHost });
 }

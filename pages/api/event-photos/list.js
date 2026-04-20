@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
+import { isOwnerRow, normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { isEventHost } from '../../../lib/eventAdminAuth';
 
 function getSupabase() {
   return createClient(
@@ -22,12 +24,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid eventId.' });
   }
 
+  const viewerDevice = normalizeDeviceId(req.query.deviceId);
+  const hostToken = typeof req.query.hostToken === 'string' ? req.query.hostToken.trim() : '';
+
   const sectionIndex = req.query.sectionIndex;
   const supabase = getSupabase();
 
+  const isHost = await isEventHost(supabase, eventId, {
+    deviceId: viewerDevice,
+    adminToken: hostToken,
+  });
+
   let q = supabase
     .from('event_photos')
-    .select('id, s3_key, section_index, created_at')
+    .select('id, s3_key, section_index, created_at, owner_device_id')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -61,9 +71,10 @@ export default async function handler(req, res) {
       id: row.id,
       url,
       section_index: row.section_index,
+      owned_by_me: isOwnerRow(row.owner_device_id, viewerDevice) || isHost,
     });
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ photos });
+  return res.status(200).json({ photos, is_host: isHost });
 }
