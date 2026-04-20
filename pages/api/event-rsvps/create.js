@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { isEventHost } from '../../../lib/eventAdminAuth';
 
 function getSupabase() {
   return createClient(
@@ -26,12 +27,13 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Shared RSVPs are not configured.' });
   }
 
-  const { guestName, adults, kids, deviceId } = req.body || {};
+  const { guestName, adults, kids, deviceId, adminToken } = req.body || {};
 
   const dev = normalizeDeviceId(deviceId);
   if (!dev) {
     return res.status(400).json({ error: 'Missing or invalid deviceId (16–128 hex chars).' });
   }
+  const rawAdmin = typeof adminToken === 'string' ? adminToken.trim() : '';
 
   const rawEventId = req.body && req.body.eventId;
   const eventId =
@@ -56,18 +58,43 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
 
-  const { data: eventRow, error: eventLookupErr } = await supabase
+  let { data: eventRow, error: eventLookupErr } = await supabase
     .from('event_apps')
-    .select('id')
+    .select('id, rsvp_join_enabled')
     .eq('id', eventId)
     .maybeSingle();
 
   if (eventLookupErr) {
-    console.error('[event-rsvps/create] event lookup', eventLookupErr);
-    return res.status(500).json({ error: 'Database error.' });
+    const msg = String(eventLookupErr.message || eventLookupErr);
+    if (msg.includes('rsvp_join_enabled') && msg.includes('column')) {
+      const fallback = await supabase
+        .from('event_apps')
+        .select('id')
+        .eq('id', eventId)
+        .maybeSingle();
+      eventRow = fallback.data;
+      eventLookupErr = fallback.error;
+    }
+    if (eventLookupErr) {
+      console.error('[event-rsvps/create] event lookup', eventLookupErr);
+      return res.status(500).json({ error: 'Database error.' });
+    }
   }
   if (!eventRow) {
     return res.status(400).json({ error: 'Event not found.', code: 'NO_EVENT' });
+  }
+  const joinEnabled = eventRow.rsvp_join_enabled !== false;
+  if (!joinEnabled) {
+    const host = await isEventHost(supabase, eventId, {
+      deviceId: dev,
+      adminToken: rawAdmin,
+    });
+    if (!host) {
+      return res.status(403).json({
+        error: 'RSVP joining is currently turned off by the host.',
+        code: 'RSVP_JOIN_DISABLED',
+      });
+    }
   }
 
   const { count, error: countErr } = await supabase

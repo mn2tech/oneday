@@ -46,20 +46,28 @@ export default async function handler(req, res) {
 
   const { data: eventRow, error: eventErr } = await supabase
     .from('event_apps')
-    .select('guest_list_hidden')
+    .select('guest_list_hidden, rsvp_join_enabled')
     .eq('id', eventId)
     .maybeSingle();
   let guestListHidden = false;
+  let rsvpJoinEnabled = true;
   if (eventErr) {
     const msg = String(eventErr.message || eventErr);
-    if (msg.includes('guest_list_hidden') && msg.includes('column')) {
+    if (
+      (msg.includes('guest_list_hidden') || msg.includes('rsvp_join_enabled')) &&
+      msg.includes('column')
+    ) {
       guestListHidden = false;
+      rsvpJoinEnabled = true;
     } else {
     console.error('[event-rsvps/list] event', eventErr);
     return res.status(500).json({ error: 'Database error.', rsvps: [] });
     }
   }
   if (eventRow) guestListHidden = Boolean(eventRow.guest_list_hidden);
+  if (eventRow && Object.prototype.hasOwnProperty.call(eventRow, 'rsvp_join_enabled')) {
+    rsvpJoinEnabled = eventRow.rsvp_join_enabled !== false;
+  }
 
   const { data: rows, error } = await supabase
     .from('event_rsvps')
@@ -102,5 +110,6 @@ export default async function handler(req, res) {
     totalKids,
     is_host: isHost,
     guest_list_hidden: guestListHidden,
+    rsvp_join_enabled: rsvpJoinEnabled,
   });
 }

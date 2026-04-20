@@ -14,6 +14,7 @@ create table if not exists event_apps (
   creator_device_id  text,
   admin_token_hash   text,
   guest_list_hidden  boolean     default false,
+  rsvp_join_enabled  boolean     default true,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
 );

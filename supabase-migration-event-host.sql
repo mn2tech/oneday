@@ -9,3 +9,6 @@ alter table public.event_apps
 
 alter table public.event_apps
   add column if not exists guest_list_hidden boolean default false;
+
+alter table public.event_apps
+  add column if not exists rsvp_join_enabled boolean default true;
