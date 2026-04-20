@@ -5,7 +5,12 @@ const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby
 
 const COLOR_SUGGESTIONS = ['Gold & Purple', 'Black & Gold', 'Blush & Ivory', 'Navy & Silver', 'Tropical Brights', 'Sage & Terracotta'];
 
-const EMPTY_SCHEDULE = () => ({ id: Date.now(), time: '', description: '' });
+let scheduleIdCounter = 0;
+function nextScheduleId() {
+  scheduleIdCounter += 1;
+  return `sched_${Date.now()}_${scheduleIdCounter}`;
+}
+const EMPTY_SCHEDULE = () => ({ id: nextScheduleId(), time: '', description: '' });
 
 const DEFAULT_FORM = {
   eventType: '',
