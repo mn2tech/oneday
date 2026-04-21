@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import styles from '../styles/PromptBuilder.module.css';
 
-const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby Shower', 'Graduation', 'Corporate', 'Party', 'Other'];
+const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby Shower', 'Bridal Shower', 'Graduation', 'Corporate', 'Party', 'Other'];
 
 const COLOR_SUGGESTIONS = ['Gold & Purple', 'Black & Gold', 'Blush & Ivory', 'Navy & Silver', 'Tropical Brights', 'Sage & Terracotta'];
 
