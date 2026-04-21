@@ -1479,14 +1479,28 @@ export async function getServerSideProps({ params, res, query }) {
       if(!t.el || t.el.dataset.onedayGui) return;
       t.el.dataset.onedayGui='1';
       t.el.setAttribute('contenteditable','true');
+      t.el.setAttribute('tabindex','0');
       t.el.setAttribute('spellcheck','false');
       t.el.style.outline='1px dashed rgba(124,92,252,0.65)';
       t.el.style.outlineOffset='2px';
+      t.el.style.cursor='text';
+      t.el.style.userSelect='text';
+      t.el.style.webkitUserSelect='text';
+      t.el.style.pointerEvents='auto';
+      t.el.style.webkitUserModify='read-write-plaintext-only';
       t.el.title='Editable in preview';
+      t.el.addEventListener('mousedown', function(ev){ ev.stopPropagation(); });
+      t.el.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        ev.preventDefault();
+        t.el.focus();
+      });
       t.el.addEventListener('blur', postUpdate);
       t.el.addEventListener('keydown', function(ev){
+        ev.stopPropagation();
         if(ev.key==='Enter'){ ev.preventDefault(); t.el.blur(); }
       });
+      t.el.addEventListener('input', function(ev){ ev.stopPropagation(); });
     });
   }
   if(document.readyState==='loading'){
