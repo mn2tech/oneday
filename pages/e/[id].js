@@ -1285,24 +1285,6 @@ export async function getServerSideProps({ params, res, query }) {
     });
     return best||all[0];
   }
-  function removeLegacySubsectionLabels(root, keepTitle){
-    if(!root) return;
-    var keep=(keepTitle||'').trim().toLowerCase();
-    var badRe=/^(celebration moments|moments|fun\s*&\s*festivity|fun and festivity)$/i;
-    var targets=Array.prototype.slice.call(root.querySelectorAll('h2,h3,h4,strong,p,div,span'));
-    targets.forEach(function(el){
-      if(!el || el.children.length) return;
-      var tx=(el.textContent||'').replace(/\s+/g,' ').trim();
-      if(!tx) return;
-      var low=tx.toLowerCase();
-      if(low===keep) return;
-      if(isMainPhotoHeadingText(tx)) return;
-      if(!badRe.test(tx)) return;
-      // Keep any potential interactive wrappers untouched.
-      if(el.querySelector && el.querySelector('button,label,a,[role="button"]')) return;
-      el.remove();
-    });
-  }
   function upsertPhotoWall(photoWall){
     if(!photoWall||typeof photoWall!=='object') return;
     var wallMeta=findPhotoWallContainer();
@@ -1322,7 +1304,6 @@ export async function getServerSideProps({ params, res, query }) {
         nh.style.margin='0 0 10px 0';
         section.insertBefore(nh, section.firstChild);
       }
-      removeLegacySubsectionLabels(section, subs[idx].title);
     });
 
     if(subs.length>controls.length && controls.length){
@@ -1351,7 +1332,6 @@ export async function getServerSideProps({ params, res, query }) {
           nh.style.margin='0 0 10px 0';
           clone.insertBefore(nh, clone.firstChild);
         }
-        removeLegacySubsectionLabels(clone, item.title);
         var cloneControls=Array.prototype.slice.call(clone.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
         cloneControls.forEach(function(btn){
           if(btn.tagName==='LABEL') btn.removeAttribute('for');
