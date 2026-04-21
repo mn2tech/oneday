@@ -3,6 +3,8 @@ import { normalizeDeviceId } from '../../lib/deviceOwnership';
 import { isEventHost } from '../../lib/eventAdminAuth';
 import {
   createEmptyPhase1Content,
+  extractLiveEventDetailsFromHtml,
+  mergeDetailsWithFallback,
   normalizePhase1Content,
   validatePhase1Content,
 } from '../../lib/eventStructuredPhase1';
@@ -69,14 +71,14 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     let result = await supabase
       .from('event_apps')
-      .select('title, content_phase1')
+      .select('title, event_date, html, content_phase1')
       .eq('id', eventId)
       .maybeSingle();
 
     if (result.error && String(result.error.message || '').toLowerCase().includes('content_phase1')) {
       result = await supabase
         .from('event_apps')
-        .select('title')
+        .select('title, event_date, html')
         .eq('id', eventId)
         .maybeSingle();
     }
@@ -88,11 +90,23 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Event not found.' });
     }
 
+    const currentLive = extractLiveEventDetailsFromHtml(result.data.html || '', {
+      title: result.data.title || '',
+      eventDate: result.data.event_date || '',
+    });
     const normalized = normalizePhase1Content(
-      result.data.content_phase1 || createEmptyPhase1Content(result.data.title || ''),
+      result.data.content_phase1 ||
+        {
+          ...createEmptyPhase1Content(result.data.title || ''),
+          eventDetails: currentLive,
+        },
       result.data.title || ''
     );
-    return res.status(200).json({ ok: true, content: normalized });
+    const contentWithFallback = {
+      ...normalized,
+      eventDetails: mergeDetailsWithFallback(normalized.eventDetails, currentLive),
+    };
+    return res.status(200).json({ ok: true, content: contentWithFallback, currentLive });
   }
 
   const normalized = normalizePhase1Content(req.body?.content, '');

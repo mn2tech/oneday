@@ -37,6 +37,9 @@ const styles = {
   gridTwo: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 },
   input: { width: '100%', background: '#1c1c28', border: '1px solid #2a2a3d', borderRadius: 10, color: '#f0f0f5', padding: '10px 12px', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' },
   scheduleCard: { border: '1px solid #2a2a3d', background: '#141420', borderRadius: 12, padding: 12, marginTop: 10 },
+  readOnlyWrap: { border: '1px dashed #3a3a58', borderRadius: 12, padding: 10, background: '#12131d', marginBottom: 12 },
+  readOnlyLabel: { display: 'block', fontSize: '0.72rem', color: '#9d9dc5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 },
+  readOnlyValue: { fontSize: '0.88rem', color: '#e7e7ff', minHeight: 18 },
 };
 
 const EXAMPLES = [
@@ -66,6 +69,7 @@ export default function EditPage() {
   const [structuredSaving, setStructuredSaving] = useState(false);
   const [structuredError, setStructuredError] = useState('');
   const [structuredMessage, setStructuredMessage] = useState('');
+  const [currentLive, setCurrentLive] = useState(createEmptyPhase1Content('').eventDetails);
 
   const liveUrl = id ? `/e/${id}` : null;
   const previewThemeQs = themePreset !== 'default' ? `?themePreview=${encodeURIComponent(themePreset)}` : '';
@@ -146,6 +150,7 @@ export default function EditPage() {
           return;
         }
         setStructuredContent(j.content || createEmptyPhase1Content(''));
+        setCurrentLive(j.currentLive || createEmptyPhase1Content('').eventDetails);
         setStructuredLoading(false);
       })
       .catch(() => {
@@ -360,6 +365,33 @@ export default function EditPage() {
             ) : (
               <>
                 <label style={styles.label}>Event details</label>
+                <div style={styles.readOnlyWrap}>
+                  <div style={{ ...styles.row, marginBottom: 8 }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#b7b8da' }}>Current live values</strong>
+                  </div>
+                  <div style={styles.gridTwo}>
+                    <div>
+                      <span style={styles.readOnlyLabel}>Title</span>
+                      <div style={styles.readOnlyValue}>{currentLive?.title || '—'}</div>
+                    </div>
+                    <div>
+                      <span style={styles.readOnlyLabel}>Date & time</span>
+                      <div style={styles.readOnlyValue}>{currentLive?.dateTime || '—'}</div>
+                    </div>
+                    <div>
+                      <span style={styles.readOnlyLabel}>Location</span>
+                      <div style={styles.readOnlyValue}>{currentLive?.location || '—'}</div>
+                    </div>
+                    <div>
+                      <span style={styles.readOnlyLabel}>Host</span>
+                      <div style={styles.readOnlyValue}>{currentLive?.host || '—'}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span style={styles.readOnlyLabel}>Dress code</span>
+                    <div style={styles.readOnlyValue}>{currentLive?.dressCode || '—'}</div>
+                  </div>
+                </div>
                 <div style={styles.gridTwo}>
                   <input style={styles.input} value={structuredContent.eventDetails?.title || ''} onChange={e => setDetailField('title', e.target.value)} placeholder="Event title" />
                   <input style={styles.input} value={structuredContent.eventDetails?.dateTime || ''} onChange={e => setDetailField('dateTime', e.target.value)} placeholder="Date & time" />
