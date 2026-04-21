@@ -53,15 +53,7 @@ const EXAMPLES = [
 ];
 
 const PHOTO_SUBSECTION_PRESETS = [
-  '🥂 Moments',
-  '💃 Dance Floor',
   '🍽️ Food',
-  '🍰 Dessert Table',
-  '🍷 Drinks',
-  '👨‍👩‍👧‍👦 Family',
-  '🎉 Friends',
-  '📸 Ceremony',
-  '✨ Reception',
 ];
 
 export default function EditPage() {

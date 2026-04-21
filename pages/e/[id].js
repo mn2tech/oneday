@@ -1212,6 +1212,24 @@ export async function getServerSideProps({ params, res, query }) {
     var t=(text||'').trim().toLowerCase();
     return /photo wall|photo gallery|gallery|memories|moments/.test(t);
   }
+  function findPhotoWallContainer(){
+    var heading=qsa('h1,h2,h3,h4,strong,p,div').find(function(el){
+      var t=(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+      return t==='photo wall' || t==='photo gallery' || t==='gallery';
+    });
+    if(heading){
+      return {
+        container: heading.closest('section')||heading.closest('main')||heading.parentElement||document.body,
+        headingTop: (heading.getBoundingClientRect&&heading.getBoundingClientRect().top)||null,
+      };
+    }
+    var firstControl=qsa('button,label,a,[role="button"]').find(isPhotoControl);
+    if(firstControl){
+      var sec=firstControl.closest('section')||firstControl.parentElement||document.body;
+      return { container: sec, headingTop: null };
+    }
+    return { container: document.body, headingTop: null };
+  }
   function countPhotoControls(root){
     if(!root||!root.querySelectorAll) return 0;
     return Array.prototype.slice.call(root.querySelectorAll('button,label,a,[role="button"]'))
@@ -1243,13 +1261,16 @@ export async function getServerSideProps({ params, res, query }) {
     }
     return best||control.parentElement;
   }
-  function findPhotoSubHeading(section, control){
+  function findPhotoSubHeading(section, control, minTop){
     if(!section) return null;
     var headingSelectors='h2,h3,h4,strong,[class*="section-title"],[class*="title"]';
     var all=Array.prototype.slice.call(section.querySelectorAll(headingSelectors))
       .filter(function(el){
         var tx=(el.textContent||'').trim();
-        return tx && tx.length<=140 && !isMainPhotoHeadingText(tx);
+        if(!(tx && tx.length<=140 && !isMainPhotoHeadingText(tx))) return false;
+        if(minTop==null) return true;
+        var top=(el.getBoundingClientRect&&el.getBoundingClientRect().top)||0;
+        return top >= (minTop - 2);
       });
     if(!all.length) return null;
     if(!control) return all[0];
@@ -1266,13 +1287,16 @@ export async function getServerSideProps({ params, res, query }) {
   }
   function upsertPhotoWall(photoWall){
     if(!photoWall||typeof photoWall!=='object') return;
-    var controls=qsa('button,label,a,[role="button"]').filter(isPhotoControl);
+    var wallMeta=findPhotoWallContainer();
+    var wallRoot=wallMeta.container||document.body;
+    var wallTop=wallMeta.headingTop;
+    var controls=Array.prototype.slice.call(wallRoot.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
     var subs=Array.isArray(photoWall.subsections)?photoWall.subsections:[];
     controls.forEach(function(ctrl, idx){
       if(!subs[idx]||!subs[idx].title) return;
       var section=ctrl.closest('section')||ctrl.parentElement;
       if(!section) return;
-      var h=findPhotoSubHeading(section, ctrl);
+      var h=findPhotoSubHeading(section, ctrl, wallTop);
       if(h) h.textContent=subs[idx].title;
       else {
         var nh=document.createElement('h3');
@@ -1286,7 +1310,7 @@ export async function getServerSideProps({ params, res, query }) {
       var templateControl=controls[controls.length-1];
       var templateBlock=findSubsectionTemplateBlock(templateControl);
       if(!templateBlock || !templateBlock.parentNode) return;
-      var hostSection=templateControl.closest('section')||templateBlock.parentElement;
+      var hostSection=wallRoot;
       if(!hostSection) return;
       Array.prototype.slice.call(hostSection.querySelectorAll('[data-oneday-generated-subsection="1"]')).forEach(function(el){
         if(el&&el.parentNode) el.parentNode.removeChild(el);
