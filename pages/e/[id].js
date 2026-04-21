@@ -1251,31 +1251,26 @@ export async function getServerSideProps({ params, res, query }) {
       }
     });
 
+    // IMPORTANT: Do not clone/create new full photo-wall sections for extra subsection names.
+    // Extra subsection titles are rendered as lightweight labels under the existing photo wall.
     if(subs.length>controls.length && controls.length){
-      var templateSection=controls[controls.length-1].closest('section')||controls[controls.length-1].parentElement;
-      var anchor=templateSection;
+      var host=controls[0].closest('section')||controls[0].parentElement||document.body;
+      if(!host) return;
+      var existingWrap=host.querySelector('[data-oneday-extra-subsections="1"]');
+      if(existingWrap) existingWrap.remove();
+      var wrap=document.createElement('div');
+      wrap.setAttribute('data-oneday-extra-subsections','1');
+      wrap.style.cssText='margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;';
       for(var i=controls.length;i<subs.length;i++){
         var item=subs[i];
-        if(!item||!item.title||!templateSection||!anchor||!anchor.parentNode) continue;
-        var clone=templateSection.cloneNode(true);
-        stripIds(clone);
-        clearSectionMedia(clone);
-        var heading=findPhotoSubHeading(clone, clone.querySelector('button,label,a,[role="button"]'));
-        if(heading) heading.textContent=item.title;
-        else {
-          var nh=document.createElement('h3');
-          nh.textContent=item.title;
-          nh.style.margin='0 0 10px 0';
-          clone.insertBefore(nh, clone.firstChild);
-        }
-        var cloneControls=Array.prototype.slice.call(clone.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
-        cloneControls.forEach(function(btn){
-          if(btn.tagName==='LABEL') btn.removeAttribute('for');
-          btn.textContent='Add Photos';
-          btn.removeAttribute('onclick');
-        });
-        anchor.parentNode.insertBefore(clone, anchor.nextSibling);
-        anchor=clone;
+        if(!item||!item.title) continue;
+        var chip=document.createElement('span');
+        chip.textContent=item.title;
+        chip.style.cssText='display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);font-size:12px;line-height:1.2;';
+        wrap.appendChild(chip);
+      }
+      if(wrap.childNodes.length){
+        host.appendChild(wrap);
       }
     }
   }
