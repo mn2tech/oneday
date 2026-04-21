@@ -67,13 +67,21 @@ export default function EditPage() {
   const [structuredContent, setStructuredContent] = useState(createEmptyPhase1Content(''));
   const [structuredLoading, setStructuredLoading] = useState(false);
   const [structuredSaving, setStructuredSaving] = useState(false);
+  const [structuredPublishing, setStructuredPublishing] = useState(false);
+  const [structuredDiscarding, setStructuredDiscarding] = useState(false);
   const [structuredError, setStructuredError] = useState('');
   const [structuredMessage, setStructuredMessage] = useState('');
   const [currentLive, setCurrentLive] = useState(createEmptyPhase1Content('').eventDetails);
+  const [hasStructuredDraft, setHasStructuredDraft] = useState(false);
+  const [hostToken, setHostToken] = useState('');
 
   const liveUrl = id ? `/e/${id}` : null;
-  const previewThemeQs = themePreset !== 'default' ? `?themePreview=${encodeURIComponent(themePreset)}` : '';
-  const previewUrl = liveUrl ? `${liveUrl}${previewThemeQs}` : null;
+  const previewParams = new URLSearchParams();
+  if (themePreset !== 'default') previewParams.set('themePreview', themePreset);
+  if (hasStructuredDraft) previewParams.set('phase1Preview', 'draft');
+  if (hostToken) previewParams.set('admin', hostToken);
+  const previewQs = previewParams.toString();
+  const previewUrl = liveUrl ? `${liveUrl}${previewQs ? `?${previewQs}` : ''}` : null;
 
   function makeScheduleId() {
     return `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -120,6 +128,29 @@ export default function EditPage() {
     return headers;
   }
 
+  async function loadStructuredPhase1(targetId) {
+    if (!targetId) return;
+    setStructuredLoading(true);
+    setStructuredError('');
+    try {
+      const res = await fetch(`/api/event-structured-phase1?eventId=${encodeURIComponent(targetId)}`, {
+        headers: authHeaders(),
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setStructuredError(j.error || 'Could not load structured editor data.');
+      } else {
+        setStructuredContent(j.content || createEmptyPhase1Content(''));
+        setCurrentLive(j.currentLive || createEmptyPhase1Content('').eventDetails);
+        setHasStructuredDraft(Boolean(j.hasDraft));
+      }
+    } catch {
+      setStructuredError('Network error loading structured data.');
+    } finally {
+      setStructuredLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
     let alive = true;
@@ -135,30 +166,9 @@ export default function EditPage() {
 
   useEffect(() => {
     if (!id) return;
-    let alive = true;
-    setStructuredLoading(true);
-    setStructuredError('');
-    fetch(`/api/event-structured-phase1?eventId=${encodeURIComponent(id)}`, {
-      headers: authHeaders(),
-    })
-      .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => {
-        if (!alive) return;
-        if (!ok) {
-          setStructuredError(j.error || 'Could not load structured editor data.');
-          setStructuredLoading(false);
-          return;
-        }
-        setStructuredContent(j.content || createEmptyPhase1Content(''));
-        setCurrentLive(j.currentLive || createEmptyPhase1Content('').eventDetails);
-        setStructuredLoading(false);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setStructuredError('Network error loading structured data.');
-        setStructuredLoading(false);
-      });
-    return () => { alive = false; };
+    const tok = getAdminToken();
+    setHostToken(tok || '');
+    loadStructuredPhase1(id);
   }, [id, admin]);
 
   async function handleSubmit(e) {
@@ -289,12 +299,78 @@ export default function EditPage() {
       if (!res.ok) {
         setStructuredError(data.error || 'Could not save structured content.');
       } else {
-        setStructuredMessage('Structured Phase 1 content saved.');
+        setStructuredMessage('Draft saved. Preview now shows draft until you publish.');
+        setHasStructuredDraft(true);
+        setPreviewKey(k => k + 1);
       }
     } catch {
       setStructuredError('Network error while saving structured content.');
     } finally {
       setStructuredSaving(false);
+    }
+  }
+
+  async function publishStructuredPhase1() {
+    if (!id || structuredPublishing) return;
+    setStructuredPublishing(true);
+    setStructuredMessage('');
+    setStructuredError('');
+    try {
+      const res = await fetch('/api/event-structured-phase1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          eventId: id,
+          action: 'publish',
+          adminToken: getAdminToken(),
+          deviceId: getDeviceId(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStructuredError(data.error || 'Could not publish draft.');
+      } else {
+        setStructuredMessage('Published to live successfully.');
+        setHasStructuredDraft(false);
+        await loadStructuredPhase1(id);
+        setPreviewKey(k => k + 1);
+      }
+    } catch {
+      setStructuredError('Network error while publishing.');
+    } finally {
+      setStructuredPublishing(false);
+    }
+  }
+
+  async function discardStructuredDraft() {
+    if (!id || structuredDiscarding) return;
+    setStructuredDiscarding(true);
+    setStructuredMessage('');
+    setStructuredError('');
+    try {
+      const res = await fetch('/api/event-structured-phase1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          eventId: id,
+          action: 'discard_draft',
+          adminToken: getAdminToken(),
+          deviceId: getDeviceId(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStructuredError(data.error || 'Could not discard draft.');
+      } else {
+        setStructuredMessage('Draft discarded. Preview now shows live content.');
+        setHasStructuredDraft(false);
+        await loadStructuredPhase1(id);
+        setPreviewKey(k => k + 1);
+      }
+    } catch {
+      setStructuredError('Network error while discarding draft.');
+    } finally {
+      setStructuredDiscarding(false);
     }
   }
 
@@ -358,7 +434,7 @@ export default function EditPage() {
           <div style={styles.sectionCard}>
             <h2 style={styles.sectionTitle}>Structured Edit (Phase 1)</h2>
             <p style={styles.sectionSub}>
-              Update event details and schedule in structured fields. This phase stores admin data safely before full renderer integration.
+              Save as draft to preview first, then publish when ready.
             </p>
             {structuredLoading ? (
               <p style={styles.mutedText}>Loading structured content…</p>
@@ -428,9 +504,28 @@ export default function EditPage() {
                       onClick={saveStructuredPhase1}
                       disabled={structuredSaving}
                     >
-                      {structuredSaving ? 'Saving…' : 'Save Structured Data'}
+                      {structuredSaving ? 'Saving…' : 'Save Draft'}
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.btnSecondary, ...(structuredPublishing ? styles.btnDisabled : {}) }}
+                      onClick={publishStructuredPhase1}
+                      disabled={structuredPublishing || !hasStructuredDraft}
+                    >
+                      {structuredPublishing ? 'Publishing…' : 'Publish to Live'}
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.exampleChip, ...(structuredDiscarding ? styles.btnDisabled : {}) }}
+                      onClick={discardStructuredDraft}
+                      disabled={structuredDiscarding || !hasStructuredDraft}
+                    >
+                      {structuredDiscarding ? 'Discarding…' : 'Discard Draft'}
                     </button>
                   </div>
+                  <p style={styles.mutedText}>
+                    {hasStructuredDraft ? 'Draft mode active: preview shows draft.' : 'No draft: preview shows live content.'}
+                  </p>
                   {structuredMessage && <div style={styles.successBanner}>{structuredMessage}</div>}
                   {structuredError && <div style={styles.errorBanner}>⚠ {structuredError}</div>}
                 </div>

@@ -45,7 +45,7 @@ function getAuth(req) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET' && req.method !== 'PUT') {
+  if (req.method !== 'GET' && req.method !== 'PUT' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   if (!cloudConfigured()) {
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     let result = await supabase
       .from('event_apps')
-      .select('title, event_date, html, content_phase1')
+      .select('title, event_date, html, content_phase1, content_phase1_draft')
       .eq('id', eventId)
       .maybeSingle();
 
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       title: result.data.title || '',
       eventDate: result.data.event_date || '',
     });
-    const normalized = normalizePhase1Content(
+    const liveContent = normalizePhase1Content(
       result.data.content_phase1 ||
         {
           ...createEmptyPhase1Content(result.data.title || ''),
@@ -102,39 +102,109 @@ export default async function handler(req, res) {
         },
       result.data.title || ''
     );
-    const contentWithFallback = {
-      ...normalized,
-      eventDetails: mergeDetailsWithFallback(normalized.eventDetails, currentLive),
+    const draftContent = normalizePhase1Content(result.data.content_phase1_draft || {}, result.data.title || '');
+    const effectiveEditor = (result.data.content_phase1_draft && typeof result.data.content_phase1_draft === 'object')
+      ? draftContent
+      : liveContent;
+    const editorWithFallback = {
+      ...effectiveEditor,
+      eventDetails: mergeDetailsWithFallback(effectiveEditor.eventDetails, currentLive),
     };
-    return res.status(200).json({ ok: true, content: contentWithFallback, currentLive });
+    return res.status(200).json({
+      ok: true,
+      content: editorWithFallback,
+      liveContent,
+      draftContent,
+      hasDraft: Boolean(result.data.content_phase1_draft),
+      currentLive,
+    });
   }
 
-  const normalized = normalizePhase1Content(req.body?.content, '');
-  const errors = validatePhase1Content(normalized);
-  if (errors.length) {
-    return res.status(400).json({ error: 'Invalid structured content.', details: errors });
-  }
-
-  const { data, error } = await supabase
-    .from('event_apps')
-    .update({ content_phase1: normalized, updated_at: new Date().toISOString() })
-    .eq('id', eventId)
-    .select('id')
-    .maybeSingle();
-
-  if (error) {
-    if (String(error.message || '').toLowerCase().includes('content_phase1')) {
-      return res.status(400).json({
-        error: 'Structured editing requires DB migration. Add event_apps.content_phase1 first.',
-        migrationRequired: true,
-      });
+  if (req.method === 'PUT') {
+    const normalized = normalizePhase1Content(req.body?.content, '');
+    const errors = validatePhase1Content(normalized);
+    if (errors.length) {
+      return res.status(400).json({ error: 'Invalid structured content.', details: errors });
     }
-    console.error('[event-structured-phase1][PUT]', error);
-    return res.status(500).json({ error: 'Could not save structured content.' });
-  }
-  if (!data) {
-    return res.status(404).json({ error: 'Event not found.' });
+
+    const { data, error } = await supabase
+      .from('event_apps')
+      .update({ content_phase1_draft: normalized, updated_at: new Date().toISOString() })
+      .eq('id', eventId)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      if (String(error.message || '').toLowerCase().includes('content_phase1_draft')) {
+        return res.status(400).json({
+          error: 'Draft preview requires DB migration. Add event_apps.content_phase1_draft first.',
+          migrationRequired: true,
+        });
+      }
+      console.error('[event-structured-phase1][PUT]', error);
+      return res.status(500).json({ error: 'Could not save structured draft.' });
+    }
+    if (!data) {
+      return res.status(404).json({ error: 'Event not found.' });
+    }
+    return res.status(200).json({ ok: true, content: normalized, savedAs: 'draft' });
   }
 
-  return res.status(200).json({ ok: true, content: normalized });
+  const action = String(req.body?.action || '').trim().toLowerCase();
+  if (!action) {
+    return res.status(400).json({ error: 'Missing action.' });
+  }
+
+  if (action === 'publish') {
+    const readResult = await supabase
+      .from('event_apps')
+      .select('content_phase1_draft')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (readResult.error) {
+      console.error('[event-structured-phase1][POST-publish-read]', readResult.error);
+      return res.status(500).json({ error: 'Could not load draft for publish.' });
+    }
+    if (!readResult.data) {
+      return res.status(404).json({ error: 'Event not found.' });
+    }
+    if (!readResult.data.content_phase1_draft) {
+      return res.status(400).json({ error: 'No draft to publish.' });
+    }
+    const normalizedDraft = normalizePhase1Content(readResult.data.content_phase1_draft, '');
+    const writeResult = await supabase
+      .from('event_apps')
+      .update({
+        content_phase1: normalizedDraft,
+        content_phase1_draft: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', eventId)
+      .select('id')
+      .maybeSingle();
+    if (writeResult.error) {
+      console.error('[event-structured-phase1][POST-publish-write]', writeResult.error);
+      return res.status(500).json({ error: 'Could not publish draft.' });
+    }
+    return res.status(200).json({ ok: true, published: true, content: normalizedDraft });
+  }
+
+  if (action === 'discard_draft') {
+    const clearResult = await supabase
+      .from('event_apps')
+      .update({ content_phase1_draft: null, updated_at: new Date().toISOString() })
+      .eq('id', eventId)
+      .select('id')
+      .maybeSingle();
+    if (clearResult.error) {
+      console.error('[event-structured-phase1][POST-discard]', clearResult.error);
+      return res.status(500).json({ error: 'Could not discard draft.' });
+    }
+    if (!clearResult.data) {
+      return res.status(404).json({ error: 'Event not found.' });
+    }
+    return res.status(200).json({ ok: true, discarded: true });
+  }
+
+  return res.status(400).json({ error: 'Unsupported action.' });
 }

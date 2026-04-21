@@ -4,6 +4,7 @@ import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageB
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
 import { buildThemePresetStyleTag, normalizeThemePreset } from '../../lib/eventThemePresets';
 import { normalizePhase1Content } from '../../lib/eventStructuredPhase1';
+import { isEventHost } from '../../lib/eventAdminAuth';
 
 function injectAfterBodyOpen(html, snippet) {
   const lower = html.toLowerCase();
@@ -1055,14 +1056,14 @@ export async function getServerSideProps({ params, res, query }) {
 
   let { data } = await supabase
     .from('event_apps')
-    .select('html, title, is_live, theme_preset, content_phase1')
+    .select('html, title, is_live, theme_preset, content_phase1, content_phase1_draft')
     .eq('id', id)
     .single();
   if (!data) {
     // Backward compatibility for databases that do not have theme_preset yet.
     const fallback = await supabase
       .from('event_apps')
-      .select('html, title, is_live')
+      .select('html, title, is_live, content_phase1')
       .eq('id', id)
       .single();
     data = fallback.data || null;
@@ -1075,7 +1076,14 @@ export async function getServerSideProps({ params, res, query }) {
   const savedThemePreset = normalizeThemePreset(data.theme_preset || 'default');
   const activeThemePreset = queryThemePreset !== 'default' ? queryThemePreset : savedThemePreset;
   const themeStyleTag = buildThemePresetStyleTag(activeThemePreset);
-  const phase1Content = normalizePhase1Content(data.content_phase1 || {}, data.title || '');
+  const wantsDraftPreview = String(query?.phase1Preview || '').toLowerCase() === 'draft';
+  const rawAdminToken = typeof query?.admin === 'string' ? query.admin.trim() : '';
+  let allowDraftPreview = false;
+  if (wantsDraftPreview && rawAdminToken) {
+    allowDraftPreview = await isEventHost(supabase, id, { deviceId: '', adminToken: rawAdminToken });
+  }
+  const phase1Source = allowDraftPreview && data.content_phase1_draft ? data.content_phase1_draft : data.content_phase1;
+  const phase1Content = normalizePhase1Content(phase1Source || {}, data.title || '');
   const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
 
   const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
@@ -1207,9 +1215,14 @@ export async function getServerSideProps({ params, res, query }) {
   function mount(){
     if(!hasHostToken()) return;
     if(document.getElementById('oneday-host-edit-link')) return;
+    var tok='';
+    try{
+      var eid=(window.__ONEDAY_EID__||'').slice(0,80);
+      tok=sessionStorage.getItem('oneday_host_'+eid)||'';
+    }catch(e){}
     var a=document.createElement('a');
     a.id='oneday-host-edit-link';
-    a.href='/edit/'+encodeURIComponent((window.__ONEDAY_EID__||'').slice(0,80));
+    a.href='/edit/'+encodeURIComponent((window.__ONEDAY_EID__||'').slice(0,80))+(tok?'?admin='+encodeURIComponent(tok):'');
     a.textContent='Edit Theme & Content';
     a.style.cssText='position:fixed;right:12px;bottom:52px;z-index:99999;padding:8px 12px;border-radius:999px;background:rgba(124,92,252,0.95);color:#fff;font:600 12px/1.2 Inter,system-ui,sans-serif;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.25);';
     document.body.appendChild(a);
