@@ -4,7 +4,9 @@ import { isEventHost } from '../../lib/eventAdminAuth';
 import {
   createEmptyPhase1Content,
   extractLiveEventDetailsFromHtml,
+  extractLivePhotoWallFromHtml,
   mergeDetailsWithFallback,
+  mergePhotoWallWithFallback,
   normalizePhase1Content,
   validatePhase1Content,
 } from '../../lib/eventStructuredPhase1';
@@ -94,15 +96,18 @@ export default async function handler(req, res) {
       title: result.data.title || '',
       eventDate: result.data.event_date || '',
     });
+    const extractedPhotoWall = extractLivePhotoWallFromHtml(result.data.html || '');
     const liveContent = normalizePhase1Content(
       result.data.content_phase1 ||
         {
           ...createEmptyPhase1Content(result.data.title || ''),
           eventDetails: extractedLive,
+          photoWall: extractedPhotoWall,
         },
       result.data.title || ''
     );
     const currentLive = mergeDetailsWithFallback(liveContent.eventDetails, extractedLive);
+    const currentPhotoWall = mergePhotoWallWithFallback(liveContent.photoWall, extractedPhotoWall);
     const draftContent = normalizePhase1Content(result.data.content_phase1_draft || {}, result.data.title || '');
     const effectiveEditor = (result.data.content_phase1_draft && typeof result.data.content_phase1_draft === 'object')
       ? draftContent
@@ -110,6 +115,7 @@ export default async function handler(req, res) {
     const editorWithFallback = {
       ...effectiveEditor,
       eventDetails: mergeDetailsWithFallback(effectiveEditor.eventDetails, currentLive),
+      photoWall: mergePhotoWallWithFallback(effectiveEditor.photoWall, currentPhotoWall),
     };
     return res.status(200).json({
       ok: true,
@@ -118,6 +124,7 @@ export default async function handler(req, res) {
       draftContent,
       hasDraft: Boolean(result.data.content_phase1_draft),
       currentLive,
+      currentPhotoWall,
     });
   }
 

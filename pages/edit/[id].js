@@ -72,6 +72,7 @@ export default function EditPage() {
   const [structuredError, setStructuredError] = useState('');
   const [structuredMessage, setStructuredMessage] = useState('');
   const [currentLive, setCurrentLive] = useState(createEmptyPhase1Content('').eventDetails);
+  const [currentPhotoWall, setCurrentPhotoWall] = useState(createEmptyPhase1Content('').photoWall);
   const [hasStructuredDraft, setHasStructuredDraft] = useState(false);
   const [hostToken, setHostToken] = useState('');
 
@@ -85,6 +86,10 @@ export default function EditPage() {
 
   function makeScheduleId() {
     return `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function makePhotoSubId() {
+    return `photo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
   function getDeviceId() {
@@ -142,6 +147,7 @@ export default function EditPage() {
       } else {
         setStructuredContent(j.content || createEmptyPhase1Content(''));
         setCurrentLive(j.currentLive || createEmptyPhase1Content('').eventDetails);
+        setCurrentPhotoWall(j.currentPhotoWall || createEmptyPhase1Content('').photoWall);
         setHasStructuredDraft(Boolean(j.hasDraft));
       }
     } catch {
@@ -274,6 +280,84 @@ export default function EditPage() {
       arr[idx] = arr[next];
       arr[next] = tmp;
       return { ...prev, schedule: arr };
+    });
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function setPhotoWallTitle(value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        title: value,
+        subsections: Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [],
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function addPhotoSubsection() {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        title: prev.photoWall?.title || '',
+        subsections: [
+          ...(Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : []),
+          { id: makePhotoSubId(), title: '' },
+        ],
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function updatePhotoSubsection(idx, value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        title: prev.photoWall?.title || '',
+        subsections: (Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [])
+          .map((row, i) => (i === idx ? { ...row, title: value } : row)),
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function removePhotoSubsection(idx) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        title: prev.photoWall?.title || '',
+        subsections: (Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [])
+          .filter((_, i) => i !== idx),
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function movePhotoSubsection(idx, dir) {
+    setStructuredContent(prev => {
+      const arr = [...(Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [])];
+      const next = idx + dir;
+      if (next < 0 || next >= arr.length) return prev;
+      const tmp = arr[idx];
+      arr[idx] = arr[next];
+      arr[next] = tmp;
+      return {
+        ...prev,
+        photoWall: {
+          ...(prev.photoWall || {}),
+          title: prev.photoWall?.title || '',
+          subsections: arr,
+        },
+      };
     });
     setStructuredMessage('');
     setStructuredError('');
@@ -432,9 +516,9 @@ export default function EditPage() {
           </div>
 
           <div style={styles.sectionCard}>
-            <h2 style={styles.sectionTitle}>Structured Edit (Phase 1)</h2>
+            <h2 style={styles.sectionTitle}>Structured Edit (Phase 1 + 2)</h2>
             <p style={styles.sectionSub}>
-              Save as draft to preview first, then publish when ready.
+              Edit event details, schedule, and photo wall. Save as draft to preview first, then publish when ready.
             </p>
             {structuredLoading ? (
               <p style={styles.mutedText}>Loading structured content…</p>
@@ -528,6 +612,58 @@ export default function EditPage() {
                   </p>
                   {structuredMessage && <div style={styles.successBanner}>{structuredMessage}</div>}
                   {structuredError && <div style={styles.errorBanner}>⚠ {structuredError}</div>}
+                </div>
+
+                <div style={{ marginTop: 18 }}>
+                  <label style={styles.label}>Photo wall</label>
+                  <div style={styles.readOnlyWrap}>
+                    <div style={{ ...styles.row, marginBottom: 8 }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#b7b8da' }}>Current live photo wall</strong>
+                    </div>
+                    <div>
+                      <span style={styles.readOnlyLabel}>Section title</span>
+                      <div style={styles.readOnlyValue}>{currentPhotoWall?.title || '—'}</div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <span style={styles.readOnlyLabel}>Subsections</span>
+                      {(currentPhotoWall?.subsections || []).length ? (
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {(currentPhotoWall?.subsections || []).map((row) => (
+                            <li key={row.id || row.title} style={{ color: '#e7e7ff', fontSize: '0.88rem' }}>{row.title}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div style={styles.readOnlyValue}>—</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      style={styles.input}
+                      value={structuredContent.photoWall?.title || ''}
+                      onChange={e => setPhotoWallTitle(e.target.value)}
+                      placeholder="Photo wall title (e.g. Photo Gallery)"
+                    />
+                  </div>
+                  {(structuredContent.photoWall?.subsections || []).map((row, idx) => (
+                    <div key={row.id || `photo-row-${idx}`} style={styles.scheduleCard}>
+                      <input
+                        style={styles.input}
+                        value={row.title || ''}
+                        onChange={e => updatePhotoSubsection(idx, e.target.value)}
+                        placeholder={`Subsection ${idx + 1} title`}
+                      />
+                      <div style={{ ...styles.row, marginTop: 8 }}>
+                        <button type="button" style={styles.exampleChip} onClick={() => movePhotoSubsection(idx, -1)} disabled={idx === 0}>↑ Move up</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => movePhotoSubsection(idx, 1)} disabled={idx === (structuredContent.photoWall?.subsections || []).length - 1}>↓ Move down</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => removePhotoSubsection(idx)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ ...styles.row, marginTop: 10 }}>
+                    <button type="button" style={styles.btnSecondary} onClick={addPhotoSubsection}>+ Add photo subsection</button>
+                  </div>
                 </div>
               </>
             )}

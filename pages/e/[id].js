@@ -1173,6 +1173,49 @@ export async function getServerSideProps({ params, res, query }) {
       list.appendChild(li);
     });
   }
+  function isPhotoControl(el){
+    if(!el) return false;
+    var t=(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+    return ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
+      t.indexOf('add photos')!==-1 || t.indexOf('upload photos')!==-1;
+  }
+  function findScopedHeading(root){
+    if(!root) return null;
+    var local=root.querySelector('h2,h3,h4,strong,[class*="section-title"],[class*="title"]');
+    if(local && (local.textContent||'').trim().length<=140) return local;
+    return null;
+  }
+  function upsertPhotoWall(photoWall){
+    if(!photoWall||typeof photoWall!=='object') return;
+    var controls=qsa('button,label,a,[role="button"]').filter(isPhotoControl);
+    var subs=Array.isArray(photoWall.subsections)?photoWall.subsections:[];
+    var titleText=(photoWall.title||'').trim();
+    if(titleText){
+      var mainHeading=qsa('h2,h3,h4,strong,p,div').find(function(el){
+        var t=(el.textContent||'').trim().toLowerCase();
+        return /photo wall|photo gallery|gallery|memories|moments/.test(t);
+      });
+      if(mainHeading) mainHeading.textContent=titleText;
+      else if(controls[0]){
+        var parentSection=controls[0].closest('section')||controls[0].parentElement||document.body;
+        var h=findScopedHeading(parentSection);
+        if(h) h.textContent=titleText;
+      }
+    }
+    controls.forEach(function(ctrl, idx){
+      if(!subs[idx]||!subs[idx].title) return;
+      var section=ctrl.closest('section')||ctrl.parentElement;
+      if(!section) return;
+      var h=findScopedHeading(section);
+      if(h) h.textContent=subs[idx].title;
+      else {
+        var nh=document.createElement('h3');
+        nh.textContent=subs[idx].title;
+        nh.style.margin='0 0 10px 0';
+        section.insertBefore(nh, section.firstChild);
+      }
+    });
+  }
   function applyPhase1(){
     if(!phase1||typeof phase1!=='object') return;
     var d=phase1.eventDetails||{};
@@ -1196,6 +1239,7 @@ export async function getServerSideProps({ params, res, query }) {
       setByMatchers([/dress\\s*code/i], 'Dress Code: '+d.dressCode);
     }
     upsertSchedule(phase1.schedule||[]);
+    upsertPhotoWall(phase1.photoWall||{});
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', applyPhase1);
