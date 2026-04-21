@@ -52,6 +52,18 @@ const EXAMPLES = [
   'Add photo upload to the photo wall with remove buttons',
 ];
 
+const PHOTO_SUBSECTION_PRESETS = [
+  '🥂 Moments',
+  '💃 Dance Floor',
+  '🍽️ Food',
+  '🍰 Dessert Table',
+  '🍷 Drinks',
+  '👨‍👩‍👧‍👦 Family',
+  '🎉 Friends',
+  '📸 Ceremony',
+  '✨ Reception',
+];
+
 export default function EditPage() {
   const router = useRouter();
   const { id, admin } = router.query;
@@ -75,6 +87,7 @@ export default function EditPage() {
   const [currentPhotoWall, setCurrentPhotoWall] = useState(createEmptyPhase1Content('').photoWall);
   const [hasStructuredDraft, setHasStructuredDraft] = useState(false);
   const [hostToken, setHostToken] = useState('');
+  const [photoPreset, setPhotoPreset] = useState(PHOTO_SUBSECTION_PRESETS[2]);
 
   const liveUrl = id ? `/e/${id}` : null;
   const previewParams = new URLSearchParams();
@@ -307,6 +320,23 @@ export default function EditPage() {
         subsections: [
           ...(Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : []),
           { id: makePhotoSubId(), title: '' },
+        ],
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function addPhotoSubsectionFromPreset() {
+    const title = String(photoPreset || '').trim();
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        title: prev.photoWall?.title || '',
+        subsections: [
+          ...(Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : []),
+          { id: makePhotoSubId(), title },
         ],
       },
     }));
@@ -663,6 +693,16 @@ export default function EditPage() {
                   ))}
                   <div style={{ ...styles.row, marginTop: 10 }}>
                     <button type="button" style={styles.btnSecondary} onClick={addPhotoSubsection}>+ Add photo subsection</button>
+                    <select
+                      value={photoPreset}
+                      onChange={e => setPhotoPreset(e.target.value)}
+                      style={{ ...styles.select, minWidth: 180 }}
+                    >
+                      {PHOTO_SUBSECTION_PRESETS.map(option => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                    <button type="button" style={styles.btnSecondary} onClick={addPhotoSubsectionFromPreset}>+ Add preset</button>
                   </div>
                 </div>
               </>

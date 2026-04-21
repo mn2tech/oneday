@@ -1179,6 +1179,29 @@ export async function getServerSideProps({ params, res, query }) {
     return ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
       t.indexOf('add photos')!==-1 || t.indexOf('upload photos')!==-1;
   }
+  function stripIds(root){
+    if(!root) return;
+    if(root.id) root.removeAttribute('id');
+    Array.prototype.slice.call(root.querySelectorAll('[id]')).forEach(function(el){
+      el.removeAttribute('id');
+    });
+  }
+  function clearSectionMedia(root){
+    if(!root) return;
+    Array.prototype.slice.call(root.querySelectorAll('img,video,figure picture source')).forEach(function(el){
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    var gridSel='[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
+    Array.prototype.slice.call(root.querySelectorAll(gridSel)).forEach(function(grid){
+      grid.innerHTML='';
+      grid.removeAttribute('data-oneday-managed');
+    });
+    Array.prototype.slice.call(root.querySelectorAll('input[type="file"]')).forEach(function(inp){
+      inp.value='';
+      inp.removeAttribute('data-oneday-engine');
+      inp.style.cssText='position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;';
+    });
+  }
   function findScopedHeading(root){
     if(!root) return null;
     var local=root.querySelector('h2,h3,h4,strong,[class*="section-title"],[class*="title"]');
@@ -1215,6 +1238,34 @@ export async function getServerSideProps({ params, res, query }) {
         section.insertBefore(nh, section.firstChild);
       }
     });
+
+    if(subs.length>controls.length && controls.length){
+      var templateSection=controls[controls.length-1].closest('section')||controls[controls.length-1].parentElement;
+      var anchor=templateSection;
+      for(var i=controls.length;i<subs.length;i++){
+        var item=subs[i];
+        if(!item||!item.title||!templateSection||!anchor||!anchor.parentNode) continue;
+        var clone=templateSection.cloneNode(true);
+        stripIds(clone);
+        clearSectionMedia(clone);
+        var heading=findScopedHeading(clone);
+        if(heading) heading.textContent=item.title;
+        else {
+          var nh=document.createElement('h3');
+          nh.textContent=item.title;
+          nh.style.margin='0 0 10px 0';
+          clone.insertBefore(nh, clone.firstChild);
+        }
+        var cloneControls=Array.prototype.slice.call(clone.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
+        cloneControls.forEach(function(btn){
+          if(btn.tagName==='LABEL') btn.removeAttribute('for');
+          btn.textContent='Add Photos';
+          btn.removeAttribute('onclick');
+        });
+        anchor.parentNode.insertBefore(clone, anchor.nextSibling);
+        anchor=clone;
+      }
+    }
   }
   function applyPhase1(){
     if(!phase1||typeof phase1!=='object') return;
