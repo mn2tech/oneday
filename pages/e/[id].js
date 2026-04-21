@@ -1130,6 +1130,16 @@ export async function getServerSideProps({ params, res, query }) {
     }
     return false;
   }
+  function findByMatchers(matchers){
+    var nodes=singleTextNodes();
+    for(var i=0;i<nodes.length;i++){
+      var tx=(nodes[i].textContent||'').trim();
+      for(var j=0;j<matchers.length;j++){
+        if(matchers[j].test(tx)) return nodes[i];
+      }
+    }
+    return null;
+  }
   function upsertSchedule(items){
     if(!Array.isArray(items)||!items.length) return;
     var heading=qsa('h2,h3,h4,strong,p,div').find(function(el){
@@ -1434,6 +1444,50 @@ export async function getServerSideProps({ params, res, query }) {
     }
     upsertSchedule(phase1.schedule||[]);
     upsertPhotoWall(phase1.photoWall||{});
+    enableGuiEdit();
+  }
+  function enableGuiEdit(){
+    var isGui=false;
+    try{
+      var u=new URL(window.location.href);
+      isGui=u.searchParams.get('guiEdit')==='1';
+    }catch(e){}
+    if(!isGui) return;
+    var titleEl=document.querySelector('#hero h1,.hero h1,[class*="hero"] h1,h1');
+    var dateEl=findByMatchers([/📅/,/calendar/i,/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i]);
+    var locationEl=findByMatchers([/📍/,/\blocation\b/i,/\bvenue\b/i]);
+    var hostEl=findByMatchers([/hosted by/i,/^host[:\s]/i]);
+    var dressEl=findByMatchers([/dress\s*code/i]);
+    var targets=[
+      {key:'title', el:titleEl, toValue:function(v){ return String(v||'').trim(); }},
+      {key:'dateTime', el:dateEl, toValue:function(v){ return String(v||'').replace(/^.*?(?=\d|\bjan|\bfeb|\bmar|\bapr|\bmay|\bjun|\bjul|\baug|\bsep|\boct|\bnov|\bdec)/i,'').trim()||String(v||'').replace(/^📅\s*/,'').trim(); }},
+      {key:'location', el:locationEl, toValue:function(v){ return String(v||'').replace(/^📍\s*/,'').replace(/^(location|venue)\s*[:\-]?\s*/i,'').trim(); }},
+      {key:'host', el:hostEl, toValue:function(v){ return String(v||'').replace(/^hosted by\s*/i,'').replace(/^host\s*[:\-]?\s*/i,'').trim(); }},
+      {key:'dressCode', el:dressEl, toValue:function(v){ return String(v||'').replace(/^dress\s*code\s*[:\-]?\s*/i,'').trim(); }},
+    ];
+    function postUpdate(){
+      var payload={};
+      targets.forEach(function(t){
+        if(!t.el) return;
+        payload[t.key]=t.toValue(t.el.textContent||'');
+      });
+      try{
+        window.parent.postMessage({ type:'oneday_gui_update', payload:payload }, '*');
+      }catch(e){}
+    }
+    targets.forEach(function(t){
+      if(!t.el || t.el.dataset.onedayGui) return;
+      t.el.dataset.onedayGui='1';
+      t.el.setAttribute('contenteditable','true');
+      t.el.setAttribute('spellcheck','false');
+      t.el.style.outline='1px dashed rgba(124,92,252,0.65)';
+      t.el.style.outlineOffset='2px';
+      t.el.title='Editable in preview';
+      t.el.addEventListener('blur', postUpdate);
+      t.el.addEventListener('keydown', function(ev){
+        if(ev.key==='Enter'){ ev.preventDefault(); t.el.blur(); }
+      });
+    });
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', applyPhase1);
