@@ -1094,6 +1094,31 @@ export async function getServerSideProps({ params, res, query }) {
   }catch(e){}
 })();
 <\/script>`;
+  const hostEditLauncher = `<script>
+(function(){
+  function hasHostToken(){
+    try{
+      var eid=(window.__ONEDAY_EID__||'').slice(0,80);
+      return !!sessionStorage.getItem('oneday_host_'+eid);
+    }catch(e){ return false; }
+  }
+  function mount(){
+    if(!hasHostToken()) return;
+    if(document.getElementById('oneday-host-edit-link')) return;
+    var a=document.createElement('a');
+    a.id='oneday-host-edit-link';
+    a.href='/edit/'+encodeURIComponent((window.__ONEDAY_EID__||'').slice(0,80));
+    a.textContent='Edit Theme & Content';
+    a.style.cssText='position:fixed;right:12px;bottom:52px;z-index:99999;padding:8px 12px;border-radius:999px;background:rgba(124,92,252,0.95);color:#fff;font:600 12px/1.2 Inter,system-ui,sans-serif;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.25);';
+    document.body.appendChild(a);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',mount);
+  } else {
+    mount();
+  }
+})();
+<\/script>`;
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
@@ -1101,6 +1126,8 @@ export async function getServerSideProps({ params, res, query }) {
     themeStyleTag +
     '\n' +
     eidScript +
+    '\n' +
+    hostEditLauncher +
     '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
