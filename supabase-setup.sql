@@ -5,6 +5,7 @@ create table if not exists event_apps (
   title              text,
   html               text,
   prompt             text,
+  theme_preset       text        default 'default',
   plan               text,
   email              text,
   event_date         text,

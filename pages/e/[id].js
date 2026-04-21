@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
 import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
+import { buildThemePresetStyleTag, normalizeThemePreset } from '../../lib/eventThemePresets';
 
 function injectAfterBodyOpen(html, snippet) {
   const lower = html.toLowerCase();
@@ -1046,19 +1047,33 @@ const PHOTO_ENGINE_S3 = `<script>
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getServerSideProps({ params, res }) {
+export async function getServerSideProps({ params, res, query }) {
   const { id } = params;
   const supabase = getSupabase();
+  let queryThemePreset = 'default';
 
-  const { data } = await supabase
+  let { data } = await supabase
     .from('event_apps')
-    .select('html, title, is_live')
+    .select('html, title, is_live, theme_preset')
     .eq('id', id)
     .single();
+  if (!data) {
+    // Backward compatibility for databases that do not have theme_preset yet.
+    const fallback = await supabase
+      .from('event_apps')
+      .select('html, title, is_live')
+      .eq('id', id)
+      .single();
+    data = fallback.data || null;
+  }
 
   if (!data || !data.html) {
     return { notFound: true };
   }
+  queryThemePreset = normalizeThemePreset(query?.themePreview || 'default');
+  const savedThemePreset = normalizeThemePreset(data.theme_preset || 'default');
+  const activeThemePreset = queryThemePreset !== 'default' ? queryThemePreset : savedThemePreset;
+  const themeStyleTag = buildThemePresetStyleTag(activeThemePreset);
 
   const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
 
@@ -1082,6 +1097,8 @@ export async function getServerSideProps({ params, res }) {
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
+    '\n' +
+    themeStyleTag +
     '\n' +
     eidScript +
     '\n' +
