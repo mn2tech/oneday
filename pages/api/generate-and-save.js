@@ -322,8 +322,9 @@ export default async function handler(req, res) {
 
   const { prompt, plan, tier, email, paymentIntentId, eventMeta, deviceId } = req.body || {};
   const creatorDeviceId = normalizeDeviceId(deviceId);
-  const eventTier = tier === 'free' ? 'free' : 'pro';
-  const isFree = eventTier === 'free';
+  // isFree: client sends tier='free' OR paymentIntentId starts with 'free_' (belt-and-suspenders)
+  const isFree = tier === 'free' || (typeof paymentIntentId === 'string' && paymentIntentId.startsWith('free_'));
+  const eventTier = isFree ? 'free' : 'pro';
 
   // Input validation
   if (!prompt || !email) {
