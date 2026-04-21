@@ -1288,23 +1288,16 @@ export async function getServerSideProps({ params, res, query }) {
   function removeLegacySubsectionLabels(root, keepTitle){
     if(!root) return;
     var keep=(keepTitle||'').trim().toLowerCase();
-    function normalizeLabel(text){
-      return String(text||'')
-        .toLowerCase()
-        .replace(/[^a-z0-9&\s]/g,' ')
-        .replace(/\s+/g,' ')
-        .trim();
-    }
-    var badRe=/(^|\s)(celebration moments|moments|fun & festivity|fun and festivity)(\s|$)/i;
+    var badRe=/^(celebration moments|moments|fun\s*&\s*festivity|fun and festivity)$/i;
     var targets=Array.prototype.slice.call(root.querySelectorAll('h2,h3,h4,strong,p,div,span'));
     targets.forEach(function(el){
-      if(!el) return;
+      if(!el || el.children.length) return;
       var tx=(el.textContent||'').replace(/\s+/g,' ').trim();
       if(!tx) return;
-      var low=normalizeLabel(tx);
+      var low=tx.toLowerCase();
       if(low===keep) return;
       if(isMainPhotoHeadingText(tx)) return;
-      if(!badRe.test(low)) return;
+      if(!badRe.test(tx)) return;
       // Keep any potential interactive wrappers untouched.
       if(el.querySelector && el.querySelector('button,label,a,[role="button"]')) return;
       el.remove();
