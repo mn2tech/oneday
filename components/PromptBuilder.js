@@ -3,7 +3,22 @@ import styles from '../styles/PromptBuilder.module.css';
 
 const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby Shower', 'Bridal Shower', 'Graduation', 'Corporate', 'Party', 'Other'];
 
-const COLOR_SUGGESTIONS = ['Gold & Purple', 'Black & Gold', 'Blush & Ivory', 'Navy & Silver', 'Tropical Brights', 'Sage & Terracotta'];
+const COLOR_THEMES = [
+  { name: 'Gold & Purple', colors: ['#b8860b', '#6d28d9', '#f5e6a3'] },
+  { name: 'Black & Gold', colors: ['#0b0b10', '#c9a227', '#2f2f38'] },
+  { name: 'Blush & Ivory', colors: ['#f4c2c2', '#fff8e7', '#d88fa8'] },
+  { name: 'Navy & Silver', colors: ['#102a43', '#cbd5e1', '#334e68'] },
+  { name: 'Tropical Brights', colors: ['#06d6a0', '#ffd166', '#ef476f'] },
+  { name: 'Sage & Terracotta', colors: ['#a3b18a', '#bc6c25', '#dde5d0'] },
+  { name: 'Rose Gold & Cream', colors: ['#b76e79', '#fff4ea', '#d8a39d'] },
+  { name: 'Emerald & Champagne', colors: ['#047857', '#f7e7ce', '#0f766e'] },
+  { name: 'Lavender & Pearl', colors: ['#b8a1e3', '#f8f6ff', '#8570b8'] },
+  { name: 'Royal Blue & White', colors: ['#1d4ed8', '#ffffff', '#93c5fd'] },
+  { name: 'Sunset Coral', colors: ['#ff6b6b', '#f7b267', '#ffe66d'] },
+  { name: 'Forest & Linen', colors: ['#386641', '#f2e8cf', '#6a994e'] },
+  { name: 'Burgundy & Gold', colors: ['#7f1d1d', '#d4af37', '#fef3c7'] },
+  { name: 'Teal & Peach', colors: ['#0f766e', '#ffb4a2', '#99f6e4'] },
+];
 
 let scheduleIdCounter = 0;
 function nextScheduleId() {
@@ -323,8 +338,20 @@ export default function PromptBuilder({ onComplete }) {
               onChange={e => set('colorTheme', e.target.value)}
             />
             <div className={styles.colorChips}>
-              {COLOR_SUGGESTIONS.map(c => (
-                <button key={c} type="button" className={styles.colorChip} onClick={() => set('colorTheme', c)}>{c}</button>
+              {COLOR_THEMES.map(theme => (
+                <button
+                  key={theme.name}
+                  type="button"
+                  className={`${styles.colorChip} ${form.colorTheme === theme.name ? styles.colorChipActive : ''}`}
+                  onClick={() => set('colorTheme', theme.name)}
+                >
+                  <span className={styles.colorSwatches}>
+                    {theme.colors.map(color => (
+                      <span key={color} className={styles.colorSwatch} style={{ background: color }} />
+                    ))}
+                  </span>
+                  <span>{theme.name}</span>
+                </button>
               ))}
             </div>
           </div>

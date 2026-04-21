@@ -104,27 +104,49 @@
 
 /* Color suggestion chips */
 .colorChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
   margin-top: 8px;
 }
 
 .colorChip {
-  background: transparent;
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-text-muted);
-  padding: 3px 10px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: 8px 10px;
+  font-size: 0.78rem;
   cursor: pointer;
   transition: all var(--transition);
   font-family: var(--font-body);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
 }
 
 .colorChip:hover {
   border-color: var(--color-accent);
-  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.colorChipActive {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.2);
+}
+
+.colorSwatches {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.colorSwatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 /* Schedule */
