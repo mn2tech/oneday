@@ -1302,7 +1302,6 @@ export async function getServerSideProps({ params, res, query }) {
       setByMatchers([/dress\\s*code/i], 'Dress Code: '+d.dressCode);
     }
     upsertSchedule(phase1.schedule||[]);
-    upsertPhotoWall(phase1.photoWall||{});
   }
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', applyPhase1);
