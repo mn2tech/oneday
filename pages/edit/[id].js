@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { EVENT_THEME_PRESETS } from '../../lib/eventThemePresets';
+import { createEmptyPhase1Content } from '../../lib/eventStructuredPhase1';
 
 const THEME_PRESETS = EVENT_THEME_PRESETS;
 
@@ -30,6 +31,12 @@ const styles = {
   select: { minWidth: 220, background: '#1c1c28', border: '1px solid #2a2a3d', borderRadius: 12, color: '#f0f0f5', padding: '10px 12px', fontSize: '0.95rem', outline: 'none' },
   btnSecondary: { background: 'transparent', color: '#c6b7ff', border: '1px solid #4b3f77', borderRadius: 12, padding: '10px 14px', fontWeight: 600, cursor: 'pointer' },
   mutedText: { fontSize: '0.85rem', color: '#8888aa', marginTop: 8 },
+  sectionCard: { marginBottom: 24, border: '1px solid #2a2a3d', borderRadius: 14, padding: '16px 14px', background: '#171722' },
+  sectionTitle: { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f0f0f5' },
+  sectionSub: { margin: '6px 0 14px', color: '#8888aa', fontSize: '0.84rem' },
+  gridTwo: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 },
+  input: { width: '100%', background: '#1c1c28', border: '1px solid #2a2a3d', borderRadius: 10, color: '#f0f0f5', padding: '10px 12px', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' },
+  scheduleCard: { border: '1px solid #2a2a3d', background: '#141420', borderRadius: 12, padding: 12, marginTop: 10 },
 };
 
 const EXAMPLES = [
@@ -44,7 +51,7 @@ const EXAMPLES = [
 
 export default function EditPage() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, admin } = router.query;
   const [changeRequest, setChangeRequest] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -54,10 +61,60 @@ export default function EditPage() {
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeMessage, setThemeMessage] = useState('');
   const [themeError, setThemeError] = useState('');
+  const [structuredContent, setStructuredContent] = useState(createEmptyPhase1Content(''));
+  const [structuredLoading, setStructuredLoading] = useState(false);
+  const [structuredSaving, setStructuredSaving] = useState(false);
+  const [structuredError, setStructuredError] = useState('');
+  const [structuredMessage, setStructuredMessage] = useState('');
 
   const liveUrl = id ? `/e/${id}` : null;
   const previewThemeQs = themePreset !== 'default' ? `?themePreview=${encodeURIComponent(themePreset)}` : '';
   const previewUrl = liveUrl ? `${liveUrl}${previewThemeQs}` : null;
+
+  function makeScheduleId() {
+    return `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function getDeviceId() {
+    if (typeof window === 'undefined') return '';
+    const key = 'oneday_device_global_v1';
+    let v = localStorage.getItem(key) || '';
+    if (!v || v.length < 16) {
+      v = '';
+      if (window.crypto?.getRandomValues) {
+        const a = new Uint8Array(16);
+        window.crypto.getRandomValues(a);
+        for (let i = 0; i < 16; i += 1) v += (`0${a[i].toString(16)}`).slice(-2);
+      } else {
+        v = `${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
+      }
+      v = String(v).toLowerCase().replace(/[^a-f0-9]/g, '').slice(0, 32);
+      localStorage.setItem(key, v);
+    }
+    return v;
+  }
+
+  function getAdminToken() {
+    if (typeof window === 'undefined' || !id) return '';
+    const eventId = String(id).slice(0, 80);
+    const storageKey = `oneday_host_${eventId}`;
+    let token = sessionStorage.getItem(storageKey) || '';
+    const queryToken = Array.isArray(admin) ? admin[0] : admin;
+    if (!token && typeof queryToken === 'string' && queryToken.trim().length >= 32) {
+      token = queryToken.trim();
+      sessionStorage.setItem(storageKey, token);
+    }
+    return token;
+  }
+
+  function authHeaders() {
+    const headers = {};
+    const adminToken = getAdminToken();
+    const deviceId = getDeviceId();
+    if (adminToken) headers['x-admin-token'] = adminToken;
+    if (deviceId) headers['x-device-id'] = deviceId;
+    return headers;
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -71,6 +128,33 @@ export default function EditPage() {
       .catch(() => {});
     return () => { alive = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    setStructuredLoading(true);
+    setStructuredError('');
+    fetch(`/api/event-structured-phase1?eventId=${encodeURIComponent(id)}`, {
+      headers: authHeaders(),
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!alive) return;
+        if (!ok) {
+          setStructuredError(j.error || 'Could not load structured editor data.');
+          setStructuredLoading(false);
+          return;
+        }
+        setStructuredContent(j.content || createEmptyPhase1Content(''));
+        setStructuredLoading(false);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setStructuredError('Network error loading structured data.');
+        setStructuredLoading(false);
+      });
+    return () => { alive = false; };
+  }, [id, admin]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -130,6 +214,85 @@ export default function EditPage() {
     }
   }
 
+  function setDetailField(key, value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      eventDetails: { ...(prev.eventDetails || {}), [key]: value },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function updateScheduleItem(idx, key, value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      schedule: (prev.schedule || []).map((item, i) => (i === idx ? { ...item, [key]: value } : item)),
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function addScheduleItem() {
+    setStructuredContent(prev => ({
+      ...prev,
+      schedule: [...(prev.schedule || []), { id: makeScheduleId(), time: '', title: '', description: '' }],
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function removeScheduleItem(idx) {
+    setStructuredContent(prev => ({
+      ...prev,
+      schedule: (prev.schedule || []).filter((_, i) => i !== idx),
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function moveScheduleItem(idx, dir) {
+    setStructuredContent(prev => {
+      const arr = [...(prev.schedule || [])];
+      const next = idx + dir;
+      if (next < 0 || next >= arr.length) return prev;
+      const tmp = arr[idx];
+      arr[idx] = arr[next];
+      arr[next] = tmp;
+      return { ...prev, schedule: arr };
+    });
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  async function saveStructuredPhase1() {
+    if (!id || structuredSaving) return;
+    setStructuredSaving(true);
+    setStructuredMessage('');
+    setStructuredError('');
+    try {
+      const res = await fetch('/api/event-structured-phase1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({
+          eventId: id,
+          adminToken: getAdminToken(),
+          deviceId: getDeviceId(),
+          content: structuredContent,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStructuredError(data.error || 'Could not save structured content.');
+      } else {
+        setStructuredMessage('Structured Phase 1 content saved.');
+      }
+    } catch {
+      setStructuredError('Network error while saving structured content.');
+    } finally {
+      setStructuredSaving(false);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -185,6 +348,62 @@ export default function EditPage() {
             <p style={styles.mutedText}>Pick a style, preview it below, then save before sharing.</p>
             {themeMessage && <div style={styles.successBanner}>{themeMessage}</div>}
             {themeError && <div style={styles.errorBanner}>⚠ {themeError}</div>}
+          </div>
+
+          <div style={styles.sectionCard}>
+            <h2 style={styles.sectionTitle}>Structured Edit (Phase 1)</h2>
+            <p style={styles.sectionSub}>
+              Update event details and schedule in structured fields. This phase stores admin data safely before full renderer integration.
+            </p>
+            {structuredLoading ? (
+              <p style={styles.mutedText}>Loading structured content…</p>
+            ) : (
+              <>
+                <label style={styles.label}>Event details</label>
+                <div style={styles.gridTwo}>
+                  <input style={styles.input} value={structuredContent.eventDetails?.title || ''} onChange={e => setDetailField('title', e.target.value)} placeholder="Event title" />
+                  <input style={styles.input} value={structuredContent.eventDetails?.dateTime || ''} onChange={e => setDetailField('dateTime', e.target.value)} placeholder="Date & time" />
+                  <input style={styles.input} value={structuredContent.eventDetails?.location || ''} onChange={e => setDetailField('location', e.target.value)} placeholder="Location" />
+                  <input style={styles.input} value={structuredContent.eventDetails?.host || ''} onChange={e => setDetailField('host', e.target.value)} placeholder="Host name" />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <input style={styles.input} value={structuredContent.eventDetails?.dressCode || ''} onChange={e => setDetailField('dressCode', e.target.value)} placeholder="Dress code" />
+                </div>
+
+                <div style={{ marginTop: 18 }}>
+                  <label style={styles.label}>Schedule</label>
+                  {(structuredContent.schedule || []).map((item, idx) => (
+                    <div key={item.id || `row-${idx}`} style={styles.scheduleCard}>
+                      <div style={styles.gridTwo}>
+                        <input style={styles.input} value={item.time || ''} onChange={e => updateScheduleItem(idx, 'time', e.target.value)} placeholder="Time (e.g. 5:00 PM)" />
+                        <input style={styles.input} value={item.title || ''} onChange={e => updateScheduleItem(idx, 'title', e.target.value)} placeholder="Schedule title" />
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <input style={styles.input} value={item.description || ''} onChange={e => updateScheduleItem(idx, 'description', e.target.value)} placeholder="Description (optional)" />
+                      </div>
+                      <div style={{ ...styles.row, marginTop: 8 }}>
+                        <button type="button" style={styles.exampleChip} onClick={() => moveScheduleItem(idx, -1)} disabled={idx === 0}>↑ Move up</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => moveScheduleItem(idx, 1)} disabled={idx === (structuredContent.schedule || []).length - 1}>↓ Move down</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => removeScheduleItem(idx)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ ...styles.row, marginTop: 10 }}>
+                    <button type="button" style={styles.btnSecondary} onClick={addScheduleItem}>+ Add schedule item</button>
+                    <button
+                      type="button"
+                      style={{ ...styles.btnSecondary, ...(structuredSaving ? styles.btnDisabled : {}) }}
+                      onClick={saveStructuredPhase1}
+                      disabled={structuredSaving}
+                    >
+                      {structuredSaving ? 'Saving…' : 'Save Structured Data'}
+                    </button>
+                  </div>
+                  {structuredMessage && <div style={styles.successBanner}>{structuredMessage}</div>}
+                  {structuredError && <div style={styles.errorBanner}>⚠ {structuredError}</div>}
+                </div>
+              </>
+            )}
           </div>
 
           <form onSubmit={handleSubmit}>
