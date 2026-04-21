@@ -11,6 +11,7 @@ function nextScheduleId() {
   return `sched_${Date.now()}_${scheduleIdCounter}`;
 }
 const EMPTY_SCHEDULE = () => ({ id: nextScheduleId(), time: '', description: '' });
+const EMPTY_PHOTO_SUBSECTION = () => ({ id: nextScheduleId(), title: '' });
 
 const DEFAULT_FORM = {
   eventType: '',
@@ -21,6 +22,7 @@ const DEFAULT_FORM = {
   time: '',
   venue: '',
   scheduleItems: [EMPTY_SCHEDULE(), EMPTY_SCHEDULE()],
+  photoSubsections: [EMPTY_PHOTO_SUBSECTION(), EMPTY_PHOTO_SUBSECTION()],
   dressCode: '',
   colorTheme: '',
   specialNotes: '',
@@ -48,6 +50,13 @@ function assemblePrompt(f) {
   if (schedule.length > 0) {
     const schedStr = schedule.map(s => s.time ? `${s.time} – ${s.description}` : s.description).join(', ');
     parts.push(`Schedule: ${schedStr}.`);
+  }
+
+  const photoSubsections = f.photoSubsections
+    .map(s => s.title.trim())
+    .filter(Boolean);
+  if (photoSubsections.length > 0) {
+    parts.push(`Photo wall subsections should be: ${photoSubsections.join(', ')}.`);
   }
 
   if (f.dressCode) parts.push(`Dress code: ${f.dressCode}.`);
@@ -88,6 +97,8 @@ function getChecks(f) {
   if (!f.time.trim()) checks.push({ level: 'suggestion', field: 'time', message: 'Adding a start time makes the countdown more precise' });
   if (f.scheduleItems.filter(s => s.description.trim()).length === 0)
     checks.push({ level: 'warning', field: 'schedule', message: 'No schedule items — add a few for a richer timeline section' });
+  if (f.photoSubsections.filter(s => s.title.trim()).length === 0)
+    checks.push({ level: 'suggestion', field: 'photoSubsections', message: 'Add photo wall subsections so guests know where to upload memories' });
   if (!f.dressCode.trim()) checks.push({ level: 'suggestion', field: 'dressCode', message: 'A dress code adds a nice personal touch' });
   if (!f.colorTheme.trim()) checks.push({ level: 'suggestion', field: 'colorTheme', message: 'A color theme helps the AI match the design to your event' });
 
@@ -117,6 +128,21 @@ export default function PromptBuilder({ onComplete }) {
 
   function removeScheduleItem(id) {
     setForm(f => ({ ...f, scheduleItems: f.scheduleItems.filter(s => s.id !== id) }));
+  }
+
+  function setPhotoSubsection(id, value) {
+    setForm(f => ({
+      ...f,
+      photoSubsections: f.photoSubsections.map(s => s.id === id ? { ...s, title: value } : s),
+    }));
+  }
+
+  function addPhotoSubsection() {
+    setForm(f => ({ ...f, photoSubsections: [...f.photoSubsections, EMPTY_PHOTO_SUBSECTION()] }));
+  }
+
+  function removePhotoSubsection(id) {
+    setForm(f => ({ ...f, photoSubsections: f.photoSubsections.filter(s => s.id !== id) }));
   }
 
   function handleReview() {
@@ -246,6 +272,34 @@ export default function PromptBuilder({ onComplete }) {
           </div>
           <button type="button" className={styles.addBtn} onClick={addScheduleItem}>
             + Add item
+          </button>
+        </div>
+
+        {/* Photo Wall subsections */}
+        <div className={styles.field}>
+          <label className={styles.label}>Photo wall subsections</label>
+          <div className={styles.scheduleList}>
+            {form.photoSubsections.map((item, i) => (
+              <div key={item.id} className={styles.scheduleRow}>
+                <input
+                  className={styles.scheduleDesc}
+                  placeholder={`e.g. ${['Ceremony', 'Reception', 'Family moments', 'After party'][i] || 'Photo subsection'}`}
+                  value={item.title}
+                  onChange={e => setPhotoSubsection(item.id, e.target.value)}
+                />
+                {form.photoSubsections.length > 1 && (
+                  <button
+                    type="button"
+                    className={styles.removeBtn}
+                    onClick={() => removePhotoSubsection(item.id)}
+                    aria-label="Remove"
+                  >×</button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button type="button" className={styles.addBtn} onClick={addPhotoSubsection}>
+            + Add subsection
           </button>
         </div>
 
