@@ -1296,30 +1296,18 @@ export async function getServerSideProps({ params, res, query }) {
         .trim();
     }
     var badRe=/(^|\s)(celebration moments|moments|fun & festivity|fun and festivity)(\s|$)/i;
-    // Pass 1: scrub matching legacy phrases at text-node level (handles icon + nested wrappers).
-    var walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    var textNodes=[];
-    while(walker.nextNode()) textNodes.push(walker.currentNode);
-    textNodes.forEach(function(node){
-      var raw=node&&node.nodeValue?node.nodeValue:'';
-      var tx=raw.replace(/\s+/g,' ').trim();
+    var targets=Array.prototype.slice.call(root.querySelectorAll('h2,h3,h4,strong,p,div,span'));
+    targets.forEach(function(el){
+      if(!el) return;
+      var tx=(el.textContent||'').replace(/\s+/g,' ').trim();
       if(!tx) return;
       var low=normalizeLabel(tx);
       if(low===keep) return;
       if(isMainPhotoHeadingText(tx)) return;
       if(!badRe.test(low)) return;
-      node.nodeValue='';
-    });
-
-    // Pass 2: remove now-empty wrappers that are not interactive/media containers.
-    var targets=Array.prototype.slice.call(root.querySelectorAll('h1,h2,h3,h4,strong,p,div,span,small,em,i,b'));
-    targets.forEach(function(el){
-      if(!el) return;
-      if(el.querySelector && el.querySelector('button,label,a,[role="button"],input,textarea,select,img,video,svg,canvas')) return;
-      var tx=(el.textContent||'').replace(/\s+/g,' ').trim();
-      if(tx) return;
-      if(el.childElementCount>0) return;
-      if(el.parentNode) el.parentNode.removeChild(el);
+      // Keep any potential interactive wrappers untouched.
+      if(el.querySelector && el.querySelector('button,label,a,[role="button"]')) return;
+      el.remove();
     });
   }
   function upsertPhotoWall(photoWall){
