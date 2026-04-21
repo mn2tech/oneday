@@ -99,7 +99,6 @@ export default function EditPage() {
   const previewParams = new URLSearchParams();
   if (themePreset !== 'default') previewParams.set('themePreview', themePreset);
   if (hasStructuredDraft) previewParams.set('phase1Preview', 'draft');
-  previewParams.set('guiEdit', '1');
   if (hostToken) previewParams.set('admin', hostToken);
   const previewQs = previewParams.toString();
   const previewUrl = liveUrl ? `${liveUrl}${previewQs ? `?${previewQs}` : ''}` : null;
@@ -196,29 +195,6 @@ export default function EditPage() {
     setHostToken(tok || '');
     loadStructuredPhase1(id);
   }, [id, admin]);
-
-  useEffect(() => {
-    function onGuiMessage(ev) {
-      const msg = ev?.data;
-      if (!msg || msg.type !== 'oneday_gui_update' || !msg.payload) return;
-      const p = msg.payload || {};
-      setStructuredContent(prev => ({
-        ...prev,
-        eventDetails: {
-          ...(prev.eventDetails || {}),
-          title: p.title != null ? p.title : prev.eventDetails?.title || '',
-          dateTime: p.dateTime != null ? p.dateTime : prev.eventDetails?.dateTime || '',
-          location: p.location != null ? p.location : prev.eventDetails?.location || '',
-          host: p.host != null ? p.host : prev.eventDetails?.host || '',
-          dressCode: p.dressCode != null ? p.dressCode : prev.eventDetails?.dressCode || '',
-        },
-      }));
-      setStructuredMessage('GUI preview edit captured. Save Draft to keep changes.');
-      setStructuredError('');
-    }
-    window.addEventListener('message', onGuiMessage);
-    return () => window.removeEventListener('message', onGuiMessage);
-  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -661,7 +637,6 @@ export default function EditPage() {
                   <p style={styles.mutedText}>
                     {hasStructuredDraft ? 'Draft mode active: preview shows draft.' : 'No draft: preview shows live content.'}
                   </p>
-                  <p style={styles.mutedText}>Tip: click text in preview to edit directly (GUI edit mode), then Save Draft.</p>
                   {structuredMessage && <div style={styles.successBanner}>{structuredMessage}</div>}
                   {structuredError && <div style={styles.errorBanner}>⚠ {structuredError}</div>}
                 </div>
