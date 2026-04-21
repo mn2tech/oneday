@@ -221,10 +221,10 @@ export default function Home() {
     setSelectedPlan(planId);
     setSelectedTier(plan?.tier || 'pro');
 
-    // Free tier — skip payment entirely
+    // Free tier — skip payment entirely, pass tier directly to avoid stale state
     if (planId === 'free') {
       setErrorMsg('');
-      handlePaymentSuccess(`free_${Date.now()}`);
+      handlePaymentSuccess(`free_${Date.now()}`, 'free');
       return;
     }
 
@@ -243,7 +243,10 @@ export default function Home() {
   }
 
   // Step 3 payment success → start generation
-  async function handlePaymentSuccess(paymentIntentId) {
+  // tierOverride is passed directly to avoid stale closure on selectedTier
+  async function handlePaymentSuccess(paymentIntentId, tierOverride) {
+    const tierToSend = tierOverride || selectedTier;
+    setSelectedTier(tierToSend);
     setStep(4);
     setGenerationStatus('Building your event app with AI…');
     setErrorMsg('');
@@ -259,7 +262,7 @@ export default function Home() {
         body: JSON.stringify({
           prompt,
           plan: selectedPlan,
-          tier: selectedTier,
+          tier: tierToSend,
           email,
           paymentIntentId,
           eventMeta,
