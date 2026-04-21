@@ -1212,37 +1212,6 @@ export async function getServerSideProps({ params, res, query }) {
     var t=(text||'').trim().toLowerCase();
     return /photo wall|photo gallery|gallery|memories|moments/.test(t);
   }
-  function countPhotoControls(root){
-    if(!root||!root.querySelectorAll) return 0;
-    return Array.prototype.slice.call(root.querySelectorAll('button,label,a,[role="button"]'))
-      .filter(isPhotoControl).length;
-  }
-  function findSubsectionTemplateBlock(control){
-    if(!control) return null;
-    var node=control.parentElement;
-    var best=node;
-    while(node && node!==document.body){
-      if(node.tagName==='SECTION') break;
-      var ownControls=countPhotoControls(node);
-      var hasHeading=!!findPhotoSubHeading(node, control);
-      if(hasHeading && ownControls===1){
-        best=node;
-      }
-      var parent=node.parentElement;
-      if(!parent) break;
-      if(parent.tagName==='SECTION'){
-        if(hasHeading && ownControls===1) best=node;
-        break;
-      }
-      var parentControls=countPhotoControls(parent);
-      if(parentControls>1){
-        if(hasHeading && ownControls===1) best=node;
-        break;
-      }
-      node=parent;
-    }
-    return best||control.parentElement;
-  }
   function findPhotoSubHeading(section, control){
     if(!section) return null;
     var headingSelectors='h2,h3,h4,strong,[class*="section-title"],[class*="title"]';
@@ -1282,40 +1251,26 @@ export async function getServerSideProps({ params, res, query }) {
       }
     });
 
+    // IMPORTANT: Do not clone/create new full photo-wall sections for extra subsection names.
+    // Extra subsection titles are rendered as lightweight labels under the existing photo wall.
     if(subs.length>controls.length && controls.length){
-      var templateControl=controls[controls.length-1];
-      var templateBlock=findSubsectionTemplateBlock(templateControl);
-      if(!templateBlock || !templateBlock.parentNode) return;
-      var hostSection=templateControl.closest('section')||templateBlock.parentElement;
-      if(!hostSection) return;
-      Array.prototype.slice.call(hostSection.querySelectorAll('[data-oneday-generated-subsection="1"]')).forEach(function(el){
-        if(el&&el.parentNode) el.parentNode.removeChild(el);
-      });
-      var anchorBlock=templateBlock;
+      var host=controls[0].closest('section')||controls[0].parentElement||document.body;
+      if(!host) return;
+      var existingWrap=host.querySelector('[data-oneday-extra-subsections="1"]');
+      if(existingWrap) existingWrap.remove();
+      var wrap=document.createElement('div');
+      wrap.setAttribute('data-oneday-extra-subsections','1');
+      wrap.style.cssText='margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;';
       for(var i=controls.length;i<subs.length;i++){
         var item=subs[i];
         if(!item||!item.title) continue;
-        var clone=templateBlock.cloneNode(true);
-        clone.setAttribute('data-oneday-generated-subsection','1');
-        stripIds(clone);
-        clearSectionMedia(clone);
-        var cloneControl=clone.querySelector('button,label,a,[role="button"]');
-        var heading=findPhotoSubHeading(clone, cloneControl);
-        if(heading) heading.textContent=item.title;
-        else {
-          var nh=document.createElement('h3');
-          nh.textContent=item.title;
-          nh.style.margin='0 0 10px 0';
-          clone.insertBefore(nh, clone.firstChild);
-        }
-        var cloneControls=Array.prototype.slice.call(clone.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
-        cloneControls.forEach(function(btn){
-          if(btn.tagName==='LABEL') btn.removeAttribute('for');
-          btn.textContent='Add Photos';
-          btn.removeAttribute('onclick');
-        });
-        anchorBlock.parentNode.insertBefore(clone, anchorBlock.nextSibling);
-        anchorBlock=clone;
+        var chip=document.createElement('span');
+        chip.textContent=item.title;
+        chip.style.cssText='display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);font-size:12px;line-height:1.2;';
+        wrap.appendChild(chip);
+      }
+      if(wrap.childNodes.length){
+        host.appendChild(wrap);
       }
     }
   }
