@@ -3,6 +3,7 @@ import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
 import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
 import { buildThemePresetStyleTag, normalizeThemePreset } from '../../lib/eventThemePresets';
+import { normalizePhase1Content } from '../../lib/eventStructuredPhase1';
 
 function injectAfterBodyOpen(html, snippet) {
   const lower = html.toLowerCase();
@@ -1054,7 +1055,7 @@ export async function getServerSideProps({ params, res, query }) {
 
   let { data } = await supabase
     .from('event_apps')
-    .select('html, title, is_live, theme_preset')
+    .select('html, title, is_live, theme_preset, content_phase1')
     .eq('id', id)
     .single();
   if (!data) {
@@ -1074,6 +1075,8 @@ export async function getServerSideProps({ params, res, query }) {
   const savedThemePreset = normalizeThemePreset(data.theme_preset || 'default');
   const activeThemePreset = queryThemePreset !== 'default' ? queryThemePreset : savedThemePreset;
   const themeStyleTag = buildThemePresetStyleTag(activeThemePreset);
+  const phase1Content = normalizePhase1Content(data.content_phase1 || {}, data.title || '');
+  const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
 
   const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
 
@@ -1092,6 +1095,105 @@ export async function getServerSideProps({ params, res, query }) {
       window.history.replaceState({},'', u.pathname+u.search+u.hash);
     }
   }catch(e){}
+})();
+<\/script>`;
+  const phase1ApplyScript = `<script>
+(function(){
+  var phase1=${phase1Payload};
+  function qsa(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function singleTextNodes(){
+    return qsa('h1,h2,h3,h4,p,div,span,li,strong,small').filter(function(el){
+      if(!el || el.children.length) return false;
+      var tx=(el.textContent||'').trim();
+      return tx && tx.length<=220;
+    });
+  }
+  function setByMatchers(matchers, text){
+    if(!text) return false;
+    var nodes=singleTextNodes();
+    for(var i=0;i<nodes.length;i++){
+      var tx=(nodes[i].textContent||'').trim();
+      for(var j=0;j<matchers.length;j++){
+        if(matchers[j].test(tx)){
+          nodes[i].textContent=text;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  function upsertSchedule(items){
+    if(!Array.isArray(items)||!items.length) return;
+    var heading=qsa('h2,h3,h4,strong,p,div').find(function(el){
+      var t=(el.textContent||'').trim().toLowerCase();
+      return t==='schedule'||t==='itinerary'||t==='program'||t==='event schedule';
+    });
+    var list=null;
+    if(heading){
+      var parent=heading.parentElement||document.body;
+      list=parent.querySelector('ul,ol,[data-oneday-schedule],.oneday-schedule-list,[class*="schedule-list"],[id*="schedule-list"]');
+      if(!list && heading.nextElementSibling && /^(UL|OL|DIV)$/i.test(heading.nextElementSibling.tagName||'')){
+        list=heading.nextElementSibling;
+      }
+      if(!list){
+        list=document.createElement('ul');
+        list.setAttribute('data-oneday-schedule','1');
+        list.style.cssText='margin-top:10px;padding-left:20px;';
+        heading.insertAdjacentElement('afterend', list);
+      }
+    } else {
+      var mount=document.querySelector('main')||document.body;
+      var section=document.createElement('section');
+      section.style.cssText='margin-top:24px;';
+      var h=document.createElement('h3');
+      h.textContent='Schedule';
+      list=document.createElement('ul');
+      list.setAttribute('data-oneday-schedule','1');
+      list.style.cssText='margin-top:10px;padding-left:20px;';
+      section.appendChild(h);
+      section.appendChild(list);
+      mount.appendChild(section);
+    }
+    if(!list) return;
+    list.innerHTML='';
+    items.forEach(function(it){
+      var li=document.createElement('li');
+      li.style.margin='6px 0';
+      var line=(it.time?it.time+' - ':'')+(it.title||'');
+      if(it.description) line+=': '+it.description;
+      li.textContent=line;
+      list.appendChild(li);
+    });
+  }
+  function applyPhase1(){
+    if(!phase1||typeof phase1!=='object') return;
+    var d=phase1.eventDetails||{};
+    if(d.title){
+      var h1=document.querySelector('#hero h1,.hero h1,[class*="hero"] h1,h1');
+      if(h1) h1.textContent=d.title;
+      var titleLike=document.querySelector('[id*="title"],[class*="title"]');
+      if(titleLike && (!h1 || titleLike!==h1) && (titleLike.textContent||'').trim().length<140) titleLike.textContent=d.title;
+      if(document.title) document.title=d.title + ' — OneDay';
+    }
+    if(d.dateTime){
+      setByMatchers([/📅/,/calendar/i,/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i], '📅 '+d.dateTime);
+    }
+    if(d.location){
+      setByMatchers([/📍/,/\blocation\b/i,/\bvenue\b/i], '📍 '+d.location);
+    }
+    if(d.host){
+      setByMatchers([/hosted by/i,/^host[:\\s]/i], 'Hosted by '+d.host);
+    }
+    if(d.dressCode){
+      setByMatchers([/dress\\s*code/i], 'Dress Code: '+d.dressCode);
+    }
+    upsertSchedule(phase1.schedule||[]);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', applyPhase1);
+  } else {
+    applyPhase1();
+  }
 })();
 <\/script>`;
   const hostEditLauncher = `<script>
@@ -1126,6 +1228,8 @@ export async function getServerSideProps({ params, res, query }) {
     themeStyleTag +
     '\n' +
     eidScript +
+    '\n' +
+    phase1ApplyScript +
     '\n' +
     hostEditLauncher +
     '\n' +
