@@ -72,6 +72,7 @@ export default function EditPage() {
   const [structuredError, setStructuredError] = useState('');
   const [structuredMessage, setStructuredMessage] = useState('');
   const [currentLive, setCurrentLive] = useState(createEmptyPhase1Content('').eventDetails);
+  const [currentPhotoWall, setCurrentPhotoWall] = useState(createEmptyPhase1Content('').photoWall);
   const [hasStructuredDraft, setHasStructuredDraft] = useState(false);
   const [hostToken, setHostToken] = useState('');
 
@@ -142,6 +143,7 @@ export default function EditPage() {
       } else {
         setStructuredContent(j.content || createEmptyPhase1Content(''));
         setCurrentLive(j.currentLive || createEmptyPhase1Content('').eventDetails);
+        setCurrentPhotoWall(j.currentPhotoWall || createEmptyPhase1Content('').photoWall);
         setHasStructuredDraft(Boolean(j.hasDraft));
       }
     } catch {
@@ -274,6 +276,71 @@ export default function EditPage() {
       arr[idx] = arr[next];
       arr[next] = tmp;
       return { ...prev, schedule: arr };
+    });
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function setPhotoWallField(key, value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: { ...(prev.photoWall || {}), [key]: value },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function updatePhotoSubsection(idx, value) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        subsections: (prev.photoWall?.subsections || []).map((item, i) => (i === idx ? { ...item, title: value } : item)),
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function addPhotoSubsection() {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        subsections: [...(prev.photoWall?.subsections || []), { id: makeScheduleId(), title: '' }],
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function removePhotoSubsection(idx) {
+    setStructuredContent(prev => ({
+      ...prev,
+      photoWall: {
+        ...(prev.photoWall || {}),
+        subsections: (prev.photoWall?.subsections || []).filter((_, i) => i !== idx),
+      },
+    }));
+    setStructuredMessage('');
+    setStructuredError('');
+  }
+
+  function movePhotoSubsection(idx, dir) {
+    setStructuredContent(prev => {
+      const arr = [...(prev.photoWall?.subsections || [])];
+      const next = idx + dir;
+      if (next < 0 || next >= arr.length) return prev;
+      const tmp = arr[idx];
+      arr[idx] = arr[next];
+      arr[next] = tmp;
+      return {
+        ...prev,
+        photoWall: {
+          ...(prev.photoWall || {}),
+          subsections: arr,
+        },
+      };
     });
     setStructuredMessage('');
     setStructuredError('');
@@ -528,6 +595,55 @@ export default function EditPage() {
                   </p>
                   {structuredMessage && <div style={styles.successBanner}>{structuredMessage}</div>}
                   {structuredError && <div style={styles.errorBanner}>⚠ {structuredError}</div>}
+                </div>
+
+                <div style={{ marginTop: 18 }}>
+                  <label style={styles.label}>Photo wall</label>
+                  <div style={styles.readOnlyWrap}>
+                    <div style={{ ...styles.row, marginBottom: 8 }}>
+                      <strong style={{ fontSize: '0.85rem', color: '#b7b8da' }}>Current live values</strong>
+                    </div>
+                    <div style={styles.gridTwo}>
+                      <div>
+                        <span style={styles.readOnlyLabel}>Title</span>
+                        <div style={styles.readOnlyValue}>{currentPhotoWall?.title || '—'}</div>
+                      </div>
+                      <div>
+                        <span style={styles.readOnlyLabel}>Subsections</span>
+                        <div style={styles.readOnlyValue}>
+                          {(currentPhotoWall?.subsections || []).length || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 10 }}>
+                    <input
+                      style={styles.input}
+                      value={structuredContent.photoWall?.title || ''}
+                      onChange={e => setPhotoWallField('title', e.target.value)}
+                      placeholder="Photo wall title (e.g. Photo Wall)"
+                    />
+                  </div>
+
+                  {(structuredContent.photoWall?.subsections || []).map((item, idx) => (
+                    <div key={item.id || `photo-${idx}`} style={styles.scheduleCard}>
+                      <input
+                        style={styles.input}
+                        value={item.title || ''}
+                        onChange={e => updatePhotoSubsection(idx, e.target.value)}
+                        placeholder={`Subsection ${idx + 1} title`}
+                      />
+                      <div style={{ ...styles.row, marginTop: 8 }}>
+                        <button type="button" style={styles.exampleChip} onClick={() => movePhotoSubsection(idx, -1)} disabled={idx === 0}>↑ Move up</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => movePhotoSubsection(idx, 1)} disabled={idx === (structuredContent.photoWall?.subsections || []).length - 1}>↓ Move down</button>
+                        <button type="button" style={styles.exampleChip} onClick={() => removePhotoSubsection(idx)}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ ...styles.row, marginTop: 10 }}>
+                    <button type="button" style={styles.btnSecondary} onClick={addPhotoSubsection}>+ Add photo subsection</button>
+                  </div>
                 </div>
 
               </>
