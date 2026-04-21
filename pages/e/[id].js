@@ -1475,16 +1475,6 @@ export async function getServerSideProps({ params, res, query }) {
         window.parent.postMessage({ type:'oneday_gui_update', payload:payload }, '*');
       }catch(e){}
     }
-    function placeCaretAtEnd(el){
-      try{
-        var range=document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        var sel=window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }catch(e){}
-    }
     targets.forEach(function(t){
       if(!t.el || t.el.dataset.onedayGui) return;
       t.el.dataset.onedayGui='1';
@@ -1502,21 +1492,8 @@ export async function getServerSideProps({ params, res, query }) {
       t.el.addEventListener('mousedown', function(ev){ ev.stopPropagation(); });
       t.el.addEventListener('click', function(ev){
         ev.stopPropagation();
-        // Keep single-click inline edit attempt.
-        setTimeout(function(){
-          t.el.focus();
-          placeCaretAtEnd(t.el);
-        },0);
-      });
-      t.el.addEventListener('dblclick', function(ev){
-        ev.stopPropagation();
         ev.preventDefault();
-        // Guaranteed fallback when inline typing is blocked by template scripts/styles.
-        var cur=(t.el.textContent||'').trim();
-        var next=window.prompt('Edit text', cur);
-        if(next==null) return;
-        t.el.textContent=String(next);
-        postUpdate();
+        t.el.focus();
       });
       t.el.addEventListener('blur', postUpdate);
       t.el.addEventListener('keydown', function(ev){
