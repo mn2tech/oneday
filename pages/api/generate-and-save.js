@@ -309,6 +309,7 @@ async function sendConfirmationEmail(resend, email, eventUrl, manageUrl) {
 }
 
 const DEV_MODE = (id) => typeof id === 'string' && id.startsWith('dev_test_');
+const ALLOW_DEV_TEST_PAYMENTS = process.env.ALLOW_DEV_TEST_PAYMENTS === 'true';
 
 export const config = {
   maxDuration: 300,
@@ -319,11 +320,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { prompt, plan, email, paymentIntentId, eventMeta, deviceId } = req.body || {};
+  const { prompt, plan, tier, email, paymentIntentId, eventMeta, deviceId } = req.body || {};
   const creatorDeviceId = normalizeDeviceId(deviceId);
+  const eventTier = tier === 'free' ? 'free' : 'pro';
+  const isFree = eventTier === 'free';
 
   // Input validation
-  if (!prompt || !email || !paymentIntentId) {
+  if (!prompt || !email) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  if (!isFree && !paymentIntentId) {
     return res.status(400).json({ error: 'Missing required fields.' });
   }
 
@@ -334,12 +340,17 @@ export default async function handler(req, res) {
   }
 
   const isDev = DEV_MODE(paymentIntentId);
+  if (isDev && !ALLOW_DEV_TEST_PAYMENTS) {
+    return res.status(400).json({
+      error: 'Dev payment IDs are disabled. Complete a real Stripe payment to continue.',
+    });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error('[generate-and-save] ANTHROPIC_API_KEY is not set');
     return res.status(500).json({ error: 'AI service not configured. Please contact support.' });
   }
-  if (!isDev && !process.env.STRIPE_SECRET_KEY) {
+  if (!isFree && !isDev && !process.env.STRIPE_SECRET_KEY) {
     console.error('[generate-and-save] STRIPE_SECRET_KEY is not set');
     return res.status(500).json({ error: 'Payment service not configured. Please contact support.' });
   }
@@ -350,8 +361,8 @@ export default async function handler(req, res) {
     const supabase = getSupabase();
     const resend = getResend();
 
-    // 1. Verify payment (skip in dev mode)
-    if (!isDev) {
+    // 1. Verify payment (skip for free tier and dev mode)
+    if (!isFree && !isDev) {
       let paymentIntent;
       try {
         paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -495,11 +506,13 @@ export default async function handler(req, res) {
     // Save to Supabase
     const { error: insertError } = await supabase.from('event_apps').insert({
       id,
-      payment_intent_id: paymentIntentId,
+      payment_intent_id: paymentIntentId || null,
       title,
       html,
       prompt,
       plan: resolvedPlan,
+      tier: eventTier,
+      edit_count: 0,
       email,
       is_live: true,
       generation_status: 'complete',

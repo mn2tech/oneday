@@ -1056,14 +1056,14 @@ export async function getServerSideProps({ params, res, query }) {
 
   let { data } = await supabase
     .from('event_apps')
-    .select('html, title, is_live, theme_preset, content_phase1, content_phase1_draft')
+    .select('html, title, is_live, theme_preset, content_phase1, content_phase1_draft, tier, created_at')
     .eq('id', id)
     .single();
   if (!data) {
     // Backward compatibility for databases that do not have theme_preset yet.
     const fallback = await supabase
       .from('event_apps')
-      .select('html, title, is_live, content_phase1')
+      .select('html, title, is_live, content_phase1, tier, created_at')
       .eq('id', id)
       .single();
     data = fallback.data || null;
@@ -1071,6 +1071,22 @@ export async function getServerSideProps({ params, res, query }) {
 
   if (!data || !data.html) {
     return { notFound: true };
+  }
+
+  // ── Freemium: expiry check for free pages ──────────────────────────────────
+  const isFree = data.tier === 'free';
+  const createdAt = data.created_at ? new Date(data.created_at) : new Date();
+  const expiresAt = new Date(createdAt);
+  expiresAt.setDate(expiresAt.getDate() + 90);
+  const isExpired = isFree && new Date() > expiresAt;
+  const daysLeft = isFree ? Math.max(0, Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24))) : null;
+
+  if (isExpired) {
+    const expiredHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Page Expired — OneDay</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#08080f;color:#f0f0f5;font-family:Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}.card{background:#111118;border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:40px 32px;max-width:480px;text-align:center}.icon{font-size:2.5rem;margin-bottom:16px}.title{font-size:1.4rem;font-weight:700;margin-bottom:8px}.sub{color:#888;font-size:0.9rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-block;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-weight:600;padding:12px 24px;border-radius:10px;text-decoration:none;font-size:0.95rem}</style></head><body><div class="card"><div class="icon">⏰</div><h1 class="title">This event page has expired</h1><p class="sub">Free OneDay pages are available for 90 days. The host did not upgrade to keep it live.</p><a href="https://getoneday.com" class="btn">Create Your Own Event →</a></div></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(expiredHtml);
+    return { props: {} };
   }
   queryThemePreset = normalizeThemePreset(query?.themePreview || 'default');
   const savedThemePreset = normalizeThemePreset(data.theme_preset || 'default');
@@ -1086,7 +1102,10 @@ export async function getServerSideProps({ params, res, query }) {
   const phase1Content = normalizePhase1Content(phase1Source || {}, data.title || '');
   const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
 
-  const watermark = `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
+  // Pro pages: small corner badge. Free pages: full watermark bar with upgrade CTA.
+  const watermark = isFree
+    ? `<div id="oneday-wm-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:2147483645;background:linear-gradient(90deg,rgba(10,10,20,0.97),rgba(20,10,30,0.97));border-top:1px solid rgba(168,85,247,0.3);padding:9px 16px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px);font-family:Inter,system-ui,sans-serif;"><span style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:#aaa;"><span style="font-weight:700;color:#a855f7;">◆ OneDay</span>Free page · expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}</span><a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://getoneday.com'}/upgrade/${id}" target="_blank" rel="noopener noreferrer" style="background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:0.78rem;font-weight:600;padding:7px 13px;border-radius:8px;text-decoration:none;white-space:nowrap;">✦ Remove Watermark — $14</a></div>`
+    : `<div style="position:fixed;bottom:12px;right:12px;z-index:99999;background:rgba(10,10,20,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-family:sans-serif;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3);">Made with <a href="https://getoneday.com" target="_blank" rel="noopener noreferrer" style="color:#a855f7;text-decoration:none;font-weight:600;">OneDay</a></div>`;
 
   const useS3 = eventPhotosUseS3();
   const useCloudIx = eventInteractionsUseCloud();

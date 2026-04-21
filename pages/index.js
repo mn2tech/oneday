@@ -15,21 +15,41 @@ function getStripePromise() {
   return stripePromise;
 }
 
+function hasConfiguredStripeKey() {
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  return Boolean(key && !key.startsWith('pk_test_...') && key !== 'undefined');
+}
+
 const PLANS = [
   {
+    id: 'free',
+    name: 'Try OneDay',
+    price: '$0',
+    tier: 'free',
+    features: [
+      'AI-generated event page',
+      'Hero, countdown, schedule',
+      'Photo wall, RSVP, messages',
+      '2 AI edits included',
+    ],
+    limitations: [
+      'Page expires in 90 days',
+      'OneDay watermark visible',
+    ],
+  },
+  {
     id: 'standard',
-    name: 'OneDay',
+    name: 'OneDay Pro',
     price: '$14',
+    tier: 'pro',
     popular: true,
     features: [
-      'AI-generated event microsite',
-      'Hero with countdown timer',
-      'Schedule timeline',
-      'Photo wall (2 sections)',
-      'RSVP with adults & kids count',
-      'Live poll with results',
-      'Guest message wall',
-      'Permanent memory page — forever',
+      'AI-generated event page',
+      'Hero, countdown, schedule',
+      'Photo wall, RSVP, messages',
+      'Unlimited AI edits',
+      'Permanent — never expires',
+      'No watermark',
     ],
   },
 ];
@@ -176,10 +196,12 @@ export default function Home() {
   const [eventMeta, setEventMeta] = useState({}); // { names, eventType, hostedBy }
   const [email, setEmail] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('standard');
+  const [selectedTier, setSelectedTier] = useState('pro');
   const [generationStatus, setGenerationStatus] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [doneUrl, setDoneUrl] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const stripeConfigured = hasConfiguredStripeKey();
 
   useEffect(() => {
     if (step !== 3) setTermsAccepted(false);
@@ -195,11 +217,27 @@ export default function Home() {
 
   // Step 2 select plan
   function handlePlanSelect(planId) {
+    const plan = PLANS.find(p => p.id === planId);
     setSelectedPlan(planId);
+    setSelectedTier(plan?.tier || 'pro');
+
+    // Free tier — skip payment entirely
+    if (planId === 'free') {
+      setErrorMsg('');
+      handlePaymentSuccess(`free_${Date.now()}`);
+      return;
+    }
+
+    // Paid tier
     if (!getStripePromise()) {
-      // Dev mode: no Stripe keys configured, skip payment
-      handlePaymentSuccess('dev_test_' + Date.now());
+      if (process.env.NODE_ENV === 'production') {
+        setErrorMsg('Live payments are not configured yet. Please contact support.');
+        return;
+      }
+      // Local/dev mode fallback only
+      handlePaymentSuccess(`dev_test_${Date.now()}`);
     } else {
+      setErrorMsg('');
       setStep(3);
     }
   }
@@ -221,6 +259,7 @@ export default function Home() {
         body: JSON.stringify({
           prompt,
           plan: selectedPlan,
+          tier: selectedTier,
           email,
           paymentIntentId,
           eventMeta,
@@ -365,7 +404,7 @@ export default function Home() {
             <div className={styles.card}>
               <button className={styles.backBtn} onClick={() => setStep(1)}>← Back</button>
               <h2 className={styles.cardTitle}>Choose your plan</h2>
-              <p className={styles.cardSubtitle}>One-time payment. No subscription.</p>
+              <p className={styles.cardSubtitle}>Start free, upgrade anytime — no subscription ever.</p>
 
               <div className={styles.plansGrid}>
                 {PLANS.map((plan) => (
@@ -379,27 +418,40 @@ export default function Home() {
                     onClick={() => handlePlanSelect(plan.id)}
                     type="button"
                   >
-                    {plan.popular && <span className={styles.popularBadge}>Most Popular</span>}
+                    {plan.popular && <span className={styles.popularBadge}>✦ Most Popular</span>}
+                    <div className={styles.planTier}>{plan.tier === 'free' ? 'FREE' : 'PRO'}</div>
                     <div className={styles.planName}>{plan.name}</div>
                     <div className={styles.planPrice}>
-                      {plan.price}<span className={styles.planPriceSuffix}> one-time</span>
+                      {plan.price}
+                      <span className={styles.planPriceSuffix}>
+                        {plan.tier === 'free' ? ' forever' : ' one-time'}
+                      </span>
                     </div>
                     <ul className={styles.planFeatures}>
                       {plan.features.map((f) => (
                         <li key={f}>
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                            <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                            <path d="M2 7l3.5 3.5L12 3" stroke={plan.tier === 'pro' ? '#a855f7' : 'currentColor'} strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                      {(plan.limitations || []).map((f) => (
+                        <li key={f} className={styles.planFeatureDim}>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                            <path d="M3 3l8 8M11 3l-8 8" stroke="#555" strokeWidth="2" strokeLinecap="round"/>
                           </svg>
                           {f}
                         </li>
                       ))}
                     </ul>
                     <span className={styles.planCta}>
-                      Select {plan.name}
+                      {plan.tier === 'free' ? 'Start Free →' : `Pay ${plan.price} & Generate →`}
                     </span>
                   </button>
                 ))}
               </div>
+              <p className={styles.compareNote}>🔒 Payments secured by Stripe · No subscription, no recurring charges</p>
             </div>
           )}
 
@@ -408,27 +460,9 @@ export default function Home() {
             <div className={styles.card}>
               <button className={styles.backBtn} onClick={() => setStep(2)}>← Back</button>
               <h2 className={styles.cardTitle}>Complete your order</h2>
-              {!getStripePromise() && (
+              {!stripeConfigured && (
                 <div style={{ background: 'rgba(245,200,66,0.1)', border: '1px solid rgba(245,200,66,0.4)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: '0.85rem', color: '#f5c842' }}>
-                  <strong>Dev mode:</strong> Stripe keys not configured.{' '}
-                  <button
-                    type="button"
-                    onClick={() => handlePaymentSuccess('dev_test_' + Date.now())}
-                    disabled={!termsAccepted}
-                    style={{
-                      background: termsAccepted ? '#f5c842' : 'rgba(245,200,66,0.35)',
-                      color: '#0a0a0f',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '4px 12px',
-                      fontWeight: 700,
-                      cursor: termsAccepted ? 'pointer' : 'not-allowed',
-                      marginLeft: 8,
-                      opacity: termsAccepted ? 1 : 0.7,
-                    }}
-                  >
-                    Skip Payment →
-                  </button>
+                  <strong>Stripe not configured:</strong> set a real publishable key to enable checkout.
                 </div>
               )}
               <p className={styles.cardSubtitle}>
@@ -487,10 +521,12 @@ export default function Home() {
             <div className={styles.card}>
               {generationStatus === 'done' ? (
                 <div className={styles.doneScreen}>
-                  <div className={styles.doneIcon}>🎉</div>
+                  <div className={styles.doneIcon}>{selectedTier === 'free' ? '✨' : '🎉'}</div>
                   <h2 className={styles.cardTitle}>Your event is live!</h2>
                   <p className={styles.cardSubtitle}>
-                    Share this link with your guests. It&apos;s permanent.
+                    {selectedTier === 'free'
+                      ? 'Your free page is live! Share with guests — upgrade anytime to remove the watermark.'
+                      : "Share this link with your guests. It's permanent."}
                   </p>
                   <a
                     href={doneUrl}
@@ -514,6 +550,20 @@ export default function Home() {
                   >
                     ✏ Edit Your Event
                   </a>
+                  {selectedTier === 'free' && (
+                    <div className={styles.upgradeNudge}>
+                      <div className={styles.upgradeNudgeTitle}>✦ Want to remove the watermark?</div>
+                      <p className={styles.upgradeNudgeText}>Upgrade to Pro for $14 — permanent page, no watermark, unlimited edits.</p>
+                      <a
+                        href={`${doneUrl}?upgrade=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.upgradeNudgeBtn}
+                      >
+                        Upgrade for $14 →
+                      </a>
+                    </div>
+                  )}
                   {errorMsg && (
                     <p className={styles.errorMsg}>{errorMsg}</p>
                   )}

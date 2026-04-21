@@ -153,26 +153,31 @@ async function loadHtml(id, supabase) {
   // Try local file first (dev mode)
   const filePath = path.join(process.cwd(), 'public', 'preview', `${id}.html`);
   if (fs.existsSync(filePath)) {
-    return { html: fs.readFileSync(filePath, 'utf8'), source: 'file', filePath };
+    return { html: fs.readFileSync(filePath, 'utf8'), source: 'file', filePath, tier: 'pro', edit_count: 0 };
   }
   // Fall back to Supabase (production)
   const { data, error } = await supabase
     .from('event_apps')
-    .select('html')
+    .select('html, tier, edit_count')
     .eq('id', id)
     .single();
-  if (error || !data) return { html: null, source: null };
-  return { html: data.html, source: 'supabase' };
+  if (error || !data) return { html: null, source: null, tier: 'pro', edit_count: 0 };
+  return { html: data.html, source: 'supabase', tier: data.tier || 'pro', edit_count: data.edit_count || 0 };
 }
 
-async function saveHtml(id, html, source, filePath, supabase) {
+async function saveHtml(id, html, source, filePath, supabase, tierInfo) {
   if (source === 'file') {
     fs.writeFileSync(filePath, html, 'utf8');
     return null;
   }
+  const update = { html, updated_at: new Date().toISOString() };
+  // Increment edit_count for free tier
+  if (tierInfo?.tier === 'free') {
+    update.edit_count = (tierInfo.edit_count || 0) + 1;
+  }
   const { error } = await supabase
     .from('event_apps')
-    .update({ html, updated_at: new Date().toISOString() })
+    .update(update)
     .eq('id', id);
   return error;
 }
@@ -206,10 +211,19 @@ export default async function handler(req, res) {
     const supabase = getSupabase();
 
     // 1. Load existing HTML
-    const { html: existingHtml, source, filePath } = await loadHtml(id, supabase);
+    const { html: existingHtml, source, filePath, tier, edit_count } = await loadHtml(id, supabase);
 
     if (!existingHtml) {
       return res.status(404).json({ error: 'Event page not found.' });
+    }
+
+    // Gate free tier at 2 AI edits
+    if (tier === 'free' && (edit_count || 0) >= 2) {
+      return res.status(403).json({
+        error: 'Free pages are limited to 2 AI edits. Upgrade to Pro for unlimited edits.',
+        upgradeRequired: true,
+        upgradeUrl: `${process.env.NEXT_PUBLIC_APP_URL || ''}/upgrade/${id}`,
+      });
     }
 
     // 2. Call Claude to apply the changes (full HTML in + full HTML out — needs high max_tokens)
@@ -245,8 +259,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Incomplete page from AI. Please try again.' });
     }
 
-    // 3. Save updated HTML
-    const saveError = await saveHtml(id, updatedHtml, source, filePath, supabase);
+    // 3. Save updated HTML (also increments edit_count for free tier)
+    const saveError = await saveHtml(id, updatedHtml, source, filePath, supabase, { tier, edit_count });
     if (saveError) {
       console.error('[edit-event] Save error:', saveError.message);
       return res.status(500).json({ error: 'Failed to save changes.' });
