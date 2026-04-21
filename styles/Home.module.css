@@ -307,6 +307,13 @@
   transform: translateY(0);
 }
 
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ── Secondary Button ── */
 .btnSecondary {
   width: 100%;
@@ -510,6 +517,39 @@
 .cardWrapper:focus-within {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.15);
+}
+
+.termsRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.termsCheckbox {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.termsLabel {
+  flex: 1;
+}
+
+.termsLink {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.termsLink:hover {
+  color: var(--color-accent);
 }
 
 .secureNote {

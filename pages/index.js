@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import styles from '../styles/Home.module.css';
@@ -70,15 +71,23 @@ function getOrCreateBrowserDeviceId() {
 }
 
 // Inner form component (needs Stripe hooks)
-function CheckoutForm({ plan, email, onSuccess }) {
+function CheckoutForm({ plan, email, onSuccess, termsAccepted }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  useEffect(() => {
+    if (termsAccepted) setErrorMsg('');
+  }, [termsAccepted]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!stripe || !elements) return;
+    if (!termsAccepted) {
+      setErrorMsg('Please agree to the Terms & Conditions to continue.');
+      return;
+    }
 
     setLoading(true);
     setErrorMsg('');
@@ -140,7 +149,7 @@ function CheckoutForm({ plan, email, onSuccess }) {
       <button
         type="submit"
         className={styles.btnPrimary}
-        disabled={!stripe || loading}
+        disabled={!stripe || loading || !termsAccepted}
       >
         {loading ? (
           <span className={styles.spinner} aria-label="Processing payment" />
@@ -170,6 +179,11 @@ export default function Home() {
   const [generationStatus, setGenerationStatus] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [doneUrl, setDoneUrl] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  useEffect(() => {
+    if (step !== 3) setTermsAccepted(false);
+  }, [step]);
 
   // Step 1 submit
   function handlePromptSubmit(e) {
@@ -400,7 +414,18 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => handlePaymentSuccess('dev_test_' + Date.now())}
-                    style={{ background: '#f5c842', color: '#0a0a0f', border: 'none', borderRadius: 6, padding: '4px 12px', fontWeight: 700, cursor: 'pointer', marginLeft: 8 }}
+                    disabled={!termsAccepted}
+                    style={{
+                      background: termsAccepted ? '#f5c842' : 'rgba(245,200,66,0.35)',
+                      color: '#0a0a0f',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '4px 12px',
+                      fontWeight: 700,
+                      cursor: termsAccepted ? 'pointer' : 'not-allowed',
+                      marginLeft: 8,
+                      opacity: termsAccepted ? 1 : 0.7,
+                    }}
                   >
                     Skip Payment →
                   </button>
@@ -430,11 +455,28 @@ export default function Home() {
                 </div>
               </div>
 
+              <label className={styles.termsRow}>
+                <input
+                  type="checkbox"
+                  className={styles.termsCheckbox}
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                />
+                <span className={styles.termsLabel}>
+                  I agree to the{' '}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" className={styles.termsLink}>
+                    Terms &amp; Conditions
+                  </Link>
+                  {' '}and confirm I am authorised to make this purchase.
+                </span>
+              </label>
+
               <Elements stripe={getStripePromise()}>
                 <CheckoutForm
                   plan={selectedPlan}
                   email={email}
                   onSuccess={handlePaymentSuccess}
+                  termsAccepted={termsAccepted}
                 />
               </Elements>
             </div>
