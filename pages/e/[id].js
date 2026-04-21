@@ -1322,30 +1322,6 @@ export async function getServerSideProps({ params, res, query }) {
       if(el.parentNode) el.parentNode.removeChild(el);
     });
   }
-  function removeLegacyLabelsFromWallRoot(root, allowedTitles){
-    if(!root) return;
-    function normalizeLabel(text){
-      return String(text||'')
-        .toLowerCase()
-        .replace(/[^a-z0-9&\s]/g,' ')
-        .replace(/\s+/g,' ')
-        .trim();
-    }
-    var badRe=/(^|\s)(celebration moments|moments|fun & festivity|fun and festivity)(\s|$)/i;
-    var allowed=new Set((allowedTitles||[]).map(normalizeLabel).filter(Boolean));
-    var nodes=Array.prototype.slice.call(root.querySelectorAll('h1,h2,h3,h4,strong,p,div,span,small,em,i,b'));
-    nodes.forEach(function(el){
-      if(!el) return;
-      if(el.querySelector && el.querySelector('button,label,a,[role="button"],input,textarea,select,img,video,svg,canvas')) return;
-      var tx=(el.textContent||'').replace(/\s+/g,' ').trim();
-      if(!tx) return;
-      if(isMainPhotoHeadingText(tx)) return;
-      var norm=normalizeLabel(tx);
-      if(allowed.has(norm)) return;
-      if(!badRe.test(norm)) return;
-      if(el.parentNode) el.parentNode.removeChild(el);
-    });
-  }
   function upsertPhotoWall(photoWall){
     if(!photoWall||typeof photoWall!=='object') return;
     var wallMeta=findPhotoWallContainer();
@@ -1405,10 +1381,6 @@ export async function getServerSideProps({ params, res, query }) {
         anchorBlock=clone;
       }
     }
-    removeLegacyLabelsFromWallRoot(
-      wallRoot,
-      subs.map(function(s){ return s && s.title ? s.title : ''; })
-    );
   }
   function applyPhase1(){
     if(!phase1||typeof phase1!=='object') return;
