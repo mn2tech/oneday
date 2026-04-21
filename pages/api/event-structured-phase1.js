@@ -90,7 +90,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Event not found.' });
     }
 
-    const currentLive = extractLiveEventDetailsFromHtml(result.data.html || '', {
+    const extractedLive = extractLiveEventDetailsFromHtml(result.data.html || '', {
       title: result.data.title || '',
       eventDate: result.data.event_date || '',
     });
@@ -98,10 +98,11 @@ export default async function handler(req, res) {
       result.data.content_phase1 ||
         {
           ...createEmptyPhase1Content(result.data.title || ''),
-          eventDetails: currentLive,
+          eventDetails: extractedLive,
         },
       result.data.title || ''
     );
+    const currentLive = mergeDetailsWithFallback(liveContent.eventDetails, extractedLive);
     const draftContent = normalizePhase1Content(result.data.content_phase1_draft || {}, result.data.title || '');
     const effectiveEditor = (result.data.content_phase1_draft && typeof result.data.content_phase1_draft === 'object')
       ? draftContent
