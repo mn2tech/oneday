@@ -13,10 +13,15 @@ export default function handler(req, res) {
   }
 
   const has = (k) => Boolean(process.env[k]);
+  const prefix = (k) => { const v = process.env[k]; return v ? v.slice(0, 12) + '...' : 'NOT SET'; };
 
   return res.status(200).json({
     NEXT_PUBLIC_SUPABASE_URL: has('NEXT_PUBLIC_SUPABASE_URL'),
     SUPABASE_SERVICE_ROLE_KEY: has('SUPABASE_SERVICE_ROLE_KEY'),
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: has('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'),
+    STRIPE_SECRET_KEY: has('STRIPE_SECRET_KEY'),
+    STRIPE_SECRET_KEY_prefix: prefix('STRIPE_SECRET_KEY'),
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_prefix: prefix('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'),
     NEXT_PUBLIC_APP_URL: has('NEXT_PUBLIC_APP_URL'),
     RESEND_API_KEY: has('RESEND_API_KEY'),
     RESEND_FROM_set: has('RESEND_FROM'),
