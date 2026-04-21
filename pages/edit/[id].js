@@ -298,19 +298,6 @@ export default function EditPage() {
     setStructuredError('');
   }
 
-  function setPhotoWallTitle(value) {
-    setStructuredContent(prev => ({
-      ...prev,
-      photoWall: {
-        ...(prev.photoWall || {}),
-        title: value,
-        subsections: Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [],
-      },
-    }));
-    setStructuredMessage('');
-    setStructuredError('');
-  }
-
   function addPhotoSubsection() {
     setStructuredContent(prev => ({
       ...prev,
@@ -650,11 +637,7 @@ export default function EditPage() {
                     <div style={{ ...styles.row, marginBottom: 8 }}>
                       <strong style={{ fontSize: '0.85rem', color: '#b7b8da' }}>Current live photo wall</strong>
                     </div>
-                    <div>
-                      <span style={styles.readOnlyLabel}>Section title</span>
-                      <div style={styles.readOnlyValue}>{currentPhotoWall?.title || '—'}</div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
+                  <div>
                       <span style={styles.readOnlyLabel}>Subsections</span>
                       {(currentPhotoWall?.subsections || []).length ? (
                         <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -668,14 +651,6 @@ export default function EditPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <input
-                      style={styles.input}
-                      value={structuredContent.photoWall?.title || ''}
-                      onChange={e => setPhotoWallTitle(e.target.value)}
-                      placeholder="Photo wall title (e.g. Photo Gallery)"
-                    />
-                  </div>
                   {(structuredContent.photoWall?.subsections || []).map((row, idx) => (
                     <div key={row.id || `photo-row-${idx}`} style={styles.scheduleCard}>
                       <input

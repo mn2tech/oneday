@@ -1237,19 +1237,6 @@ export async function getServerSideProps({ params, res, query }) {
     if(!photoWall||typeof photoWall!=='object') return;
     var controls=qsa('button,label,a,[role="button"]').filter(isPhotoControl);
     var subs=Array.isArray(photoWall.subsections)?photoWall.subsections:[];
-    var titleText=(photoWall.title||'').trim();
-    if(titleText){
-      var mainHeading=qsa('h2,h3,h4,strong,p,div').find(function(el){
-        var t=(el.textContent||'').trim().toLowerCase();
-        return /photo wall|photo gallery|gallery|memories|moments/.test(t);
-      });
-      if(mainHeading) mainHeading.textContent=titleText;
-      else if(controls[0]){
-        var parentSection=controls[0].closest('section')||controls[0].parentElement||document.body;
-        var h=findScopedHeading(parentSection);
-        if(h) h.textContent=titleText;
-      }
-    }
     controls.forEach(function(ctrl, idx){
       if(!subs[idx]||!subs[idx].title) return;
       var section=ctrl.closest('section')||ctrl.parentElement;
