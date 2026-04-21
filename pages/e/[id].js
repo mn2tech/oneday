@@ -1465,9 +1465,6 @@ export async function getServerSideProps({ params, res, query }) {
       {key:'host', el:hostEl, toValue:function(v){ return String(v||'').replace(/^hosted by\s*/i,'').replace(/^host\s*[:\-]?\s*/i,'').trim(); }},
       {key:'dressCode', el:dressEl, toValue:function(v){ return String(v||'').replace(/^dress\s*code\s*[:\-]?\s*/i,'').trim(); }},
     ];
-    targets.forEach(function(t){
-      if(t.el) t.el.dataset.onedayGuiKey=t.key;
-    });
     function postUpdate(){
       var payload={};
       targets.forEach(function(t){
@@ -1478,29 +1475,21 @@ export async function getServerSideProps({ params, res, query }) {
         window.parent.postMessage({ type:'oneday_gui_update', payload:payload }, '*');
       }catch(e){}
     }
-    function promptEditFor(el){
-      if(!el) return;
-      var cur=(el.textContent||'').trim();
-      var next=window.prompt('Edit text', cur);
-      if(next==null) return;
-      el.textContent=String(next);
-      postUpdate();
-    }
-    if(!document.body.dataset.onedayGuiCapture){
-      document.body.dataset.onedayGuiCapture='1';
-      document.addEventListener('click', function(ev){
-        var node=ev.target && ev.target.closest ? ev.target.closest('[data-oneday-gui="1"]') : null;
-        if(!node) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
-        promptEditFor(node);
-      }, true);
+    function placeCaretAtEnd(el){
+      try{
+        var range=document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        var sel=window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }catch(e){}
     }
     targets.forEach(function(t){
       if(!t.el || t.el.dataset.onedayGui) return;
       t.el.dataset.onedayGui='1';
-      t.el.setAttribute('contenteditable','false');
+      t.el.setAttribute('contenteditable','true');
+      t.el.setAttribute('tabindex','0');
       t.el.setAttribute('spellcheck','false');
       t.el.style.outline='1px dashed rgba(124,92,252,0.65)';
       t.el.style.outlineOffset='2px';
@@ -1508,12 +1497,33 @@ export async function getServerSideProps({ params, res, query }) {
       t.el.style.userSelect='text';
       t.el.style.webkitUserSelect='text';
       t.el.style.pointerEvents='auto';
-      t.el.title='Click to edit';
+      t.el.style.webkitUserModify='read-write-plaintext-only';
+      t.el.title='Editable in preview';
+      t.el.addEventListener('mousedown', function(ev){ ev.stopPropagation(); });
+      t.el.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        // Keep single-click inline edit attempt.
+        setTimeout(function(){
+          t.el.focus();
+          placeCaretAtEnd(t.el);
+        },0);
+      });
       t.el.addEventListener('dblclick', function(ev){
         ev.stopPropagation();
         ev.preventDefault();
-        promptEditFor(t.el);
+        // Guaranteed fallback when inline typing is blocked by template scripts/styles.
+        var cur=(t.el.textContent||'').trim();
+        var next=window.prompt('Edit text', cur);
+        if(next==null) return;
+        t.el.textContent=String(next);
+        postUpdate();
       });
+      t.el.addEventListener('blur', postUpdate);
+      t.el.addEventListener('keydown', function(ev){
+        ev.stopPropagation();
+        if(ev.key==='Enter'){ ev.preventDefault(); t.el.blur(); }
+      });
+      t.el.addEventListener('input', function(ev){ ev.stopPropagation(); });
     });
   }
   if(document.readyState==='loading'){
