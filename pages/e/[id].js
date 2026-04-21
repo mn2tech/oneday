@@ -1208,6 +1208,31 @@ export async function getServerSideProps({ params, res, query }) {
     if(local && (local.textContent||'').trim().length<=140) return local;
     return null;
   }
+  function isMainPhotoHeadingText(text){
+    var t=(text||'').trim().toLowerCase();
+    return /photo wall|photo gallery|gallery|memories|moments/.test(t);
+  }
+  function findPhotoSubHeading(section, control){
+    if(!section) return null;
+    var headingSelectors='h2,h3,h4,strong,[class*="section-title"],[class*="title"]';
+    var all=Array.prototype.slice.call(section.querySelectorAll(headingSelectors))
+      .filter(function(el){
+        var tx=(el.textContent||'').trim();
+        return tx && tx.length<=140 && !isMainPhotoHeadingText(tx);
+      });
+    if(!all.length) return null;
+    if(!control) return all[0];
+    // Prefer the nearest heading above the specific photo control.
+    var controlTop=(control.getBoundingClientRect&&control.getBoundingClientRect().top)||0;
+    var best=null;
+    var bestDist=Infinity;
+    all.forEach(function(h){
+      var top=(h.getBoundingClientRect&&h.getBoundingClientRect().top)||0;
+      var dist=controlTop-top;
+      if(dist>=-6 && dist<bestDist){ best=h; bestDist=dist; }
+    });
+    return best||all[0];
+  }
   function upsertPhotoWall(photoWall){
     if(!photoWall||typeof photoWall!=='object') return;
     var controls=qsa('button,label,a,[role="button"]').filter(isPhotoControl);
@@ -1229,7 +1254,7 @@ export async function getServerSideProps({ params, res, query }) {
       if(!subs[idx]||!subs[idx].title) return;
       var section=ctrl.closest('section')||ctrl.parentElement;
       if(!section) return;
-      var h=findScopedHeading(section);
+      var h=findPhotoSubHeading(section, ctrl);
       if(h) h.textContent=subs[idx].title;
       else {
         var nh=document.createElement('h3');
@@ -1248,7 +1273,7 @@ export async function getServerSideProps({ params, res, query }) {
         var clone=templateSection.cloneNode(true);
         stripIds(clone);
         clearSectionMedia(clone);
-        var heading=findScopedHeading(clone);
+        var heading=findPhotoSubHeading(clone, clone.querySelector('button,label,a,[role="button"]'));
         if(heading) heading.textContent=item.title;
         else {
           var nh=document.createElement('h3');
