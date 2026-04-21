@@ -56,6 +56,20 @@ const PHOTO_SUBSECTION_PRESETS = [
   '🍽️ Food',
 ];
 
+function isLegacyPhotoSubsectionLabel(value) {
+  const s = String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9&\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (
+    s === 'celebration moments' ||
+    s === 'moments' ||
+    s === 'fun & festivity' ||
+    s === 'fun and festivity'
+  );
+}
+
 export default function EditPage() {
   const router = useRouter();
   const { id, admin } = router.query;
@@ -313,10 +327,14 @@ export default function EditPage() {
       photoWall: {
         ...(prev.photoWall || {}),
         title: prev.photoWall?.title || '',
-        subsections: [
-          ...(Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : []),
-          { id: makePhotoSubId(), title },
-        ],
+        subsections: (() => {
+          const existing = Array.isArray(prev.photoWall?.subsections) ? prev.photoWall.subsections : [];
+          // Replace single legacy inferred label with the chosen preset.
+          if (existing.length === 1 && isLegacyPhotoSubsectionLabel(existing[0]?.title || '')) {
+            return [{ id: existing[0]?.id || makePhotoSubId(), title }];
+          }
+          return [...existing, { id: makePhotoSubId(), title }];
+        })(),
       },
     }));
     setStructuredMessage('');
