@@ -1359,6 +1359,9 @@ export async function getServerSideProps({ params, res, query }) {
   }
 })();
 <\/script>`;
+  // In cloud mode, INTERACTIONS_CLOUD already includes the shared photo wall engine.
+  // Do not also inject PHOTO_ENGINE_* or upload controls can flicker/disappear from competing DOM rewrites.
+  const photoEngineInjection = useCloudIx ? '' : (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
@@ -1372,7 +1375,7 @@ export async function getServerSideProps({ params, res, query }) {
     hostEditLauncher +
     '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
-    (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
+    photoEngineInjection;
 
   let html = data.html;
   if (useCloudIx) {
