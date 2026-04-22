@@ -77,9 +77,11 @@ const isLocked = today > lockDate;
 SECTIONS:
 1. Hero — title, date, location, JS countdown timer, "Hosted by [name]" line.
    Keep hero copy concise and non-redundant:
-   - Do NOT repeat the exact same sentence in both title and subtitle.
+   - NEVER repeat the title text in the subtitle — they must be meaningfully different.
+   - The subtitle must NOT be the same sentence as the title, not even paraphrased.
+   - If no tagline was provided, invent a warm, poetic one-liner that fits the event tone (e.g. "Join us for a day of love, color, and celebration" or "A joyful gathering to honor the bride-to-be").
    - If date/time is shown in chips/metadata, do not repeat the same full date/time sentence in subtitle.
-   - Prefer: title = event + honoree, subtitle = short welcome/context (without duplicating date/time/location verbatim).
+   - Prefer: title = event name + honoree, subtitle = short warm welcome or poetic context phrase.
 2. Schedule — vertical timeline
 3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
    HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
