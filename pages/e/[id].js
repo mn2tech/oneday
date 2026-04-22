@@ -16,6 +16,15 @@ function injectAfterBodyOpen(html, snippet) {
   return html.slice(0, insertAt) + snippet + html.slice(insertAt);
 }
 
+function stripLegacyPhotoUploadInjectors(html) {
+  if (!html || typeof html !== 'string') return html;
+  // Remove legacy generate/edit injector blocks so cloud pages have one photo engine.
+  return html.replace(
+    /<script[\s\S]*?Max 200 photos per event\.[\s\S]*?<\/script>/gi,
+    ''
+  );
+}
+
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
   return Boolean(
@@ -1379,6 +1388,7 @@ export async function getServerSideProps({ params, res, query }) {
 
   let html = data.html;
   if (useCloudIx) {
+    html = stripLegacyPhotoUploadInjectors(html);
     html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
   }
   const bodyIdx = html.lastIndexOf('</body>');
