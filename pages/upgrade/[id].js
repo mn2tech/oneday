@@ -2,11 +2,13 @@ import { useState } from 'react';
 import Head from 'next/head';
 import { loadStripe } from '@stripe/stripe-js';
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
+import { looksLikeStripePublishableKey, normalizeStripePublishableKey } from '../../lib/stripePublishableKey';
 
 let stripePromise = null;
 function getStripePromise() {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  const key = normalizeStripePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
   if (!key || key.startsWith('pk_test_...') || key === 'undefined') return null;
+  if (!looksLikeStripePublishableKey(key)) return null;
   if (!stripePromise) stripePromise = loadStripe(key);
   return stripePromise;
 }

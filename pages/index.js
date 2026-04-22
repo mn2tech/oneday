@@ -5,19 +5,21 @@ import { loadStripe } from '@stripe/stripe-js';
 import { CardElement, Elements, useStripe, useElements } from '@stripe/react-stripe-js';
 import styles from '../styles/Home.module.css';
 import PromptBuilder from '../components/PromptBuilder';
+import { looksLikeStripePublishableKey, normalizeStripePublishableKey } from '../lib/stripePublishableKey';
 
 // Lazy-initialise Stripe — avoids crashing the module if the key is a placeholder
 let stripePromise = null;
 function getStripePromise() {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  const key = normalizeStripePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
   if (!key || key.startsWith('pk_test_...') || key === 'undefined') return null;
+  if (!looksLikeStripePublishableKey(key)) return null;
   if (!stripePromise) stripePromise = loadStripe(key);
   return stripePromise;
 }
 
 function hasConfiguredStripeKey() {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-  return Boolean(key && !key.startsWith('pk_test_...') && key !== 'undefined');
+  const key = normalizeStripePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  return looksLikeStripePublishableKey(key);
 }
 
 const PLANS = [
