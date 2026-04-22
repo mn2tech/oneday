@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { normalizeStripeEnvKey, looksLikeStripeSecretKey } from '../../lib/stripePublishableKey';
 
 const PRICES = {
   standard: 1400,  // $14.00 in cents
@@ -9,9 +10,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    console.error('[create-payment-intent] STRIPE_SECRET_KEY is not set');
+  const stripeKey = normalizeStripeEnvKey(process.env.STRIPE_SECRET_KEY);
+  if (!stripeKey || !looksLikeStripeSecretKey(stripeKey)) {
+    console.error('[create-payment-intent] STRIPE_SECRET_KEY is missing or invalid shape');
     return res.status(500).json({ error: 'Payment service not configured. Please contact support.' });
   }
 
@@ -36,6 +37,7 @@ export default async function handler(req, res) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: PRICES[resolvedPlan],
       currency: 'usd',
+      payment_method_types: ['card'],
       metadata: { plan: resolvedPlan, email },
       receipt_email: email,
       description: `OneDay — Event Microsite`,

@@ -5,10 +5,15 @@ import { nanoid } from 'nanoid';
 import { Resend } from 'resend';
 import { generateAdminToken, hashAdminToken } from '../../lib/eventAdminAuth';
 import { normalizeDeviceId } from '../../lib/deviceOwnership';
+import { normalizeStripeEnvKey, looksLikeStripeSecretKey } from '../../lib/stripePublishableKey';
 
 // Lazily initialised inside the handler so env vars are always resolved at request time
 function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
+  const key = normalizeStripeEnvKey(process.env.STRIPE_SECRET_KEY);
+  if (!key || !looksLikeStripeSecretKey(key)) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key, { apiVersion: '2023-10-16' });
 }
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -357,13 +362,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const stripe = getStripe();
+    const stripe = !isFree && !isDev ? getStripe() : null;
     const anthropic = getAnthropic();
     const supabase = getSupabase();
     const resend = getResend();
 
     // 1. Verify payment (skip for free tier and dev mode)
-    if (!isFree && !isDev) {
+    if (!isFree && !isDev && stripe) {
       let paymentIntent;
       try {
         paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);

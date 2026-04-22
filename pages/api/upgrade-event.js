@@ -1,8 +1,13 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeStripeEnvKey, looksLikeStripeSecretKey } from '../../lib/stripePublishableKey';
 
 function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
+  const key = normalizeStripeEnvKey(process.env.STRIPE_SECRET_KEY);
+  if (!key || !looksLikeStripeSecretKey(key)) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key, { apiVersion: '2023-10-16' });
 }
 function getSupabase() {
   return createClient(

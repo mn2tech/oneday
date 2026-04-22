@@ -1,4 +1,8 @@
-import { looksLikeStripePublishableKey, normalizeStripePublishableKey } from '../../../lib/stripePublishableKey';
+import {
+  looksLikeStripePublishableKey,
+  looksLikeStripeSecretKey,
+  normalizeStripeEnvKey,
+} from '../../../lib/stripePublishableKey';
 
 /**
  * Optional diagnostics (set DEPLOYMENT_HEALTH_SECRET in env, then GET /api/health/deployment?secret=YOUR_SECRET).
@@ -17,8 +21,10 @@ export default function handler(req, res) {
   const has = (k) => Boolean(process.env[k]);
   const prefix = (k) => { const v = process.env[k]; return v ? v.slice(0, 12) + '...' : 'NOT SET'; };
 
-  const pk = normalizeStripePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  const pk = normalizeStripeEnvKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  const sk = normalizeStripeEnvKey(process.env.STRIPE_SECRET_KEY);
   const stripePublishableKeyShapeOk = looksLikeStripePublishableKey(pk);
+  const stripeSecretKeyShapeOk = looksLikeStripeSecretKey(sk);
 
   return res.status(200).json({
     NEXT_PUBLIC_SUPABASE_URL: has('NEXT_PUBLIC_SUPABASE_URL'),
@@ -28,6 +34,7 @@ export default function handler(req, res) {
     STRIPE_SECRET_KEY_prefix: prefix('STRIPE_SECRET_KEY'),
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_prefix: prefix('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'),
     stripePublishableKeyShapeOk,
+    stripeSecretKeyShapeOk,
     NEXT_PUBLIC_APP_URL: has('NEXT_PUBLIC_APP_URL'),
     RESEND_API_KEY: has('RESEND_API_KEY'),
     RESEND_FROM_set: has('RESEND_FROM'),

@@ -510,14 +510,20 @@ export default function Home() {
                 </span>
               </label>
 
-              <Elements stripe={getStripePromise()}>
-                <CheckoutForm
-                  plan={selectedPlan}
-                  email={email}
-                  onSuccess={handlePaymentSuccess}
-                  termsAccepted={termsAccepted}
-                />
-              </Elements>
+              {stripeConfigured && getStripePromise() ? (
+                <Elements stripe={getStripePromise()}>
+                  <CheckoutForm
+                    plan={selectedPlan}
+                    email={email}
+                    onSuccess={handlePaymentSuccess}
+                    termsAccepted={termsAccepted}
+                  />
+                </Elements>
+              ) : (
+                <p className={styles.errorMsg} role="alert">
+                  Stripe could not load. Confirm NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY and redeploy.
+                </p>
+              )}
             </div>
           )}
 
