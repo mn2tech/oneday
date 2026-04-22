@@ -189,6 +189,7 @@ function injectPhotoUpload(html) {
     '<scr' + 'ipt>',
     '(function(){',
     'document.addEventListener("DOMContentLoaded",function(){',
+    'if(window.__ONEDAY_PHOTO_UPLOAD_INJECTED__)return;window.__ONEDAY_PHOTO_UPLOAD_INJECTED__=1;',
     'var eid=(window.location.pathname.split("/").pop()||"event").slice(0,30);',
     // Step 1: Fix display:none file inputs so change events fire in all browsers
     'document.querySelectorAll("input[type=\\"file\\"]").forEach(function(inp){',
