@@ -310,28 +310,19 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return isPhotoUploadControl(el);
     });
 
-    // Fallback for templates that have a photo grid but no detectable upload control text/class.
-    if(!buttons.length){
-      Array.from(document.querySelectorAll(GSEL)).forEach(function(grid){
-        var host = grid.closest('section') || grid.parentElement;
-        if(!host) return;
-        var existing = host.querySelector('button[class*="upload"],label[class*="upload"],button[class*="photo"],label[class*="photo"]');
-        var ctl = existing;
-        if(!ctl){
-          ctl = document.createElement('button');
-          ctl.type = 'button';
-          ctl.className = 'upload-btn oneday-upload-fallback';
-          ctl.textContent = 'Add Photos';
-          grid.parentNode.insertBefore(ctl, grid.nextSibling);
-        }
-        if(!alreadyWired(ctl)) buttons.push(ctl);
+    // No fallback creation. Only wire explicit upload controls present in the generated page.
+    if(buttons.length>2){
+      buttons.slice(2).forEach(function(el){
+        var block=el.closest('section')||el.closest('div')||el.parentElement;
+        if(block) block.style.display='none';
       });
+      buttons=buttons.slice(0,2);
     }
 
     // 4. Wire every photo section (must not hide extras: later boot() passes would wire section 2 with si=0 and duplicate section 0).
     if (!buttons.length) return;
 
-    var MAX_SECTIONS = 11;
+    var MAX_SECTIONS = 2;
     buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
       var si = idx;
       var key='photos_'+eid+'_'+si;
@@ -883,26 +874,18 @@ const PHOTO_ENGINE_S3 = `<script>
       return isPhotoUploadControl(el);
     });
 
-    if(!buttons.length){
-      Array.from(document.querySelectorAll(GSEL)).forEach(function(grid){
-        var host = grid.closest('section') || grid.parentElement;
-        if(!host) return;
-        var existing = host.querySelector('button[class*="upload"],label[class*="upload"],button[class*="photo"],label[class*="photo"]');
-        var ctl = existing;
-        if(!ctl){
-          ctl = document.createElement('button');
-          ctl.type = 'button';
-          ctl.className = 'upload-btn oneday-upload-fallback';
-          ctl.textContent = 'Add Photos';
-          grid.parentNode.insertBefore(ctl, grid.nextSibling);
-        }
-        if(!alreadyWired(ctl)) buttons.push(ctl);
+    // No fallback creation. Only wire explicit upload controls present in the generated page.
+    if(buttons.length>2){
+      buttons.slice(2).forEach(function(el){
+        var block=el.closest('section')||el.closest('div')||el.parentElement;
+        if(block) block.style.display='none';
       });
+      buttons=buttons.slice(0,2);
     }
 
     if (!buttons.length) return;
 
-    var MAX_SECTIONS = 11;
+    var MAX_SECTIONS = 2;
     buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
       var si = idx;
       var fb=btn.cloneNode(true);
