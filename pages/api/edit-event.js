@@ -29,6 +29,7 @@ STRICT RULES:
 - If the Guest Message Wall exists and has no edit/delete buttons, add them with window.editMsg / window.deleteMsg pattern above.
 - Keep all existing styles, fonts, and design intact
 - Only change what the customer asked to change
+- Keep text clear and non-duplicative (especially hero copy): avoid repeating date/time/location in both subtitle and metadata chips, and avoid title/subtitle sentence duplication.
 - Always close all tags properly and end with </html>`;
 
 function injectPhotoUpload(html) {

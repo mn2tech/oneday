@@ -45,38 +45,66 @@ const DEFAULT_FORM = {
 
 // ── Assemble the final prompt from form fields ────────────────────────────────
 function assemblePrompt(f) {
-  const type = f.eventType === 'Other' ? f.customEventType : f.eventType;
+  const typeRaw = f.eventType === 'Other' ? f.customEventType : f.eventType;
+  const type = typeRaw.trim();
+  const names = f.names.trim();
+  const hostedBy = f.hostedBy.trim();
+  const date = f.date.trim();
+  const time = f.time.trim();
+  const venue = f.venue.trim();
+  const dressCode = f.dressCode.trim();
+  const colorTheme = f.colorTheme.trim();
+  const specialNotes = f.specialNotes.trim();
   const parts = [];
+  const seenParts = new Set();
+
+  function normalizePart(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[.!?]+$/g, '')
+      .trim();
+  }
+
+  function pushUnique(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return;
+    const key = normalizePart(raw);
+    if (!key || seenParts.has(key)) return;
+    seenParts.add(key);
+    parts.push(/[.!?]$/.test(raw) ? raw : `${raw}.`);
+  }
 
   // Opening sentence
   let opening = '';
-  if (type && f.names) opening = `A ${type} celebration for ${f.names}`;
-  else if (type) opening = `A ${type} event`;
-  else if (f.names) opening = `An event for ${f.names}`;
+  if (type && names) opening = `A ${type.toLowerCase()} celebration for ${names}`;
+  else if (type) opening = `A ${type.toLowerCase()} event`;
+  else if (names) opening = `An event for ${names}`;
   else opening = 'An event';
-  if (f.date && f.time) opening += ` on ${f.date} at ${f.time}`;
-  else if (f.date) opening += ` on ${f.date}`;
-  parts.push(opening + '.');
+  pushUnique(opening);
 
-  if (f.hostedBy) parts.push(`Hosted by ${f.hostedBy}.`);
-  if (f.venue) parts.push(`The event will be held at ${f.venue}.`);
+  if (date && time) pushUnique(`Date and time: ${date}, ${time}`);
+  else if (date) pushUnique(`Date: ${date}`);
+
+  if (hostedBy) pushUnique(`Hosted by ${hostedBy}`);
+  if (venue) pushUnique(`Location: ${venue}`);
 
   const schedule = f.scheduleItems.filter(s => s.description.trim());
   if (schedule.length > 0) {
     const schedStr = schedule.map(s => s.time ? `${s.time} – ${s.description}` : s.description).join(', ');
-    parts.push(`Schedule: ${schedStr}.`);
+    pushUnique(`Schedule: ${schedStr}`);
   }
 
   const photoSubsections = f.photoSubsections
     .map(s => s.title.trim())
     .filter(Boolean);
   if (photoSubsections.length > 0) {
-    parts.push(`Photo wall subsections should be: ${photoSubsections.join(', ')}.`);
+    pushUnique(`Photo wall subsections: ${photoSubsections.join(', ')}`);
   }
 
-  if (f.dressCode) parts.push(`Dress code: ${f.dressCode}.`);
-  if (f.colorTheme) parts.push(`Color theme: ${f.colorTheme}.`);
-  if (f.specialNotes.trim()) parts.push(f.specialNotes.trim());
+  if (dressCode) pushUnique(`Dress code: ${dressCode}`);
+  if (colorTheme) pushUnique(`Color theme: ${colorTheme}`);
+  if (specialNotes) pushUnique(specialNotes);
 
   return parts.join(' ');
 }
