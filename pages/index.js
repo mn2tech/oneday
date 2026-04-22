@@ -124,7 +124,8 @@ function CheckoutForm({ plan, email, onSuccess, termsAccepted }) {
       const piData = await piRes.json();
 
       if (!piRes.ok) {
-        setErrorMsg(piData.error || 'Failed to initialise payment.');
+        const extra = piData.stripeCode ? ` (${piData.stripeCode})` : '';
+        setErrorMsg((piData.error || 'Failed to initialise payment.') + extra);
         setLoading(false);
         return;
       }
