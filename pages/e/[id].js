@@ -23,6 +23,17 @@ function injectBeforeHeadClose(html, snippet) {
   return html.slice(0, idx) + snippet + html.slice(idx);
 }
 
+/** Runs before embedded inline scripts’ DOMContentLoaded handlers (capture phase). Inline HTML often defines renderPhotos after our tail injection — capture reapplies noops before bubble handlers clear photo grids. */
+const PHOTO_WALL_EMBEDDED_GUARD = `<script>
+(function(){
+  document.addEventListener('DOMContentLoaded',function(){
+    try{
+      window.renderPhotos=function(){};
+      window.setupPhotoInput=function(){};
+    }catch(e){}
+  },true);
+})();<\/script>`;
+
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
   return Boolean(
@@ -1710,9 +1721,10 @@ export async function getServerSideProps({ params, res, query }) {
 
   let html = data.html;
   html = injectBeforeHeadClose(html, manifestLinks);
-  if (useCloudIx) {
-    html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
-  }
+  html = injectAfterBodyOpen(
+    html,
+    PHOTO_WALL_EMBEDDED_GUARD + (useCloudIx ? SHARED_CLOUD_LOCALSTORAGE_BLOCK : '')
+  );
   const bodyIdx = html.lastIndexOf('</body>');
   html =
     bodyIdx !== -1

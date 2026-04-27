@@ -60,27 +60,27 @@ export default async function handler(req, res) {
   const basename = (row.s3_key && row.s3_key.split('/').pop()) || 'photo.jpg';
   const safe = String(basename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'photo.jpg';
 
-  res.setHeader('Content-Type', ct);
-  res.setHeader('Content-Disposition', `attachment; filename="${safe}"`);
-  res.setHeader('Cache-Control', 'private, max-age=60');
-
-  if (typeof body.pipe === 'function') {
-    body.on('error', (e) => {
-      console.error('[event-photos/download] stream', e);
-      if (!res.headersSent) res.status(500).end();
-    });
-    body.pipe(res);
+  let buffer;
+  try {
+    if (typeof body.transformToByteArray === 'function') {
+      const u8 = await body.transformToByteArray();
+      buffer = Buffer.from(u8);
+    } else {
+      const chunks = [];
+      for await (const chunk of body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      buffer = Buffer.concat(chunks);
+    }
+  } catch (e) {
+    console.error('[event-photos/download] read body', e);
+    if (!res.headersSent) return res.status(500).json({ error: 'Download failed.' });
     return;
   }
 
-  try {
-    const chunks = [];
-    for await (const chunk of body) {
-      chunks.push(chunk);
-    }
-    res.end(Buffer.concat(chunks));
-  } catch (e) {
-    console.error('[event-photos/download] buffer', e);
-    if (!res.headersSent) return res.status(500).json({ error: 'Download failed.' });
-  }
+  res.setHeader('Content-Type', ct);
+  res.setHeader('Content-Disposition', `attachment; filename="${safe}"`);
+  res.setHeader('Content-Length', String(buffer.length));
+  res.setHeader('Cache-Control', 'private, max-age=60');
+  res.end(buffer);
 }
