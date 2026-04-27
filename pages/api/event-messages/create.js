@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { sendHostMessageNotification } from '../../../lib/notifications';
 
 function getSupabase() {
   return createClient(
@@ -49,6 +50,20 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
 
+  const { data: eventRow, error: eventLookupErr } = await supabase
+    .from('event_apps')
+    .select('id, title, email')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (eventLookupErr) {
+    console.error('[event-messages/create] event lookup', eventLookupErr);
+    return res.status(500).json({ error: 'Database error.' });
+  }
+  if (!eventRow) {
+    return res.status(400).json({ error: 'Event not found.', code: 'NO_EVENT' });
+  }
+
   const { count, error: countErr } = await supabase
     .from('event_messages')
     .select('id', { count: 'exact', head: true })
@@ -93,5 +108,13 @@ export default async function handler(req, res) {
   }
 
   const row = inserted;
+  const notification = await sendHostMessageNotification({
+    event: eventRow,
+    message: row,
+  });
+  if (notification.status === 'failed') {
+    console.warn('[event-messages/create] host notification failed', notification.reason);
+  }
+
   return res.status(200).json({ message: row });
 }

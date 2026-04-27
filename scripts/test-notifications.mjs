@@ -6,6 +6,8 @@ const {
   escapeHtml,
   hostEmailNotificationsEnabled,
   normalizeNotificationEmail,
+  sendHostMessageNotification,
+  sendHostPhotoNotification,
   sendHostRsvpNotification,
 } = await import('../lib/notifications.js');
 
@@ -50,14 +52,14 @@ try {
     { status: 'skipped', reason: 'RESEND_NOT_CONFIGURED' }
   );
 
-  let sendRequest;
+  const sendRequests = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
-    sendRequest = {
+    sendRequests.push({
       url: String(url),
       method: options?.method,
       body: JSON.parse(String(options?.body || '{}')),
-    };
+    });
     return new Response(JSON.stringify({ id: 'email_123' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -78,17 +80,50 @@ try {
       }),
       { status: 'sent' }
     );
+    assert.deepEqual(
+      await sendHostMessageNotification({
+        event: { id: 'event-1', title: 'Party', email: 'Host@Example.com' },
+        message: { author_name: 'Friend <One>', body: 'Congrats & cheers!' },
+      }),
+      { status: 'sent' }
+    );
+    assert.deepEqual(
+      await sendHostPhotoNotification({
+        event: { id: 'event-1', title: 'Party', email: 'Host@Example.com' },
+        photo: {
+          section_index: 1,
+          content_type: 'image/png',
+          byte_size: 1536000,
+          url: 'https://cdn.example.com/photo.png?x=1&y=2',
+        },
+      }),
+      { status: 'sent' }
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assert.equal(sendRequest.url, 'https://api.resend.com/emails');
-  assert.equal(sendRequest.method, 'POST');
-  assert.equal(sendRequest.body.from, 'OneDay <notifications@example.com>');
-  assert.equal(sendRequest.body.to, 'host@example.com');
-  assert.equal(sendRequest.body.subject, 'New RSVP for Party');
-  assert.match(sendRequest.body.html, /Guest &amp; Friend/);
-  assert.match(sendRequest.body.html, /https:\/\/example\.com\/e\/event-1/);
+  assert.equal(sendRequests.length, 3);
+  for (const request of sendRequests) {
+    assert.equal(request.url, 'https://api.resend.com/emails');
+    assert.equal(request.method, 'POST');
+    assert.equal(request.body.from, 'OneDay <notifications@example.com>');
+    assert.equal(request.body.to, 'host@example.com');
+    assert.match(request.body.html, /https:\/\/example\.com\/e\/event-1/);
+  }
+
+  assert.equal(sendRequests[0].body.subject, 'New RSVP for Party');
+  assert.match(sendRequests[0].body.html, /Guest &amp; Friend/);
+
+  assert.equal(sendRequests[1].body.subject, 'New message for Party');
+  assert.match(sendRequests[1].body.html, /Friend &lt;One&gt;/);
+  assert.match(sendRequests[1].body.html, /Congrats &amp; cheers!/);
+
+  assert.equal(sendRequests[2].body.subject, 'New photo for Party');
+  assert.match(sendRequests[2].body.html, /Photo wall section 2/);
+  assert.match(sendRequests[2].body.html, /image\/png/);
+  assert.match(sendRequests[2].body.html, /1.5 MB/);
+  assert.match(sendRequests[2].body.html, /https:\/\/cdn\.example\.com\/photo\.png\?x=1&amp;y=2/);
 
   console.log('notification helper tests passed');
 } finally {

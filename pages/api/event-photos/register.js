@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../../lib/photoLimits';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { sendHostPhotoNotification } from '../../../lib/notifications';
 
 function getSupabase() {
   return createClient(
@@ -52,6 +53,23 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
+
+  const { data: eventRow, error: eventErr } = await supabase
+    .from('event_apps')
+    .select('id, title, email')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (eventErr) {
+    console.error('[event-photos/register] event lookup', eventErr);
+    return res.status(500).json({ error: 'Database error.', code: 'DB_EVENT' });
+  }
+  if (!eventRow) {
+    return res.status(400).json({
+      error: 'Event id is not in the database. Regenerate or save the event, then try again.',
+      code: 'EVENT_FK',
+    });
+  }
 
   const { count, error: countErr } = await supabase
     .from('event_photos')
@@ -128,6 +146,21 @@ export default async function handler(req, res) {
       console.error('[event-photos/register] presignedGet', e);
       return res.status(500).json({ error: 'Could not build image URL.' });
     }
+  }
+
+  const notification = await sendHostPhotoNotification({
+    event: eventRow,
+    photo: {
+      id: inserted.id,
+      section_index: sec,
+      content_type: contentType || 'image/jpeg',
+      byte_size: Math.round(size),
+      url,
+      key,
+    },
+  });
+  if (notification.status === 'failed') {
+    console.warn('[event-photos/register] host notification failed', notification.reason);
   }
 
   return res.status(200).json({
