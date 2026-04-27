@@ -12,8 +12,6 @@ function getSupabase() {
   );
 }
 
-const MAX_PER_SECTION = 20;
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -70,28 +68,6 @@ export default async function handler(req, res) {
       error: 'Event id is not in the database. Regenerate or save the event, then try again.',
       code: 'EVENT_FK',
     });
-  }
-
-  const { count, error: countErr } = await supabase
-    .from('event_photos')
-    .select('id', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('section_index', sec);
-
-  if (countErr) {
-    console.error('[event-photos/register] count', countErr);
-    const msg = String(countErr.message || countErr);
-    if (msg.includes('does not exist') || msg.includes('schema cache')) {
-      return res.status(500).json({
-        error: 'Database table missing. Run the event_photos SQL in Supabase (see supabase-setup.sql).',
-        code: 'TABLE_MISSING',
-      });
-    }
-    return res.status(500).json({ error: 'Database error.', code: 'DB_COUNT' });
-  }
-
-  if ((count ?? 0) >= MAX_PER_SECTION) {
-    return res.status(400).json({ error: `Maximum ${MAX_PER_SECTION} photos per event.` });
   }
 
   const { data: inserted, error: insErr } = await supabase
