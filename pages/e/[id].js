@@ -843,6 +843,8 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     function loadGrid(grid, si){
+      if(!grid || grid.dataset.onedayLoading === '1') return;
+      grid.dataset.onedayLoading = '1';
       fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
         .then(function(r){
           return r.json().then(function(d){
@@ -852,6 +854,16 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
+          var sig = photos.map(function(p){
+            return String(p.id || '') + ':' + String(p.url || '');
+          }).join('|');
+          var prevSig = grid.dataset.onedayPhotoSig || '';
+          var hasChanged = sig !== prevSig;
+          grid.dataset.onedayPhotoSig = sig;
+          if(!hasChanged){
+            trackPhotoCount(si, photos.length, grid);
+            return;
+          }
           var viewer=ensurePhotoViewer();
           var viewerItems=photos.map(function(p,ix){
             return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg'};
@@ -901,7 +913,10 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
-          grid.innerHTML='';
+          if(!grid.dataset.onedayPhotoSig) grid.innerHTML='';
+        })
+        .finally(function(){
+          grid.dataset.onedayLoading = '0';
         });
     }
 
@@ -978,11 +993,12 @@ const PHOTO_ENGINE_S3 = `<script>
       loadGrid(grid, si);
       if(!noticeState.timer){
         noticeState.timer=setInterval(function(){
+          if(document.hidden) return;
           Object.keys(noticeState.grids).forEach(function(key){
             var gridRef=noticeState.grids[key];
             if(gridRef&&document.body.contains(gridRef)) loadGrid(gridRef, Number(key));
           });
-        }, 20000);
+        }, 45000);
       }
 
       inp.addEventListener('change', function(){
