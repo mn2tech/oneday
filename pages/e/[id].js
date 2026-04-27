@@ -126,6 +126,11 @@ const PHOTO_ENGINE_LEGACY = `<script>
           s=s.nextElementSibling;
         }
       }
+      var sec=el.closest&&el.closest('section');
+      if(sec){
+        var gq=sec.querySelectorAll(GSEL);
+        if(gq.length===1) return gq[0];
+      }
       return null;
     }
 
@@ -335,6 +340,8 @@ const PHOTO_ENGINE_LEGACY = `<script>
         ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
+        t.indexOf('your photo')!==-1 ||
+        t.indexOf('a photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
         c.indexOf('upload-btn')!==-1
       );
@@ -478,7 +485,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
+  function schedulePhotoLegacyBoot(){
     setTimeout(bootPhotoLegacy, 0);
     setTimeout(bootPhotoLegacy, 200);
     setTimeout(bootPhotoLegacy, 500);
@@ -489,7 +496,12 @@ const PHOTO_ENGINE_LEGACY = `<script>
       n++;
       if(n>=30) clearInterval(iv);
     }, 200);
-  });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', schedulePhotoLegacyBoot);
+  } else {
+    schedulePhotoLegacyBoot();
+  }
   window.addEventListener('load', function(){ setTimeout(bootPhotoLegacy, 0); });
 
   // ── RSVP + Message Wall rescue ───────────────────────────────────────────
@@ -617,6 +629,11 @@ const PHOTO_ENGINE_S3 = `<script>
           if(c2) return c2;
           s=s.nextElementSibling;
         }
+      }
+      var sec=el.closest&&el.closest('section');
+      if(sec){
+        var gq=sec.querySelectorAll(GSEL);
+        if(gq.length===1) return gq[0];
       }
       return null;
     }
@@ -857,7 +874,7 @@ const PHOTO_ENGINE_S3 = `<script>
       Array.prototype.slice.call(root.querySelectorAll('p,div,span,em,strong,small,i')).forEach(function(el){
         if(grid.contains(el)) return;
         var tx = (el.textContent || '').toLowerCase();
-        if(tx.indexOf('no photo') !== -1 || tx.indexOf('be the first') !== -1 || (tx.indexOf('share') !== -1 && tx.indexOf('first') !== -1)) el.style.display = 'none';
+        if(tx.indexOf('no photo') !== -1 || tx.indexOf('photos yet') !== -1 || tx.indexOf('be the first') !== -1 || tx.indexOf('share a memory') !== -1 || (tx.indexOf('share') !== -1 && tx.indexOf('first') !== -1)) el.style.display = 'none';
       });
     }
 
@@ -949,9 +966,9 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
-          // URLs may be presigned and rotate often; compare using stable IDs only.
+          // Include URL in the signature: presigned GET links expire; ID-only diffing left stale src= and images vanished.
           var sig = photos.map(function(p){
-            return String(p.id || '');
+            return String(p.id || '') + '\t' + String(p.url || '');
           }).join('|');
           var prevSig = grid.dataset.onedayPhotoSig || '';
           var hasChanged = sig !== prevSig;
@@ -1029,6 +1046,8 @@ const PHOTO_ENGINE_S3 = `<script>
         ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
+        t.indexOf('your photo')!==-1 ||
+        t.indexOf('a photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
         c.indexOf('upload-btn')!==-1
       );
@@ -1134,7 +1153,7 @@ const PHOTO_ENGINE_S3 = `<script>
 
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
+  function schedulePhotoS3Boot(){
     setTimeout(bootPhotoS3, 0);
     setTimeout(bootPhotoS3, 200);
     setTimeout(bootPhotoS3, 500);
@@ -1145,7 +1164,12 @@ const PHOTO_ENGINE_S3 = `<script>
       n++;
       if(n>=30) clearInterval(iv);
     }, 200);
-  });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', schedulePhotoS3Boot);
+  } else {
+    schedulePhotoS3Boot();
+  }
   window.addEventListener('load', function(){ setTimeout(bootPhotoS3, 0); });
 
   document.addEventListener('DOMContentLoaded', function(){
