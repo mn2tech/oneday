@@ -61,6 +61,10 @@ function getSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
+  try{
+    window.renderPhotos=function(){};
+    window.setupPhotoInput=function(){};
+  }catch(e){}
   function bootPhotoLegacy(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -99,7 +103,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -570,6 +574,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
 /** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
+  try{
+    window.renderPhotos=function(){};
+    window.setupPhotoInput=function(){};
+  }catch(e){}
   function bootPhotoS3(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -608,7 +616,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
