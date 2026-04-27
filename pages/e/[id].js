@@ -65,6 +65,25 @@ const PHOTO_ENGINE_LEGACY = `<script>
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
     var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
+    function quickDownload(url, name){
+      if(!url) return;
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
+    }
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
@@ -146,12 +165,14 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
 
-      dl.addEventListener('click', function(e){
-        e.preventDefault();
-        var cur=state.items[state.idx]||{};
-        if(!cur.url) return;
-        quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-      });
+      if(dl){
+        dl.addEventListener('click', function(e){
+          e.preventDefault();
+          var cur=state.items[state.idx]||{};
+          if(!cur.url) return;
+          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        });
+      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -301,26 +322,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
       window.__onedayPhotoViewer={open:open,close:close};
       return window.__onedayPhotoViewer;
-    }
-
-    function quickDownload(url, name){
-      if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
     }
 
     // Match original OneDay behavior (+ case-insensitive text + file-picker labels).
@@ -566,6 +567,25 @@ const PHOTO_ENGINE_S3 = `<script>
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
     var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
+    function quickDownload(url, name){
+      if(!url) return;
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
+    }
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
     var noticeState = window.__onedayPhotoNoticeState || (window.__onedayPhotoNoticeState = {counts:{},initialized:{},grids:{},timer:null});
@@ -676,12 +696,14 @@ const PHOTO_ENGINE_S3 = `<script>
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
 
-      dl.addEventListener('click', function(e){
-        e.preventDefault();
-        var cur=state.items[state.idx]||{};
-        if(!cur.url) return;
-        quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-      });
+      if(dl){
+        dl.addEventListener('click', function(e){
+          e.preventDefault();
+          var cur=state.items[state.idx]||{};
+          if(!cur.url) return;
+          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        });
+      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -833,26 +855,6 @@ const PHOTO_ENGINE_S3 = `<script>
       return window.__onedayPhotoViewer;
     }
 
-    function quickDownload(url, name){
-      if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
-    }
-
     function hideEmptyPhotoCopy(grid, hasPhotos){
       if(!hasPhotos) return;
       var root = grid.closest('section') || grid.parentElement;
@@ -974,9 +976,8 @@ const PHOTO_ENGINE_S3 = `<script>
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
-            im.loading='lazy';
+            im.loading=(i<12)?'eager':'lazy';
             im.decoding='async';
-            im.setAttribute('fetchpriority','low');
             im.sizes='(max-width:640px) 45vw, 200px';
             im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
             var d=document.createElement('button');
@@ -1018,7 +1019,6 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
-          if(!grid.dataset.onedayPhotoSig) grid.innerHTML='';
         })
         .finally(function(){
           grid.dataset.onedayLoading = '0';
