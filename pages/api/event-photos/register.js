@@ -141,29 +141,33 @@ export default async function handler(req, res) {
   }
 
   if (guestPushEnabled()) {
-    const { data: subs, error: subsErr } = await supabase
-      .from('event_guest_push_subscriptions')
-      .select('endpoint, keys, device_id')
-      .eq('event_id', eventId)
-      .eq('is_active', true);
-    if (subsErr) {
-      console.warn('[event-photos/register] guest subscriptions lookup failed', subsErr.message || subsErr);
-    } else {
-      const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://getoneday.com'}/e/${encodeURIComponent(eventId)}`;
-      const candidates = (subs || []).filter((row) => String(row?.device_id || '') !== dev);
-      const pushResult = await sendGuestPush({
-        subscriptions: candidates,
-        title: eventRow?.title ? `New photo in ${eventRow.title}` : 'New photo added',
-        body: 'A guest uploaded a new photo. Tap to view it.',
-        url: eventUrl,
-      });
-      if (pushResult.invalidEndpoints.length) {
-        await supabase
-          .from('event_guest_push_subscriptions')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .in('endpoint', pushResult.invalidEndpoints)
-          .eq('event_id', eventId);
+    try {
+      const { data: subs, error: subsErr } = await supabase
+        .from('event_guest_push_subscriptions')
+        .select('endpoint, keys, device_id')
+        .eq('event_id', eventId)
+        .eq('is_active', true);
+      if (subsErr) {
+        console.warn('[event-photos/register] guest subscriptions lookup failed', subsErr.message || subsErr);
+      } else {
+        const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://getoneday.com'}/e/${encodeURIComponent(eventId)}`;
+        const candidates = (subs || []).filter((row) => String(row?.device_id || '') !== dev);
+        const pushResult = await sendGuestPush({
+          subscriptions: candidates,
+          title: eventRow?.title ? `New photo in ${eventRow.title}` : 'New photo added',
+          body: 'A guest uploaded a new photo. Tap to view it.',
+          url: eventUrl,
+        });
+        if (pushResult.invalidEndpoints.length) {
+          await supabase
+            .from('event_guest_push_subscriptions')
+            .update({ is_active: false, updated_at: new Date().toISOString() })
+            .in('endpoint', pushResult.invalidEndpoints)
+            .eq('event_id', eventId);
+        }
       }
+    } catch (err) {
+      console.warn('[event-photos/register] guest push failed (non-fatal)', err?.message || err);
     }
   }
 
