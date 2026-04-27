@@ -212,7 +212,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         var cur=state.items[state.idx]||{};
         img.src=cur.url||'';
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
-        dl.href='#';
+        dl.href=cur.id?('/api/event-photos/download?photoId='+encodeURIComponent(String(cur.id))+'&eventId='+encodeURIComponent(eid)):'#';
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -859,15 +859,8 @@ const PHOTO_ENGINE_S3 = `<script>
     function quickDownload(photoId, displayName){
       if(!photoId) return;
       var nm=String(displayName||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      var u='/api/event-photos/download?photoId='+encodeURIComponent(String(photoId))+'&eventId='+encodeURIComponent(eid);
-      var a=document.createElement('a');
-      a.href=u;
-      a.setAttribute('download', nm);
-      a.rel='noopener';
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function(){ try{ a.remove(); }catch(e1){} }, 800);
+      var u='/api/event-photos/download?photoId='+encodeURIComponent(String(photoId))+'&eventId='+encodeURIComponent(eid)+'&name='+encodeURIComponent(nm);
+      window.location.assign(u);
     }
 
     function hideEmptyPhotoCopy(grid, hasPhotos){

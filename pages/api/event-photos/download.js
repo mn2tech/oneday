@@ -57,7 +57,8 @@ export default async function handler(req, res) {
   }
 
   const ct = row.content_type || out.ContentType || 'application/octet-stream';
-  const basename = (row.s3_key && row.s3_key.split('/').pop()) || 'photo.jpg';
+  const requestedName = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+  const basename = requestedName || (row.s3_key && row.s3_key.split('/').pop()) || 'photo.jpg';
   const safe = String(basename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'photo.jpg';
 
   let buffer;
