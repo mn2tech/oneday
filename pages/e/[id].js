@@ -392,10 +392,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
         grid.innerHTML='';
         saved.forEach(function(src,i){
           var w=document.createElement('div');
-          w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
+          w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
           var im=document.createElement('img');
           im.src=src;
-          im.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;border-radius:10px;display:block;';
+          im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
           var d=document.createElement('button');
           d.textContent='⬇';
           d.title='Download';
@@ -918,7 +918,7 @@ const PHOTO_ENGINE_S3 = `<script>
           grid.innerHTML='';
           photos.forEach(function(p,i){
             var w=document.createElement('div');
-            w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.06);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
+            w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
@@ -926,7 +926,7 @@ const PHOTO_ENGINE_S3 = `<script>
             im.decoding='async';
             im.setAttribute('fetchpriority','low');
             im.sizes='(max-width:640px) 45vw, 200px';
-            im.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;border-radius:10px;display:block;';
+            im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
             var d=document.createElement('button');
             d.textContent='⬇';
             d.title='Download';
