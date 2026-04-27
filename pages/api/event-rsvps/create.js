@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
 import { isEventHost } from '../../../lib/eventAdminAuth';
+import { sendHostRsvpNotification } from '../../../lib/notifications';
 
 function getSupabase() {
   return createClient(
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
 
   let { data: eventRow, error: eventLookupErr } = await supabase
     .from('event_apps')
-    .select('id, rsvp_join_enabled')
+    .select('id, title, email, rsvp_join_enabled')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -69,7 +70,7 @@ export default async function handler(req, res) {
     if (msg.includes('rsvp_join_enabled') && msg.includes('column')) {
       const fallback = await supabase
         .from('event_apps')
-        .select('id')
+        .select('id, title, email')
         .eq('id', eventId)
         .maybeSingle();
       eventRow = fallback.data;
@@ -161,6 +162,14 @@ export default async function handler(req, res) {
       });
     }
     return res.status(500).json({ error: 'Could not save RSVP.' });
+  }
+
+  const notification = await sendHostRsvpNotification({
+    event: eventRow,
+    rsvp: inserted,
+  });
+  if (notification.status === 'failed') {
+    console.warn('[event-rsvps/create] host notification failed', notification.reason);
   }
 
   return res.status(200).json({ rsvp: inserted });

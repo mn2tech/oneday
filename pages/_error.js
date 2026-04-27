@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Error({ statusCode }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', color: '#f0f0f5', fontFamily: 'Inter, sans-serif', textAlign: 'center', padding: '24px' }}>
@@ -8,9 +10,9 @@ export default function Error({ statusCode }) {
       <p style={{ color: '#8888aa', marginBottom: '32px' }}>
         Something went wrong. Please try again.
       </p>
-      <a href="/" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', padding: '12px 28px', borderRadius: '10px', textDecoration: 'none', fontWeight: 600 }}>
+      <Link href="/" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', padding: '12px 28px', borderRadius: '10px', textDecoration: 'none', fontWeight: 600 }}>
         Back to Home
-      </a>
+      </Link>
     </div>
   );
 }
