@@ -110,7 +110,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         '<button type="button" data-v-close style="position:absolute;top:14px;right:14px;border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:40px;height:40px;font-size:24px;cursor:pointer;">&times;</button>'+
         '<button type="button" data-v-prev style="position:absolute;left:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8249;</button>'+
         '<button type="button" data-v-next style="position:absolute;right:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8250;</button>'+
-        '<img data-v-img alt="" style="max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);transform-origin:center center;transition:transform .16s ease;">'+
+        '<img data-v-img alt="" decoding="async" fetchpriority="high" style="max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);transform-origin:center center;transition:transform .16s ease;">'+
         '<div data-v-thumbs style="position:absolute;left:50%;bottom:66px;transform:translateX(-50%);display:flex;gap:6px;max-width:min(96vw,1000px);overflow:auto;padding:6px 8px;background:rgba(8,10,16,.58);border-radius:12px;"></div>'+
         '<div data-v-bar style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(15,18,26,.72);padding:8px 10px;border-radius:999px;color:#fff;font:600 13px/1.2 system-ui,sans-serif;max-width:calc(100vw - 24px);">'+
         '<button type="button" data-v-zoom-out style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:34px;height:32px;cursor:pointer;">-</button>'+
@@ -159,7 +159,14 @@ const PHOTO_ENGINE_LEGACY = `<script>
           var t=document.createElement('button');
           t.type='button';
           t.style.cssText='border:2px solid transparent;padding:0;border-radius:8px;overflow:hidden;background:transparent;cursor:pointer;flex:0 0 auto;width:56px;height:56px;';
-          t.innerHTML='<img alt="" src="'+it.url+'" style="width:100%;height:100%;object-fit:cover;display:block;">';
+          var th=document.createElement('img');
+          th.alt='';
+          th.src=it.url||'';
+          th.loading='lazy';
+          th.decoding='async';
+          th.setAttribute('fetchpriority','low');
+          th.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+          t.appendChild(th);
           t.onclick=function(){ state.idx=ix; refresh(); };
           thumbs.appendChild(t);
         });
@@ -606,7 +613,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<button type="button" data-v-close style="position:absolute;top:14px;right:14px;border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:40px;height:40px;font-size:24px;cursor:pointer;">&times;</button>'+
         '<button type="button" data-v-prev style="position:absolute;left:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8249;</button>'+
         '<button type="button" data-v-next style="position:absolute;right:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8250;</button>'+
-        '<img data-v-img alt="" style="max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);transform-origin:center center;transition:transform .16s ease;">'+
+        '<img data-v-img alt="" decoding="async" fetchpriority="high" style="max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);transform-origin:center center;transition:transform .16s ease;">'+
         '<div data-v-thumbs style="position:absolute;left:50%;bottom:66px;transform:translateX(-50%);display:flex;gap:6px;max-width:min(96vw,1000px);overflow:auto;padding:6px 8px;background:rgba(8,10,16,.58);border-radius:12px;"></div>'+
         '<div data-v-bar style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(15,18,26,.72);padding:8px 10px;border-radius:999px;color:#fff;font:600 13px/1.2 system-ui,sans-serif;max-width:calc(100vw - 24px);">'+
         '<button type="button" data-v-zoom-out style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:34px;height:32px;cursor:pointer;">-</button>'+
@@ -655,7 +662,14 @@ const PHOTO_ENGINE_S3 = `<script>
           var t=document.createElement('button');
           t.type='button';
           t.style.cssText='border:2px solid transparent;padding:0;border-radius:8px;overflow:hidden;background:transparent;cursor:pointer;flex:0 0 auto;width:56px;height:56px;';
-          t.innerHTML='<img alt="" src="'+it.url+'" style="width:100%;height:100%;object-fit:cover;display:block;">';
+          var th=document.createElement('img');
+          th.alt='';
+          th.src=it.url||'';
+          th.loading='lazy';
+          th.decoding='async';
+          th.setAttribute('fetchpriority','low');
+          th.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+          t.appendChild(th);
           t.onclick=function(){ state.idx=ix; refresh(); };
           thumbs.appendChild(t);
         });
@@ -842,6 +856,38 @@ const PHOTO_ENGINE_S3 = `<script>
       noticeState.counts[key]=count;
     }
 
+    /** Resize heavy uploads in-browser (JPEG) so grids decode faster; skip GIF to preserve animation. */
+    var OPT_MAX_EDGE=2048;
+    var OPT_MIN_BYTES=140000;
+    var OPT_JPEG_Q=0.86;
+    function optimizePhotoForUpload(file, done){
+      if(!file || !file.type || file.type.indexOf('image/')!==0){ done(null); return; }
+      var t=(file.type||'').toLowerCase();
+      if(t==='image/gif'){ done(null); return; }
+      if(file.size<OPT_MIN_BYTES){ done(null); return; }
+      var objUrl=URL.createObjectURL(file);
+      var im=new Image();
+      im.onload=function(){
+        URL.revokeObjectURL(objUrl);
+        var nw=im.naturalWidth||im.width, nh=im.naturalHeight||im.height;
+        if(!nw||!nh){ done(null); return; }
+        var scale=Math.min(1, OPT_MAX_EDGE/Math.max(nw,nh));
+        var tw=Math.max(1,Math.round(nw*scale)), th=Math.max(1,Math.round(nh*scale));
+        if(scale>=1 && t==='image/jpeg'){ done(null); return; }
+        var c=document.createElement('canvas');
+        c.width=tw; c.height=th;
+        var ctx=c.getContext('2d');
+        if(!ctx){ done(null); return; }
+        try{ ctx.drawImage(im,0,0,tw,th); }catch(e){ done(null); return; }
+        c.toBlob(function(blob){
+          if(!blob || blob.size>=file.size){ done(null); return; }
+          done({blob:blob, contentType:'image/jpeg'});
+        },'image/jpeg',OPT_JPEG_Q);
+      };
+      im.onerror=function(){ URL.revokeObjectURL(objUrl); done(null); };
+      im.src=objUrl;
+    }
+
     function loadGrid(grid, si){
       if(!grid || grid.dataset.onedayLoading === '1') return;
       grid.dataset.onedayLoading = '1';
@@ -876,6 +922,10 @@ const PHOTO_ENGINE_S3 = `<script>
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
+            im.loading='lazy';
+            im.decoding='async';
+            im.setAttribute('fetchpriority','low');
+            im.sizes='(max-width:640px) 45vw, 200px';
             im.style.cssText='width:100%;height:100%;object-fit:cover;object-position:center;border-radius:10px;display:block;';
             var d=document.createElement('button');
             d.textContent='⬇';
@@ -1007,30 +1057,35 @@ const PHOTO_ENGINE_S3 = `<script>
         if(!files.length) return;
         this.value='';
         files.forEach(function(file){
-          var ct=file.type||'image/jpeg';
-          if(ct.indexOf('image/')!==0) return;
+          var origCt=file.type||'image/jpeg';
+          if(origCt.indexOf('image/')!==0) return;
           if(file.size>${MAX_PHOTO_BYTES}){ alert(file.name+' exceeds 5 MB — please resize it first.'); return; }
-          fetch('/api/event-photos/presign',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({eventId:eid,sectionIndex:si,contentType:ct})
-          })
-          .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'presign failed'); return j; }); })
-          .then(function(d){
-            return fetch(d.uploadUrl,{method:'PUT',headers:{'Content-Type':ct},body:file}).then(function(putRes){
-              if(!putRes.ok) throw new Error('Upload to storage failed');
-              return d;
-            });
-          })
-          .then(function(d){
-            return fetch('/api/event-photos/register',{
+          optimizePhotoForUpload(file, function(opt){
+            var bodyBlob=opt && opt.blob ? opt.blob : file;
+            var ct=opt && opt.contentType ? opt.contentType : origCt;
+            if(bodyBlob.size>${MAX_PHOTO_BYTES}){ alert(file.name+' is still too large after processing — try a smaller image.'); return; }
+            fetch('/api/event-photos/presign',{
               method:'POST',
               headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:file.size,contentType:ct,deviceId:getDeviceId()})
-            }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
-          })
-          .then(function(){ loadGrid(grid, si); })
-          .catch(function(err){ alert(err.message||'Upload failed'); });
+              body:JSON.stringify({eventId:eid,sectionIndex:si,contentType:ct})
+            })
+            .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'presign failed'); return j; }); })
+            .then(function(d){
+              return fetch(d.uploadUrl,{method:'PUT',headers:{'Content-Type':ct},body:bodyBlob}).then(function(putRes){
+                if(!putRes.ok) throw new Error('Upload to storage failed');
+                return d;
+              });
+            })
+            .then(function(d){
+              return fetch('/api/event-photos/register',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:bodyBlob.size,contentType:ct,deviceId:getDeviceId()})
+              }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
+            })
+            .then(function(){ loadGrid(grid, si); })
+            .catch(function(err){ alert(err.message||'Upload failed'); });
+          });
         });
       });
     });
