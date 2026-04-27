@@ -61,33 +61,10 @@ function getSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
-  try{
-    window.renderPhotos=function(){};
-    window.setupPhotoInput=function(){};
-  }catch(e){}
   function bootPhotoLegacy(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
     var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
-    function quickDownload(url, name){
-      if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
-    }
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
@@ -103,7 +80,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -129,11 +106,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
           if(c2) return c2;
           s=s.nextElementSibling;
         }
-      }
-      var sec=el.closest&&el.closest('section');
-      if(sec){
-        var gq=sec.querySelectorAll(GSEL);
-        if(gq.length===1) return gq[0];
       }
       return null;
     }
@@ -174,14 +146,12 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
 
-      if(dl){
-        dl.addEventListener('click', function(e){
-          e.preventDefault();
-          var cur=state.items[state.idx]||{};
-          if(!cur.url) return;
-          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-        });
-      }
+      dl.addEventListener('click', function(e){
+        e.preventDefault();
+        var cur=state.items[state.idx]||{};
+        if(!cur.url) return;
+        quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+      });
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -333,6 +303,26 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return window.__onedayPhotoViewer;
     }
 
+    function quickDownload(url, name){
+      if(!url) return;
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
+    }
+
     // Match original OneDay behavior (+ case-insensitive text + file-picker labels).
     // Do not exclude by #poll — some layouts nest sections oddly and uploads would disappear.
     function isPhotoUploadControl(el){
@@ -344,8 +334,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
         ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
-        t.indexOf('your photo')!==-1 ||
-        t.indexOf('a photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
         c.indexOf('upload-btn')!==-1
       );
@@ -361,15 +349,20 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return isPhotoUploadControl(el);
     });
 
-    // Cap matches API (presign/register/list): section_index 0–10. Do not hide extra sections —
-    // hiding broke multi-gallery events and mis-ordered controls vs. DB rows.
-    var MAX_SECTIONS = 11;
-    if(buttons.length > MAX_SECTIONS) buttons = buttons.slice(0, MAX_SECTIONS);
+    // No fallback creation. Only wire explicit upload controls present in the generated page.
+    if(buttons.length>2){
+      buttons.slice(2).forEach(function(el){
+        var block=el.closest('section')||el.closest('div')||el.parentElement;
+        if(block) block.style.display='none';
+      });
+      buttons=buttons.slice(0,2);
+    }
 
     // 4. Wire every photo section (must not hide extras: later boot() passes would wire section 2 with si=0 and duplicate section 0).
     if (!buttons.length) return;
 
-    buttons.forEach(function(btn, idx){
+    var MAX_SECTIONS = 2;
+    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
       var si = idx;
       var key='photos_'+eid+'_'+si;
 
@@ -489,7 +482,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
   }
 
-  function schedulePhotoLegacyBoot(){
+  document.addEventListener('DOMContentLoaded', function(){
     setTimeout(bootPhotoLegacy, 0);
     setTimeout(bootPhotoLegacy, 200);
     setTimeout(bootPhotoLegacy, 500);
@@ -500,12 +493,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
       n++;
       if(n>=30) clearInterval(iv);
     }, 200);
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', schedulePhotoLegacyBoot);
-  } else {
-    schedulePhotoLegacyBoot();
-  }
+  });
   window.addEventListener('load', function(){ setTimeout(bootPhotoLegacy, 0); });
 
   // ── RSVP + Message Wall rescue ───────────────────────────────────────────
@@ -574,33 +562,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
 /** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
-  try{
-    window.renderPhotos=function(){};
-    window.setupPhotoInput=function(){};
-  }catch(e){}
   function bootPhotoS3(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
     var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
-    function quickDownload(url, name){
-      if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
-    }
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
     var noticeState = window.__onedayPhotoNoticeState || (window.__onedayPhotoNoticeState = {counts:{},initialized:{},grids:{},timer:null});
@@ -616,7 +581,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -637,11 +602,6 @@ const PHOTO_ENGINE_S3 = `<script>
           if(c2) return c2;
           s=s.nextElementSibling;
         }
-      }
-      var sec=el.closest&&el.closest('section');
-      if(sec){
-        var gq=sec.querySelectorAll(GSEL);
-        if(gq.length===1) return gq[0];
       }
       return null;
     }
@@ -716,14 +676,12 @@ const PHOTO_ENGINE_S3 = `<script>
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
 
-      if(dl){
-        dl.addEventListener('click', function(e){
-          e.preventDefault();
-          var cur=state.items[state.idx]||{};
-          if(!cur.url) return;
-          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-        });
-      }
+      dl.addEventListener('click', function(e){
+        e.preventDefault();
+        var cur=state.items[state.idx]||{};
+        if(!cur.url) return;
+        quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+      });
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -875,6 +833,26 @@ const PHOTO_ENGINE_S3 = `<script>
       return window.__onedayPhotoViewer;
     }
 
+    function quickDownload(url, name){
+      if(!url) return;
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
+    }
+
     function hideEmptyPhotoCopy(grid, hasPhotos){
       if(!hasPhotos) return;
       var root = grid.closest('section') || grid.parentElement;
@@ -882,7 +860,7 @@ const PHOTO_ENGINE_S3 = `<script>
       Array.prototype.slice.call(root.querySelectorAll('p,div,span,em,strong,small,i')).forEach(function(el){
         if(grid.contains(el)) return;
         var tx = (el.textContent || '').toLowerCase();
-        if(tx.indexOf('no photo') !== -1 || tx.indexOf('photos yet') !== -1 || tx.indexOf('be the first') !== -1 || tx.indexOf('share a memory') !== -1 || (tx.indexOf('share') !== -1 && tx.indexOf('first') !== -1)) el.style.display = 'none';
+        if(tx.indexOf('no photo') !== -1 || tx.indexOf('be the first') !== -1 || (tx.indexOf('share') !== -1 && tx.indexOf('first') !== -1)) el.style.display = 'none';
       });
     }
 
@@ -974,9 +952,9 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
-          // Include URL in the signature: presigned GET links expire; ID-only diffing left stale src= and images vanished.
+          // URLs may be presigned and rotate often; compare using stable IDs only.
           var sig = photos.map(function(p){
-            return String(p.id || '') + '\t' + String(p.url || '');
+            return String(p.id || '');
           }).join('|');
           var prevSig = grid.dataset.onedayPhotoSig || '';
           var hasChanged = sig !== prevSig;
@@ -996,8 +974,9 @@ const PHOTO_ENGINE_S3 = `<script>
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
-            im.loading=(i<12)?'eager':'lazy';
+            im.loading='lazy';
             im.decoding='async';
+            im.setAttribute('fetchpriority','low');
             im.sizes='(max-width:640px) 45vw, 200px';
             im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
             var d=document.createElement('button');
@@ -1039,6 +1018,7 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
+          if(!grid.dataset.onedayPhotoSig) grid.innerHTML='';
         })
         .finally(function(){
           grid.dataset.onedayLoading = '0';
@@ -1054,8 +1034,6 @@ const PHOTO_ENGINE_S3 = `<script>
         ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
-        t.indexOf('your photo')!==-1 ||
-        t.indexOf('a photo')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
         c.indexOf('upload-btn')!==-1
       );
@@ -1069,12 +1047,19 @@ const PHOTO_ENGINE_S3 = `<script>
       return isPhotoUploadControl(el);
     });
 
-    var MAX_SECTIONS = 11;
-    if(buttons.length > MAX_SECTIONS) buttons = buttons.slice(0, MAX_SECTIONS);
+    // No fallback creation. Only wire explicit upload controls present in the generated page.
+    if(buttons.length>2){
+      buttons.slice(2).forEach(function(el){
+        var block=el.closest('section')||el.closest('div')||el.parentElement;
+        if(block) block.style.display='none';
+      });
+      buttons=buttons.slice(0,2);
+    }
 
     if (!buttons.length) return;
 
-    buttons.forEach(function(btn, idx){
+    var MAX_SECTIONS = 2;
+    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
       var si = idx;
       var fb=btn.cloneNode(true);
       btn.parentNode.replaceChild(fb,btn);
@@ -1161,7 +1146,7 @@ const PHOTO_ENGINE_S3 = `<script>
 
   }
 
-  function schedulePhotoS3Boot(){
+  document.addEventListener('DOMContentLoaded', function(){
     setTimeout(bootPhotoS3, 0);
     setTimeout(bootPhotoS3, 200);
     setTimeout(bootPhotoS3, 500);
@@ -1172,12 +1157,7 @@ const PHOTO_ENGINE_S3 = `<script>
       n++;
       if(n>=30) clearInterval(iv);
     }, 200);
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', schedulePhotoS3Boot);
-  } else {
-    schedulePhotoS3Boot();
-  }
+  });
   window.addEventListener('load', function(){ setTimeout(bootPhotoS3, 0); });
 
   document.addEventListener('DOMContentLoaded', function(){
