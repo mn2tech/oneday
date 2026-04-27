@@ -68,6 +68,16 @@ const PHOTO_ENGINE_LEGACY = `<script>
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
 
+    function appendEventCaption(w){
+      var t=typeof window.__ONEDAY_EVENT_TITLE__==='string'?window.__ONEDAY_EVENT_TITLE__.trim():'';
+      if(!t) return;
+      var cap=document.createElement('div');
+      cap.textContent=t.slice(0,200);
+      cap.setAttribute('aria-hidden','true');
+      cap.style.cssText='position:absolute;left:0;right:0;bottom:0;padding:8px 10px 7px;font-size:clamp(10px,2.4vw,12px);line-height:1.25;font-weight:700;color:#fff;text-align:center;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.82));text-shadow:0 1px 3px rgba(0,0,0,0.95);pointer-events:none;z-index:1;max-height:45%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;border-radius:0 0 8px 8px;';
+      w.appendChild(cap);
+    }
+
     // 1. Kill Claude's native renderers so they never overwrite our grid
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
      'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
@@ -399,7 +409,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
           var d=document.createElement('button');
           d.textContent='⬇';
           d.title='Download';
-          d.style.cssText='position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+          d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
           d.onclick=function(e){
             e.stopPropagation();
             quickDownload(src,'oneday-photo-'+(i+1)+'.jpg');
@@ -407,7 +417,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
           var b=document.createElement('button');
           b.innerHTML='&times;';
           b.title='Remove photo';
-          b.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+          b.style.cssText='position:absolute;top:4px;right:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
           b.setAttribute('data-i',i);
           b.onclick=function(e){
             e.stopPropagation();
@@ -419,7 +429,9 @@ const PHOTO_ENGINE_LEGACY = `<script>
             render();
           };
           w.onclick=function(){ viewer.open(viewerItems, i); };
-          w.appendChild(im); w.appendChild(d); w.appendChild(b); grid.appendChild(w);
+          w.appendChild(im);
+          appendEventCaption(w);
+          w.appendChild(d); w.appendChild(b); grid.appendChild(w);
         });
       }
 
@@ -542,6 +554,16 @@ const PHOTO_ENGINE_S3 = `<script>
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
     var noticeState = window.__onedayPhotoNoticeState || (window.__onedayPhotoNoticeState = {counts:{},initialized:{},grids:{},timer:null});
+
+    function appendEventCaption(w){
+      var t=typeof window.__ONEDAY_EVENT_TITLE__==='string'?window.__ONEDAY_EVENT_TITLE__.trim():'';
+      if(!t) return;
+      var cap=document.createElement('div');
+      cap.textContent=t.slice(0,200);
+      cap.setAttribute('aria-hidden','true');
+      cap.style.cssText='position:absolute;left:0;right:0;bottom:0;padding:8px 10px 7px;font-size:clamp(10px,2.4vw,12px);line-height:1.25;font-weight:700;color:#fff;text-align:center;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,0.82));text-shadow:0 1px 3px rgba(0,0,0,0.95);pointer-events:none;z-index:1;max-height:45%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;border-radius:0 0 8px 8px;';
+      w.appendChild(cap);
+    }
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
      'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
@@ -930,7 +952,7 @@ const PHOTO_ENGINE_S3 = `<script>
             var d=document.createElement('button');
             d.textContent='⬇';
             d.title='Download';
-            d.style.cssText='position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             d.onclick=function(ev){
               ev.stopPropagation();
               quickDownload(p.url,'oneday-photo-'+(i+1)+'.jpg');
@@ -938,7 +960,7 @@ const PHOTO_ENGINE_S3 = `<script>
             var b=document.createElement('button');
             b.innerHTML='&times;';
             b.title='Remove photo';
-            b.style.cssText='position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            b.style.cssText='position:absolute;top:4px;right:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             if(!p.owned_by_me){
               b.style.display='none';
             }
@@ -957,7 +979,9 @@ const PHOTO_ENGINE_S3 = `<script>
               }).catch(function(err){ alert(err.message||'Could not remove photo'); });
             };
             w.onclick=function(){ viewer.open(viewerItems, i); };
-            w.appendChild(im); w.appendChild(d); w.appendChild(b); grid.appendChild(w);
+            w.appendChild(im);
+            appendEventCaption(w);
+            w.appendChild(d); w.appendChild(b); grid.appendChild(w);
           });
           hideEmptyPhotoCopy(grid, photos.length > 0);
           trackPhotoCount(si, photos.length, grid);
@@ -1375,9 +1399,13 @@ export async function getServerSideProps({ params, res, query }) {
 
   const useS3 = eventPhotosUseS3();
   const useCloudIx = eventInteractionsUseCloud();
+  const eventTitleForClient = String(data.title || '')
+    .trim()
+    .slice(0, 200);
   const eidScript = `<script>
 (function(){
   window.__ONEDAY_EID__=${JSON.stringify(id)};
+  window.__ONEDAY_EVENT_TITLE__=${JSON.stringify(eventTitleForClient)};
   try{
     var u=new URL(window.location.href);
     var tok=u.searchParams.get('admin');
