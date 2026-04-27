@@ -854,8 +854,9 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
+          // URLs may be presigned and rotate often; compare using stable IDs only.
           var sig = photos.map(function(p){
-            return String(p.id || '') + ':' + String(p.url || '');
+            return String(p.id || '');
           }).join('|');
           var prevSig = grid.dataset.onedayPhotoSig || '';
           var hasChanged = sig !== prevSig;
