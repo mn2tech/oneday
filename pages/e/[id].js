@@ -61,6 +61,10 @@ function getSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
+  try{
+    window.renderPhotos=function(){};
+    window.setupPhotoInput=function(){};
+  }catch(e){}
   function bootPhotoLegacy(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -80,7 +84,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -564,6 +568,10 @@ const PHOTO_ENGINE_LEGACY = `<script>
 /** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
+  try{
+    window.renderPhotos=function(){};
+    window.setupPhotoInput=function(){};
+  }catch(e){}
   function bootPhotoS3(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -583,7 +591,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -683,7 +691,7 @@ const PHOTO_ENGINE_S3 = `<script>
           e.preventDefault();
           var cur=state.items[state.idx]||{};
           if(!cur.url) return;
-          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+          quickDownload(cur.id, cur.name||('photo-'+(state.idx+1)+'.jpg'));
         });
       }
 
@@ -837,24 +845,18 @@ const PHOTO_ENGINE_S3 = `<script>
       return window.__onedayPhotoViewer;
     }
 
-    function quickDownload(url, name){
-      if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
+    function quickDownload(photoId, displayName){
+      if(!photoId) return;
+      var nm=String(displayName||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      var u='/api/event-photos/download?photoId='+encodeURIComponent(String(photoId))+'&eventId='+encodeURIComponent(eid);
+      var a=document.createElement('a');
+      a.href=u;
+      a.setAttribute('download', nm);
+      a.rel='noopener';
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ try{ a.remove(); }catch(e1){} }, 800);
     }
 
     function hideEmptyPhotoCopy(grid, hasPhotos){
@@ -969,7 +971,7 @@ const PHOTO_ENGINE_S3 = `<script>
           }
           var viewer=ensurePhotoViewer();
           var viewerItems=photos.map(function(p,ix){
-            return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg'};
+            return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg',id:p.id};
           });
           grid.innerHTML='';
           photos.forEach(function(p,i){
@@ -989,7 +991,7 @@ const PHOTO_ENGINE_S3 = `<script>
             d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             d.onclick=function(ev){
               ev.stopPropagation();
-              quickDownload(p.url,'oneday-photo-'+(i+1)+'.jpg');
+              quickDownload(p.id,'oneday-photo-'+(i+1)+'.jpg');
             };
             var b=document.createElement('button');
             b.innerHTML='&times;';
@@ -1022,7 +1024,6 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
-          if(!grid.dataset.onedayPhotoSig) grid.innerHTML='';
         })
         .finally(function(){
           grid.dataset.onedayLoading = '0';
