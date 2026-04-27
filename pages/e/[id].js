@@ -16,6 +16,13 @@ function injectAfterBodyOpen(html, snippet) {
   return html.slice(0, insertAt) + snippet + html.slice(insertAt);
 }
 
+function injectBeforeHeadClose(html, snippet) {
+  const lower = html.toLowerCase();
+  const idx = lower.indexOf('</head>');
+  if (idx === -1) return snippet + html;
+  return html.slice(0, idx) + snippet + html.slice(idx);
+}
+
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
   return Boolean(
@@ -527,6 +534,7 @@ const PHOTO_ENGINE_S3 = `<script>
     var eid = (window.__ONEDAY_EID__ || idFromPath || 'event').slice(0,80);
     var GCSS = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:14px;';
     var GSEL = '[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"],[id*="photoGrid"],[class*="photo-list"],[id*="photo-list"]';
+    var noticeState = window.__onedayPhotoNoticeState || (window.__onedayPhotoNoticeState = {counts:{},initialized:{},grids:{},timer:null});
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
      'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
@@ -790,6 +798,50 @@ const PHOTO_ENGINE_S3 = `<script>
       });
     }
 
+    function ensurePhotoNotice(){
+      var root=document.getElementById('oneday-photo-notice');
+      if(root) return root;
+      root=document.createElement('div');
+      root.id='oneday-photo-notice';
+      root.style.cssText='position:fixed;left:50%;bottom:84px;transform:translate(-50%,18px);z-index:2147483645;max-width:min(92vw,420px);display:none;gap:10px;align-items:center;background:rgba(10,10,20,.96);color:#fff;border:1px solid rgba(168,85,247,.45);box-shadow:0 16px 44px rgba(0,0,0,.35);border-radius:16px;padding:12px 14px;font:600 13px/1.35 Inter,system-ui,sans-serif;opacity:0;transition:opacity .18s ease,transform .18s ease;';
+      root.innerHTML='<span data-msg style="flex:1;"></span><button type="button" data-view style="border:0;border-radius:999px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:8px 11px;font:700 12px/1 Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;">View</button><button type="button" data-close aria-label="Dismiss" style="border:0;background:transparent;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:2px 0;">&times;</button>';
+      document.body.appendChild(root);
+      root.querySelector('[data-close]').onclick=function(){ root.style.display='none'; };
+      return root;
+    }
+
+    function showPhotoNotice(count, grid){
+      if(!count||count<1) return;
+      var root=ensurePhotoNotice();
+      var msg=root.querySelector('[data-msg]');
+      var view=root.querySelector('[data-view]');
+      msg.textContent=count+' new photo'+(count===1?'':'s')+' added to the photo wall.';
+      view.onclick=function(){
+        root.style.display='none';
+        try{ (grid.closest('section')||grid).scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
+      };
+      root.style.display='flex';
+      requestAnimationFrame(function(){ root.style.opacity='1'; root.style.transform='translate(-50%,0)'; });
+      clearTimeout(root._onedayHideTimer);
+      root._onedayHideTimer=setTimeout(function(){
+        root.style.opacity='0';
+        root.style.transform='translate(-50%,18px)';
+        setTimeout(function(){ if(root.style.opacity==='0') root.style.display='none'; },220);
+      }, 9000);
+    }
+
+    function trackPhotoCount(si, count, grid){
+      var key=String(si);
+      var prev=noticeState.counts[key]||0;
+      if(!noticeState.initialized[key]){
+        noticeState.initialized[key]=true;
+        noticeState.counts[key]=count;
+        return;
+      }
+      if(count>prev) showPhotoNotice(count-prev, grid);
+      noticeState.counts[key]=count;
+    }
+
     function loadGrid(grid, si){
       fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
         .then(function(r){
@@ -845,6 +897,7 @@ const PHOTO_ENGINE_S3 = `<script>
             w.appendChild(im); w.appendChild(d); w.appendChild(b); grid.appendChild(w);
           });
           hideEmptyPhotoCopy(grid, photos.length > 0);
+          trackPhotoCount(si, photos.length, grid);
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
@@ -921,7 +974,16 @@ const PHOTO_ENGINE_S3 = `<script>
       grid.dataset.onedayManaged='1';
       grid.style.cssText=GCSS;
 
+      noticeState.grids[String(si)] = grid;
       loadGrid(grid, si);
+      if(!noticeState.timer){
+        noticeState.timer=setInterval(function(){
+          Object.keys(noticeState.grids).forEach(function(key){
+            var gridRef=noticeState.grids[key];
+            if(gridRef&&document.body.contains(gridRef)) loadGrid(gridRef, Number(key));
+          });
+        }, 20000);
+      }
 
       inp.addEventListener('change', function(){
         var files=Array.from(this.files||[]);
@@ -1027,6 +1089,52 @@ const PHOTO_ENGINE_S3 = `<script>
     }, 0);
   });
 
+})();
+<\/script>`;
+
+const INSTALL_EVENT_APP = `<script>
+(function(){
+  var deferredPrompt=null;
+  var eid=(window.__ONEDAY_EID__||location.pathname.split('/').filter(Boolean).pop()||'event').slice(0,80);
+  var dismissKey='oneday_install_dismissed_'+eid;
+  var installed=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
+  if(installed) return;
+  try{ if(localStorage.getItem(dismissKey)==='1') return; }catch(e){}
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt', function(ev){
+    ev.preventDefault();
+    deferredPrompt=ev;
+    mount();
+  });
+
+  function mount(){
+    if(document.getElementById('oneday-install-card')) return;
+    var card=document.createElement('div');
+    card.id='oneday-install-card';
+    card.style.cssText='position:fixed;left:12px;bottom:84px;z-index:2147483644;max-width:min(92vw,360px);display:flex;gap:10px;align-items:center;background:rgba(10,10,20,.96);color:#fff;border:1px solid rgba(168,85,247,.42);box-shadow:0 16px 44px rgba(0,0,0,.35);border-radius:16px;padding:12px 14px;font:600 13px/1.35 Inter,system-ui,sans-serif;';
+    card.innerHTML='<div style="flex:1;"><div style="font-weight:800;margin-bottom:2px;">Save this event</div><div style="color:#cbd5e1;font-weight:500;font-size:12px;">Add it to your home screen or desktop for quick access.</div></div><button type="button" data-install style="border:0;border-radius:999px;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:9px 12px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;">Save</button><button type="button" data-close aria-label="Dismiss" style="border:0;background:transparent;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:2px 0;">&times;</button>';
+    document.body.appendChild(card);
+    card.querySelector('[data-close]').onclick=function(){
+      try{ localStorage.setItem(dismissKey,'1'); }catch(e){}
+      card.remove();
+    };
+    card.querySelector('[data-install]').onclick=function(){
+      if(deferredPrompt){
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.finally(function(){ deferredPrompt=null; card.remove(); });
+      } else {
+        alert('Use your browser menu and choose Add to Home Screen, Install app, or Create shortcut to save this event.');
+      }
+    };
+  }
+
+  setTimeout(mount, 2500);
 })();
 <\/script>`;
 
@@ -1342,6 +1450,7 @@ export async function getServerSideProps({ params, res, query }) {
   }
 })();
 <\/script>`;
+  const manifestLinks = `<link rel="manifest" href="/api/manifest.webmanifest?start=/e/${encodeURIComponent(id)}"><meta name="theme-color" content="#7c5cfc"><link rel="apple-touch-icon" href="/icon.svg">`;
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
@@ -1354,10 +1463,13 @@ export async function getServerSideProps({ params, res, query }) {
     '\n' +
     hostEditLauncher +
     '\n' +
+    INSTALL_EVENT_APP +
+    '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
 
   let html = data.html;
+  html = injectBeforeHeadClose(html, manifestLinks);
   if (useCloudIx) {
     html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
   }
