@@ -107,3 +107,25 @@ create index if not exists idx_event_rsvps_event_created
   on event_rsvps (event_id, created_at);
 
 alter table event_rsvps enable row level security;
+
+-- Guest web-push subscriptions for event notifications (photo uploads/reminders).
+create table if not exists event_guest_push_subscriptions (
+  id              uuid        primary key default gen_random_uuid(),
+  event_id        text        not null references event_apps (id) on delete cascade,
+  device_id       text        not null,
+  endpoint        text        not null,
+  keys            jsonb       not null,
+  is_active       boolean     not null default true,
+  user_agent      text,
+  last_seen_at    timestamptz default now(),
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+
+create unique index if not exists idx_event_guest_push_unique
+  on event_guest_push_subscriptions (event_id, endpoint);
+
+create index if not exists idx_event_guest_push_event_active
+  on event_guest_push_subscriptions (event_id, is_active);
+
+alter table event_guest_push_subscriptions enable row level security;

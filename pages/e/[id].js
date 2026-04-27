@@ -1155,6 +1155,109 @@ const INSTALL_EVENT_APP = `<script>
 })();
 <\/script>`;
 
+const GUEST_PUSH_OPT_IN = `<script>
+(function(){
+  var eid=(window.__ONEDAY_EID__||location.pathname.split('/').filter(Boolean).pop()||'event').slice(0,80);
+  var dismissKey='oneday_push_dismissed_'+eid;
+
+  function getDeviceId(){
+    var k='onet_device_global_v1';
+    var v=localStorage.getItem(k);
+    if(!v||v.length<16){
+      v='';
+      if(window.crypto&&crypto.getRandomValues){
+        var a=new Uint8Array(16);
+        crypto.getRandomValues(a);
+        for(var i=0;i<16;i++) v+=('0'+a[i].toString(16)).slice(-2);
+      } else {
+        v=('00000000000000000000000000000000'+Math.random().toString(16).replace(/[^a-f0-9]/g,'')).slice(-32);
+      }
+      v=String(v).toLowerCase().replace(/[^a-f0-9]/g,'');
+      if(v.length<32){
+        var pad=32-v.length;
+        for(var j=0;j<pad;j++) v+='0';
+      }
+      v=v.slice(0,32);
+      localStorage.setItem(k,v);
+    }
+    return v;
+  }
+
+  function b64ToUint8Array(base64String){
+    var padding='='.repeat((4-base64String.length%4)%4);
+    var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+    var raw=window.atob(base64);
+    var out=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+    return out;
+  }
+
+  function mount(vapidPublicKey){
+    if(document.getElementById('oneday-push-card')) return;
+    var card=document.createElement('div');
+    card.id='oneday-push-card';
+    card.style.cssText='position:fixed;left:12px;bottom:154px;z-index:2147483643;max-width:min(92vw,360px);display:flex;gap:10px;align-items:center;background:rgba(10,10,20,.96);color:#fff;border:1px solid rgba(34,197,94,.38);box-shadow:0 16px 44px rgba(0,0,0,.35);border-radius:16px;padding:12px 14px;font:600 13px/1.35 Inter,system-ui,sans-serif;';
+    card.innerHTML='<div style="flex:1;"><div style="font-weight:800;margin-bottom:2px;">Get photo alerts</div><div style="color:#cbd5e1;font-weight:500;font-size:12px;">Turn on notifications to know when guests upload new photos.</div></div><button type="button" data-enable style="border:0;border-radius:999px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:9px 12px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;">Notify me</button><button type="button" data-close aria-label="Dismiss" style="border:0;background:transparent;color:#cbd5e1;font-size:18px;line-height:1;cursor:pointer;padding:2px 0;">&times;</button>';
+    document.body.appendChild(card);
+
+    card.querySelector('[data-close]').onclick=function(){
+      try{ localStorage.setItem(dismissKey,'1'); }catch(e){}
+      card.remove();
+    };
+
+    card.querySelector('[data-enable]').onclick=async function(){
+      try{
+        if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+          alert('Push notifications are not supported in this browser.');
+          return;
+        }
+        var permission=await Notification.requestPermission();
+        if(permission!=='granted'){
+          alert('Notifications are blocked. You can enable them from browser settings.');
+          return;
+        }
+        var reg=await navigator.serviceWorker.ready;
+        var existing=await reg.pushManager.getSubscription();
+        var sub=existing;
+        if(!sub){
+          sub=await reg.pushManager.subscribe({
+            userVisibleOnly:true,
+            applicationServerKey:b64ToUint8Array(vapidPublicKey)
+          });
+        }
+        var resp=await fetch('/api/guest-notifications/subscribe',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ eventId:eid, deviceId:getDeviceId(), subscription:sub.toJSON() })
+        });
+        if(!resp.ok){
+          var err=await resp.json().catch(function(){ return {}; });
+          throw new Error(err.error||'Could not enable notifications');
+        }
+        card.innerHTML='<div style="font-weight:700;">Notifications enabled for this event.</div>';
+        setTimeout(function(){ card.remove(); }, 2200);
+      }catch(err){
+        alert(err.message||'Could not enable notifications');
+      }
+    };
+  }
+
+  if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  if(Notification.permission==='denied') return;
+  try{
+    if(localStorage.getItem(dismissKey)==='1') return;
+  }catch(e){}
+
+  fetch('/api/guest-notifications/subscribe')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d||!d.enabled||!d.vapidPublicKey) return;
+      setTimeout(function(){ mount(d.vapidPublicKey); }, 4200);
+    })
+    .catch(function(){});
+})();
+<\/script>`;
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getServerSideProps({ params, res, query }) {
@@ -1481,6 +1584,8 @@ export async function getServerSideProps({ params, res, query }) {
     hostEditLauncher +
     '\n' +
     INSTALL_EVENT_APP +
+    '\n' +
+    GUEST_PUSH_OPT_IN +
     '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);

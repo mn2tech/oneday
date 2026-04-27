@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../../lib/photoLimits';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
+import { guestPushEnabled, sendGuestPush } from '../../../lib/guestPushNotifications';
 import { sendHostPhotoNotification } from '../../../lib/notifications';
 
 function getSupabase() {
@@ -161,6 +162,33 @@ export default async function handler(req, res) {
   });
   if (notification.status === 'failed') {
     console.warn('[event-photos/register] host notification failed', notification.reason);
+  }
+
+  if (guestPushEnabled()) {
+    const { data: subs, error: subsErr } = await supabase
+      .from('event_guest_push_subscriptions')
+      .select('endpoint, keys, device_id')
+      .eq('event_id', eventId)
+      .eq('is_active', true);
+    if (subsErr) {
+      console.warn('[event-photos/register] guest subscriptions lookup failed', subsErr.message || subsErr);
+    } else {
+      const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://getoneday.com'}/e/${encodeURIComponent(eventId)}`;
+      const candidates = (subs || []).filter((row) => String(row?.device_id || '') !== dev);
+      const pushResult = await sendGuestPush({
+        subscriptions: candidates,
+        title: eventRow?.title ? `New photo in ${eventRow.title}` : 'New photo added',
+        body: 'A guest uploaded a new photo. Tap to view it.',
+        url: eventUrl,
+      });
+      if (pushResult.invalidEndpoints.length) {
+        await supabase
+          .from('event_guest_push_subscriptions')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .in('endpoint', pushResult.invalidEndpoints)
+          .eq('event_id', eventId);
+      }
+    }
   }
 
   return res.status(200).json({
