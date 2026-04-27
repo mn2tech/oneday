@@ -350,20 +350,15 @@ const PHOTO_ENGINE_LEGACY = `<script>
       return isPhotoUploadControl(el);
     });
 
-    // No fallback creation. Only wire explicit upload controls present in the generated page.
-    if(buttons.length>2){
-      buttons.slice(2).forEach(function(el){
-        var block=el.closest('section')||el.closest('div')||el.parentElement;
-        if(block) block.style.display='none';
-      });
-      buttons=buttons.slice(0,2);
-    }
+    // Cap matches API (presign/register/list): section_index 0–10. Do not hide extra sections —
+    // hiding broke multi-gallery events and mis-ordered controls vs. DB rows.
+    var MAX_SECTIONS = 11;
+    if(buttons.length > MAX_SECTIONS) buttons = buttons.slice(0, MAX_SECTIONS);
 
     // 4. Wire every photo section (must not hide extras: later boot() passes would wire section 2 with si=0 and duplicate section 0).
     if (!buttons.length) return;
 
-    var MAX_SECTIONS = 2;
-    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
+    buttons.forEach(function(btn, idx){
       var si = idx;
       var key='photos_'+eid+'_'+si;
 
@@ -1047,19 +1042,12 @@ const PHOTO_ENGINE_S3 = `<script>
       return isPhotoUploadControl(el);
     });
 
-    // No fallback creation. Only wire explicit upload controls present in the generated page.
-    if(buttons.length>2){
-      buttons.slice(2).forEach(function(el){
-        var block=el.closest('section')||el.closest('div')||el.parentElement;
-        if(block) block.style.display='none';
-      });
-      buttons=buttons.slice(0,2);
-    }
+    var MAX_SECTIONS = 11;
+    if(buttons.length > MAX_SECTIONS) buttons = buttons.slice(0, MAX_SECTIONS);
 
     if (!buttons.length) return;
 
-    var MAX_SECTIONS = 2;
-    buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
+    buttons.forEach(function(btn, idx){
       var si = idx;
       var fb=btn.cloneNode(true);
       btn.parentNode.replaceChild(fb,btn);
