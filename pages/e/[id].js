@@ -129,7 +129,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         '<button type="button" data-v-play style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Play</button>'+
         '<button type="button" data-v-full style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Full</button>'+
         '<span data-v-count style="padding:0 4px;white-space:nowrap;"></span>'+
-        '<a data-v-download href="#" target="_blank" rel="noopener" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;">Download</a>'+
+        '<a data-v-download href="#" role="button" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;cursor:pointer;">Download</a>'+
         '</div>';
       document.body.appendChild(root);
 
@@ -145,6 +145,15 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var btnFull=root.querySelector('[data-v-full]');
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
+
+      if(dl){
+        dl.addEventListener('click', function(e){
+          e.preventDefault();
+          var cur=state.items[state.idx]||{};
+          if(!cur.url) return;
+          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        });
+      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -188,8 +197,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         var cur=state.items[state.idx]||{};
         img.src=cur.url||'';
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
-        dl.href=cur.url||'#';
-        dl.setAttribute('download', cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        dl.href='#';
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -299,13 +307,22 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     function quickDownload(url, name){
       if(!url) return;
-      var a=document.createElement('a');
-      a.href=url;
-      a.setAttribute('download', name||'photo.jpg');
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
     }
 
     // Match original OneDay behavior (+ case-insensitive text + file-picker labels).
@@ -644,7 +661,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<button type="button" data-v-play style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Play</button>'+
         '<button type="button" data-v-full style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Full</button>'+
         '<span data-v-count style="padding:0 4px;white-space:nowrap;"></span>'+
-        '<a data-v-download href="#" target="_blank" rel="noopener" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;">Download</a>'+
+        '<a data-v-download href="#" role="button" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;cursor:pointer;">Download</a>'+
         '</div>';
       document.body.appendChild(root);
 
@@ -660,6 +677,15 @@ const PHOTO_ENGINE_S3 = `<script>
       var btnFull=root.querySelector('[data-v-full]');
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
+
+      if(dl){
+        dl.addEventListener('click', function(e){
+          e.preventDefault();
+          var cur=state.items[state.idx]||{};
+          if(!cur.url) return;
+          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        });
+      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -703,8 +729,7 @@ const PHOTO_ENGINE_S3 = `<script>
         var cur=state.items[state.idx]||{};
         img.src=cur.url||'';
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
-        dl.href=cur.url||'#';
-        dl.setAttribute('download', cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        dl.href='#';
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -814,13 +839,22 @@ const PHOTO_ENGINE_S3 = `<script>
 
     function quickDownload(url, name){
       if(!url) return;
-      var a=document.createElement('a');
-      a.href=url;
-      a.setAttribute('download', name||'photo.jpg');
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
+      fetch(url,{mode:'cors',credentials:'omit'})
+        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
+        .then(function(blob){
+          var u=URL.createObjectURL(blob);
+          var a=document.createElement('a');
+          a.href=u;
+          a.setAttribute('download', nm);
+          a.style.display='none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
+        })
+        .catch(function(){
+          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
+        });
     }
 
     function hideEmptyPhotoCopy(grid, hasPhotos){
