@@ -965,7 +965,7 @@ const PHOTO_ENGINE_S3 = `<script>
       performPhotoMove(photoId, fromSi, target, grid);
     }
     function enablePointerPhotoDrag(w, grid, si, p){
-      if(!window.PointerEvent||!p||!p.id) return;
+      if(!p||!p.id) return;
       var holdTimer=null;
       var drag=null;
       function cleanup(){
@@ -985,15 +985,18 @@ const PHOTO_ENGINE_S3 = `<script>
           drag={source:w,ghost:ghost,startX:sx,startY:sy,x:sx,y:sy,active:true};
           w.__onedaySuppressClick=true;
           w.style.opacity='0.35';
-          try{ w.setPointerCapture(ev.pointerId); }catch(e){}
+          if(ev.pointerId!=null){ try{ w.setPointerCapture(ev.pointerId); }catch(e){} }
         },260);
         function move(moveEv){
+          var cx=moveEv.clientX, cy=moveEv.clientY;
+          if((cx==null||cy==null)&&moveEv.touches&&moveEv.touches.length){ cx=moveEv.touches[0].clientX; cy=moveEv.touches[0].clientY; }
+          if(cx==null||cy==null) return;
           if(!drag){
-            if(Math.abs(moveEv.clientX-sx)>10||Math.abs(moveEv.clientY-sy)>10) cleanup();
+            if(Math.abs(cx-sx)>10||Math.abs(cy-sy)>10) cleanup();
             return;
           }
           moveEv.preventDefault();
-          drag.x=moveEv.clientX; drag.y=moveEv.clientY;
+          drag.x=cx; drag.y=cy;
           drag.ghost.style.left=(drag.x-drag.ghost.offsetWidth/2)+'px';
           drag.ghost.style.top=(drag.y-drag.ghost.offsetHeight/2)+'px';
           if(drag.y<70) window.scrollBy(0,-14);
@@ -1002,7 +1005,9 @@ const PHOTO_ENGINE_S3 = `<script>
         function end(endEv){
           if(!drag){ cleanup(); teardown(); return; }
           endEv.preventDefault();
-          var x=endEv.clientX||drag.x, y=endEv.clientY||drag.y;
+          var x=endEv.clientX, y=endEv.clientY;
+          if((x==null||y==null)&&endEv.changedTouches&&endEv.changedTouches.length){ x=endEv.changedTouches[0].clientX; y=endEv.changedTouches[0].clientY; }
+          x=x||drag.x; y=y||drag.y;
           var ghost=drag.ghost;
           ghost.style.display='none';
           var hit=document.elementFromPoint(x,y);
@@ -1033,12 +1038,27 @@ const PHOTO_ENGINE_S3 = `<script>
           w.removeEventListener('pointermove', move);
           w.removeEventListener('pointerup', end);
           w.removeEventListener('pointercancel', cancel);
+          w.removeEventListener('touchmove', move);
+          w.removeEventListener('touchend', end);
+          w.removeEventListener('touchcancel', cancel);
         }
-        w.addEventListener('pointermove', move, {passive:false});
-        w.addEventListener('pointerup', end, {passive:false});
-        w.addEventListener('pointercancel', cancel, {passive:true});
+        if(ev.type==='touchstart'){
+          w.addEventListener('touchmove', move, {passive:false});
+          w.addEventListener('touchend', end, {passive:false});
+          w.addEventListener('touchcancel', cancel, {passive:true});
+        } else {
+          w.addEventListener('pointermove', move, {passive:false});
+          w.addEventListener('pointerup', end, {passive:false});
+          w.addEventListener('pointercancel', cancel, {passive:true});
+        }
       }
       w.addEventListener('pointerdown', start, {passive:true});
+      w.addEventListener('touchstart', function(ev){
+        if(window.PointerEvent) return;
+        if(!ev.touches||!ev.touches.length) return;
+        start({type:'touchstart',target:ev.target,clientX:ev.touches[0].clientX,clientY:ev.touches[0].clientY});
+      }, {passive:true});
+      w.addEventListener('contextmenu', function(ev){ ev.preventDefault(); }, true);
       w.addEventListener('click', function(ev){
         if(w.__onedaySuppressClick){
           ev.preventDefault();
@@ -1115,7 +1135,9 @@ const PHOTO_ENGINE_S3 = `<script>
             im.decoding='async';
             im.setAttribute('fetchpriority','low');
             im.sizes='(max-width:640px) 45vw, 200px';
-            im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
+            im.draggable=false;
+            im.oncontextmenu=function(ev){ ev.preventDefault(); };
+            im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;';
             var m=document.createElement('button');
             m.textContent='⇄';
             m.title='Move photo to another wall';
