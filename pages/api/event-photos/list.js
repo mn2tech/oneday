@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     .from('event_photos')
     .select('id, s3_key, section_index, created_at, owner_device_id')
     .eq('event_id', eventId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (sectionIndex !== undefined && sectionIndex !== '') {
     const sec = Number(sectionIndex);

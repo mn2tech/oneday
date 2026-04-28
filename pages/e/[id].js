@@ -396,15 +396,16 @@ const PHOTO_ENGINE_LEGACY = `<script>
         var saved=[];
         try{ saved=JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
         var viewer=ensurePhotoViewer();
-        var viewerItems=saved.map(function(src,ix){
-          return {url:src,name:'oneday-photo-'+(ix+1)+'.jpg'};
+        var ordered=saved.map(function(src,originalIndex){ return {src:src,originalIndex:originalIndex}; }).reverse();
+        var viewerItems=ordered.map(function(item,ix){
+          return {url:item.src,name:'oneday-photo-'+(ix+1)+'.jpg'};
         });
         grid.innerHTML='';
-        saved.forEach(function(src,i){
+        ordered.forEach(function(item,i){
           var w=document.createElement('div');
           w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
           var im=document.createElement('img');
-          im.src=src;
+          im.src=item.src;
           im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
           var d=document.createElement('button');
           d.textContent='⬇';
@@ -412,13 +413,13 @@ const PHOTO_ENGINE_LEGACY = `<script>
           d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
           d.onclick=function(e){
             e.stopPropagation();
-            quickDownload(src,'oneday-photo-'+(i+1)+'.jpg');
+            quickDownload(item.src,'oneday-photo-'+(i+1)+'.jpg');
           };
           var b=document.createElement('button');
           b.innerHTML='&times;';
           b.title='Remove photo';
           b.style.cssText='position:absolute;top:4px;right:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
-          b.setAttribute('data-i',i);
+          b.setAttribute('data-i',item.originalIndex);
           b.onclick=function(e){
             e.stopPropagation();
             var n=+this.getAttribute('data-i');
