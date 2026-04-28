@@ -1358,27 +1358,17 @@ const PHOTO_ENGINE_S3 = `<script>
       }
 
       fb.style.cursor='pointer';
-      // Do NOT overwrite button text — the AI already labelled it correctly.
-      // Changing it here causes a visible flash at first paint.
+      fb.textContent = 'Add Photos';
       fb.onclick=function(e){ e.preventDefault(); inp.click(); };
 
       var grid=findNextGrid(fb);
-      var gridIsNew=false;
       if(!grid||grid.dataset.onedayManaged){
         grid=document.createElement('div');
         inp.parentNode.insertBefore(grid,inp.nextSibling);
-        gridIsNew=true;
       }
       grid.dataset.onedayManaged='1';
       grid.setAttribute('data-oneday-section-index', String(si));
-      // Only overwrite CSS on newly created grids — preserving the AI's existing
-      // grid layout prevents a layout-shift flash on every page load.
-      if(gridIsNew){
-        grid.style.cssText=GCSS;
-      } else {
-        // Ensure it renders as a grid but keep the AI's column/gap values.
-        grid.style.display='grid';
-      }
+      grid.style.cssText=GCSS;
       revealPhotoWall(fb, grid);
 
       noticeState.grids[String(si)] = grid;
