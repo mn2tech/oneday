@@ -388,6 +388,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         inp.parentNode.insertBefore(grid,inp.nextSibling);
       }
       grid.dataset.onedayManaged='1';
+      grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
       grid.innerHTML=''; // clear Claude's placeholder tiles
 
@@ -937,13 +938,7 @@ const PHOTO_ENGINE_S3 = `<script>
         loadGrid(grid, si);
       });
     }
-    function movePhotoToSection(photoId, fromSi, grid){
-      var keys=Object.keys(noticeState.grids).map(function(k){ return Number(k); }).filter(function(n){ return !isNaN(n); }).sort(function(a,b){ return a-b; });
-      var maxSection=Math.max(2, keys.length);
-      var raw=prompt('Move to photo wall number (1-'+maxSection+')', String(fromSi===0?2:1));
-      if(raw==null) return;
-      var target=Number(raw)-1;
-      if(!Number.isInteger(target)||target<0||target>10||target===fromSi){ alert('Choose a different wall number.'); return; }
+    function performPhotoMove(photoId, fromSi, target, grid){
       fetch('/api/event-photos/organize',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -959,6 +954,99 @@ const PHOTO_ENGINE_S3 = `<script>
           loadGrid(targetGrid, target);
         }
       }).catch(function(err){ alert(err.message||'Could not move photo'); });
+    }
+    function movePhotoToSection(photoId, fromSi, grid){
+      var keys=Object.keys(noticeState.grids).map(function(k){ return Number(k); }).filter(function(n){ return !isNaN(n); }).sort(function(a,b){ return a-b; });
+      var maxSection=Math.max(2, keys.length);
+      var raw=prompt('Move to photo wall number (1-'+maxSection+')', String(fromSi===0?2:1));
+      if(raw==null) return;
+      var target=Number(raw)-1;
+      if(!Number.isInteger(target)||target<0||target>10||target===fromSi){ alert('Choose a different wall number.'); return; }
+      performPhotoMove(photoId, fromSi, target, grid);
+    }
+    function enablePointerPhotoDrag(w, grid, si, p){
+      if(!window.PointerEvent||!p||!p.id) return;
+      var holdTimer=null;
+      var drag=null;
+      function cleanup(){
+        if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
+        if(drag&&drag.ghost&&drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
+        if(drag&&drag.source) drag.source.style.opacity='';
+        drag=null;
+      }
+      function start(ev){
+        if(ev.target&&ev.target.closest&&ev.target.closest('button,a,input,label')) return;
+        var sx=ev.clientX, sy=ev.clientY;
+        holdTimer=setTimeout(function(){
+          var rect=w.getBoundingClientRect();
+          var ghost=w.cloneNode(true);
+          ghost.style.cssText+=';position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+rect.height+'px;z-index:2147483647;pointer-events:none;opacity:.88;box-shadow:0 18px 44px rgba(0,0,0,.35);transform:scale(.98);';
+          document.body.appendChild(ghost);
+          drag={source:w,ghost:ghost,startX:sx,startY:sy,x:sx,y:sy,active:true};
+          w.__onedaySuppressClick=true;
+          w.style.opacity='0.35';
+          try{ w.setPointerCapture(ev.pointerId); }catch(e){}
+        },260);
+        function move(moveEv){
+          if(!drag){
+            if(Math.abs(moveEv.clientX-sx)>10||Math.abs(moveEv.clientY-sy)>10) cleanup();
+            return;
+          }
+          moveEv.preventDefault();
+          drag.x=moveEv.clientX; drag.y=moveEv.clientY;
+          drag.ghost.style.left=(drag.x-drag.ghost.offsetWidth/2)+'px';
+          drag.ghost.style.top=(drag.y-drag.ghost.offsetHeight/2)+'px';
+          if(drag.y<70) window.scrollBy(0,-14);
+          else if(drag.y>window.innerHeight-70) window.scrollBy(0,14);
+        }
+        function end(endEv){
+          if(!drag){ cleanup(); teardown(); return; }
+          endEv.preventDefault();
+          var x=endEv.clientX||drag.x, y=endEv.clientY||drag.y;
+          var ghost=drag.ghost;
+          ghost.style.display='none';
+          var hit=document.elementFromPoint(x,y);
+          ghost.style.display='';
+          var targetGrid=hit&&hit.closest&&hit.closest('[data-oneday-managed="1"]');
+          var targetPhoto=hit&&hit.closest&&hit.closest('[data-photo-id]');
+          if(targetGrid&&targetGrid!==grid){
+            var targetSi=Number(targetGrid.getAttribute('data-oneday-section-index'));
+            if(Number.isInteger(targetSi)&&targetSi!==si) performPhotoMove(p.id, si, targetSi, grid);
+          } else {
+            targetGrid=grid;
+            if(targetPhoto&&targetPhoto!==w&&targetGrid.contains(targetPhoto)){
+              var rect=targetPhoto.getBoundingClientRect();
+              var before=y<(rect.top+rect.height/2);
+              grid.insertBefore(w, before?targetPhoto:targetPhoto.nextSibling);
+              savePhotoOrder(grid, si);
+            } else if(hit&&targetGrid.contains(hit)){
+              grid.appendChild(w);
+              savePhotoOrder(grid, si);
+            }
+          }
+          cleanup();
+          setTimeout(function(){ w.__onedaySuppressClick=false; },60);
+          teardown();
+        }
+        function cancel(){ cleanup(); teardown(); }
+        function teardown(){
+          w.removeEventListener('pointermove', move);
+          w.removeEventListener('pointerup', end);
+          w.removeEventListener('pointercancel', cancel);
+        }
+        w.addEventListener('pointermove', move, {passive:false});
+        w.addEventListener('pointerup', end, {passive:false});
+        w.addEventListener('pointercancel', cancel, {passive:true});
+      }
+      w.addEventListener('pointerdown', start, {passive:true});
+      w.addEventListener('click', function(ev){
+        if(w.__onedaySuppressClick){
+          ev.preventDefault();
+          if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          else ev.stopPropagation();
+          w.__onedaySuppressClick=false;
+        }
+      }, true);
     }
 
     function loadGrid(grid, si){
@@ -998,6 +1086,7 @@ const PHOTO_ENGINE_S3 = `<script>
               w.draggable=true;
               w.title='Drag to reorder photos';
               w.style.cursor='grab';
+              w.style.touchAction='none';
               w.addEventListener('dragstart', function(ev){
                 grid.__onedayDragPhotoId=p.id;
                 try{ ev.dataTransfer.setData('text/plain', p.id); ev.dataTransfer.effectAllowed='move'; }catch(e){}
@@ -1017,6 +1106,7 @@ const PHOTO_ENGINE_S3 = `<script>
                 grid.insertBefore(dragged, before?w:w.nextSibling);
                 savePhotoOrder(grid, si);
               });
+              enablePointerPhotoDrag(w, grid, si, p);
             }
             var im=document.createElement('img');
             im.src=p.url;
@@ -1142,6 +1232,7 @@ const PHOTO_ENGINE_S3 = `<script>
         inp.parentNode.insertBefore(grid,inp.nextSibling);
       }
       grid.dataset.onedayManaged='1';
+      grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
 
       noticeState.grids[String(si)] = grid;
