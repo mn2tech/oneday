@@ -975,7 +975,10 @@ const PHOTO_ENGINE_S3 = `<script>
         drag=null;
       }
       function start(ev){
+        if(w.__onedayDragStarting) return;
         if(ev.target&&ev.target.closest&&ev.target.closest('button,a,input,label')) return;
+        w.__onedayDragStarting=true;
+        if(ev.preventDefault) ev.preventDefault();
         var sx=ev.clientX, sy=ev.clientY;
         holdTimer=setTimeout(function(){
           var rect=w.getBoundingClientRect();
@@ -1035,29 +1038,29 @@ const PHOTO_ENGINE_S3 = `<script>
         }
         function cancel(){ cleanup(); teardown(); }
         function teardown(){
-          w.removeEventListener('pointermove', move);
-          w.removeEventListener('pointerup', end);
-          w.removeEventListener('pointercancel', cancel);
-          w.removeEventListener('touchmove', move);
-          w.removeEventListener('touchend', end);
-          w.removeEventListener('touchcancel', cancel);
+          document.removeEventListener('pointermove', move);
+          document.removeEventListener('pointerup', end);
+          document.removeEventListener('pointercancel', cancel);
+          document.removeEventListener('touchmove', move);
+          document.removeEventListener('touchend', end);
+          document.removeEventListener('touchcancel', cancel);
+          setTimeout(function(){ w.__onedayDragStarting=false; },80);
         }
         if(ev.type==='touchstart'){
-          w.addEventListener('touchmove', move, {passive:false});
-          w.addEventListener('touchend', end, {passive:false});
-          w.addEventListener('touchcancel', cancel, {passive:true});
+          document.addEventListener('touchmove', move, {passive:false});
+          document.addEventListener('touchend', end, {passive:false});
+          document.addEventListener('touchcancel', cancel, {passive:true});
         } else {
-          w.addEventListener('pointermove', move, {passive:false});
-          w.addEventListener('pointerup', end, {passive:false});
-          w.addEventListener('pointercancel', cancel, {passive:true});
+          document.addEventListener('pointermove', move, {passive:false});
+          document.addEventListener('pointerup', end, {passive:false});
+          document.addEventListener('pointercancel', cancel, {passive:true});
         }
       }
-      w.addEventListener('pointerdown', start, {passive:true});
+      w.addEventListener('pointerdown', start, {passive:false});
       w.addEventListener('touchstart', function(ev){
-        if(window.PointerEvent) return;
         if(!ev.touches||!ev.touches.length) return;
-        start({type:'touchstart',target:ev.target,clientX:ev.touches[0].clientX,clientY:ev.touches[0].clientY});
-      }, {passive:true});
+        start({type:'touchstart',target:ev.target,clientX:ev.touches[0].clientX,clientY:ev.touches[0].clientY,preventDefault:function(){ ev.preventDefault(); }});
+      }, {passive:false});
       w.addEventListener('contextmenu', function(ev){ ev.preventDefault(); }, true);
       w.addEventListener('click', function(ev){
         if(w.__onedaySuppressClick){
