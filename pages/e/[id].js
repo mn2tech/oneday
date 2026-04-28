@@ -97,6 +97,108 @@ function buildCountdownCorrectionScript(eventDate) {
 <\/script>`;
 }
 
+const CONFERENCE_FALLBACK_SCRIPT = `<script>
+(function(){
+  function run(){
+    var scheduleContent=document.getElementById('scheduleContent');
+    var speakersGrid=document.getElementById('speakersGrid');
+    var resourceGrid=document.getElementById('resourceGrid');
+    var isConference=!!(document.getElementById('schedule')&&document.getElementById('speakers')) ||
+      /conference|summit|innovate/i.test(document.body ? document.body.textContent || '' : '');
+    if(!isConference) return;
+
+    function esc(value){
+      return String(value==null?'':value)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function eventTitle(){
+      var h=document.querySelector('#hero h1,.hero-title,h1');
+      var text=h?(h.textContent||'').replace(/\\s+/g,' ').trim():'';
+      return text || (document.title||'Conference').replace(/\\s+[|\\-].*$/,'').trim() || 'Conference';
+    }
+    var title=eventTitle();
+
+    function empty(el){
+      return el && !(el.textContent||'').trim() && !el.querySelector('img,video,iframe,li,.tl-item,.speaker-card,.resource-card');
+    }
+
+    if(empty(scheduleContent)){
+      var days=[
+        {label:'Day 1',items:[
+          ['8:00 AM','Registration & Networking Breakfast','Check in, pick up materials, and meet fellow attendees.','networking'],
+          ['9:00 AM','Opening Keynote','Welcome remarks and the latest data and AI innovation themes.','keynote'],
+          ['10:30 AM','Breakout Sessions','Choose from analytics, AI, cloud data, and customer success sessions.','workshop'],
+          ['4:30 PM','Expo & Networking Reception','Connect with peers, partners, and product experts.','networking']
+        ]},
+        {label:'Day 2',items:[
+          ['9:00 AM','Featured Customer Stories','Real-world transformation stories and lessons learned.','panel'],
+          ['11:00 AM','Hands-on Labs','Practical sessions led by technical experts.','workshop'],
+          ['2:00 PM','Industry Tracks','Focused sessions for analytics, risk, customer intelligence, and data management.','workshop'],
+          ['5:00 PM','Community Meetup','Continue conversations with attendees and speakers.','networking']
+        ]},
+        {label:'Day 3',items:[
+          ['9:30 AM','Innovation Showcase','Product demos, partner sessions, and emerging use cases.','keynote'],
+          ['1:00 PM','Ask the Experts','Small-group Q&A with technical and business leaders.','panel'],
+          ['3:30 PM','Closing Sessions','Final takeaways and next steps for attendees.','keynote']
+        ]}
+      ];
+      var tabs=document.getElementById('scheduleTabs');
+      if(tabs&&!tabs.children.length){
+        tabs.innerHTML=days.map(function(day,idx){
+          return '<button type="button" class="tab-btn '+(idx===0?'active':'')+'" data-oneday-conf-tab="'+idx+'">'+esc(day.label)+'</button>';
+        }).join('');
+      }
+      scheduleContent.innerHTML=days.map(function(day,idx){
+        return '<div class="tab-content '+(idx===0?'active':'')+'" data-oneday-conf-panel="'+idx+'">'+
+          '<div class="timeline">'+day.items.map(function(item){
+            return '<div class="tl-item"><div class="tl-dot"></div><div class="tl-time">'+esc(item[0])+'</div>'+
+              '<div class="tl-title">'+esc(item[1])+'</div><div class="tl-desc">'+esc(item[2])+'</div>'+
+              '<span class="tl-tag tag-'+esc(item[3])+'">'+esc(item[3])+'</span></div>';
+          }).join('')+'</div></div>';
+      }).join('');
+      Array.prototype.slice.call(document.querySelectorAll('[data-oneday-conf-tab]')).forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var ix=this.getAttribute('data-oneday-conf-tab');
+          Array.prototype.slice.call(document.querySelectorAll('[data-oneday-conf-tab]')).forEach(function(b){ b.classList.toggle('active', b===btn); });
+          Array.prototype.slice.call(document.querySelectorAll('[data-oneday-conf-panel]')).forEach(function(p){ p.classList.toggle('active', p.getAttribute('data-oneday-conf-panel')===ix); });
+        });
+      });
+    }
+
+    if(empty(speakersGrid)){
+      var speakers=[
+        ['S','SAS Executive Keynote','SAS Institute','Data and AI innovation strategy'],
+        ['A','Analytics Leader','Featured Speaker','Applied AI, analytics, and decisioning'],
+        ['C','Customer Innovation Panel','Industry Leaders','Real-world transformation stories'],
+        ['T','Technical Experts','SAS Product Team','Hands-on demos and best practices']
+      ];
+      speakersGrid.innerHTML=speakers.map(function(s){
+        return '<div class="speaker-card"><div class="speaker-avatar">'+esc(s[0])+'</div>'+
+          '<div class="speaker-name">'+esc(s[1])+'</div><div class="speaker-role">'+esc(s[2])+'</div>'+
+          '<div class="speaker-company">'+esc(title)+'</div><div class="speaker-topic">'+esc(s[3])+'</div></div>';
+      }).join('');
+    }
+
+    if(empty(resourceGrid)){
+      var resources=[
+        ['Agenda & Session Notes','Keep track of keynote themes, breakout sessions, and action items.'],
+        ['Slides & Recordings','Add links to presentation decks, session recordings, and follow-up materials.'],
+        ['Networking Resources','Capture contacts, communities, and next steps from the conference.']
+      ];
+      resourceGrid.innerHTML=resources.map(function(r){
+        return '<div class="resource-card"><div class="resource-title">'+esc(r[0])+'</div>'+
+          '<div class="resource-desc">'+esc(r[1])+'</div></div>';
+      }).join('');
+    }
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',run);
+  } else {
+    run();
+  }
+})();
+<\/script>`;
+
 /**
  * Remove ALL localStorage-based photo scripts from the stored HTML.
  * Two kinds exist: (1) AI-generated scripts using `'photos_'+eventId+'_'+n`
@@ -2084,6 +2186,8 @@ label[for^="photo-input"] {
     phase1ApplyScript +
     '\n' +
     countdownCorrectionScript +
+    '\n' +
+    CONFERENCE_FALLBACK_SCRIPT +
     '\n' +
     hostEditLauncher +
     '\n' +
