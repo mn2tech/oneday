@@ -79,8 +79,8 @@ const PHOTO_ENGINE_LEGACY = `<script>
     }
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
-    ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+    ['buildPhotoGrid','renderPhotoGrid','renderPhotos','refreshPhotos','displayPhotos',
+     'setupPhotoInput','handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -327,6 +327,30 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var n=el.nextElementSibling;
       return n&&n.getAttribute&&n.getAttribute('data-oneday-engine')==='1';
     }
+    function showManagedNode(el, fallbackDisplay){
+      if(!el) return;
+      el.hidden=false;
+      el.removeAttribute('hidden');
+      el.removeAttribute('aria-hidden');
+      if(el.style){
+        if(fallbackDisplay==='grid') el.style.display='grid';
+        else el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('opacity');
+      }
+      if(fallbackDisplay && fallbackDisplay!=='grid' && window.getComputedStyle && getComputedStyle(el).display==='none'){
+        el.style.display=fallbackDisplay;
+      }
+    }
+    function revealPhotoWall(btn, grid){
+      showManagedNode(btn, 'inline-flex');
+      showManagedNode(btn.closest('.photo-sec-header') || btn.parentElement, 'block');
+      showManagedNode(btn.closest('.photo-sec') || btn.closest('[class*="photo-sec"]'), 'block');
+      if(grid){
+        showManagedNode(grid.closest('.photo-sections') || grid.parentElement, 'block');
+        showManagedNode(grid, 'grid');
+      }
+    }
     var buttons=Array.from(
       document.querySelectorAll('button,label,a,[role="button"]')
     ).filter(function(el){
@@ -391,6 +415,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
       grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
       grid.innerHTML=''; // clear Claude's placeholder tiles
+      revealPhotoWall(fb, grid);
 
       // Render saved photos from localStorage
       function render(){
@@ -559,8 +584,8 @@ const PHOTO_ENGINE_S3 = `<script>
       w.appendChild(cap);
     }
 
-    ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
+    ['buildPhotoGrid','renderPhotoGrid','renderPhotos','refreshPhotos','displayPhotos',
+     'setupPhotoInput','handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -1072,8 +1097,12 @@ const PHOTO_ENGINE_S3 = `<script>
       }, true);
     }
 
-    function loadGrid(grid, si){
-      if(!grid || grid.dataset.onedayLoading === '1') return;
+    function loadGrid(grid, si, opts){
+      if(!grid) return;
+      if(grid.dataset.onedayLoading === '1'){
+        grid.dataset.onedayPendingLoad = '1';
+        return;
+      }
       grid.dataset.onedayLoading = '1';
       fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+si+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
         .then(function(r){
@@ -1089,8 +1118,10 @@ const PHOTO_ENGINE_S3 = `<script>
           var sig = photos.map(function(p){
             return String(p.id || '');
           }).join('|');
-          var prevSig = grid.dataset.onedayPhotoSig || '';
-          var hasChanged = sig !== prevSig;
+          var prevSig = grid.dataset.onedayPhotoSig;
+          var hasRendered = grid.dataset.onedayPhotoRendered === '1';
+          var force = !!(opts && opts.force);
+          var hasChanged = force || !hasRendered || sig !== (prevSig || '');
           grid.dataset.onedayPhotoSig = sig;
           if(!hasChanged){
             trackPhotoCount(si, photos.length, grid);
@@ -1100,7 +1131,9 @@ const PHOTO_ENGINE_S3 = `<script>
           var viewerItems=photos.map(function(p,ix){
             return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg'};
           });
-          grid.innerHTML='';
+          // Build all photo nodes into a fragment first, THEN swap — prevents visible
+          // flash where the grid goes empty while we're building DOM nodes.
+          var _frag=document.createDocumentFragment();
           photos.forEach(function(p,i){
             var w=document.createElement('div');
             w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
@@ -1176,8 +1209,13 @@ const PHOTO_ENGINE_S3 = `<script>
             w.onclick=function(){ viewer.open(viewerItems, i); };
             w.appendChild(im);
             appendEventCaption(w);
-            w.appendChild(m); w.appendChild(b); grid.appendChild(w);
+            w.appendChild(m); w.appendChild(b); _frag.appendChild(w);
           });
+          // Atomic swap: clear old content and insert new in one synchronous block
+          // so the browser never paints an empty grid between the two operations.
+          grid.innerHTML='';
+          grid.dataset.onedayPhotoRendered = '1';
+          grid.appendChild(_frag);
           hideEmptyPhotoCopy(grid, photos.length > 0);
           trackPhotoCount(si, photos.length, grid);
         })
@@ -1187,6 +1225,10 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .finally(function(){
           grid.dataset.onedayLoading = '0';
+          if(grid.dataset.onedayPendingLoad === '1'){
+            grid.dataset.onedayPendingLoad = '0';
+            setTimeout(function(){ loadGrid(grid, si, {force:true}); }, 0);
+          }
         });
     }
 
@@ -1206,6 +1248,30 @@ const PHOTO_ENGINE_S3 = `<script>
     function alreadyWired(el){
       var n=el.nextElementSibling;
       return n&&n.getAttribute&&n.getAttribute('data-oneday-engine')==='1';
+    }
+    function showManagedNode(el, fallbackDisplay){
+      if(!el) return;
+      el.hidden=false;
+      el.removeAttribute('hidden');
+      el.removeAttribute('aria-hidden');
+      if(el.style){
+        if(fallbackDisplay==='grid') el.style.display='grid';
+        else el.style.removeProperty('display');
+        el.style.removeProperty('visibility');
+        el.style.removeProperty('opacity');
+      }
+      if(fallbackDisplay && fallbackDisplay!=='grid' && window.getComputedStyle && getComputedStyle(el).display==='none'){
+        el.style.display=fallbackDisplay;
+      }
+    }
+    function revealPhotoWall(btn, grid){
+      showManagedNode(btn, 'inline-flex');
+      showManagedNode(btn.closest('.photo-sec-header') || btn.parentElement, 'block');
+      showManagedNode(btn.closest('.photo-sec') || btn.closest('[class*="photo-sec"]'), 'block');
+      if(grid){
+        showManagedNode(grid.closest('.photo-sections') || grid.parentElement, 'block');
+        showManagedNode(grid, 'grid');
+      }
     }
     var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
       if(alreadyWired(el)) return false;
@@ -1259,6 +1325,7 @@ const PHOTO_ENGINE_S3 = `<script>
       grid.dataset.onedayManaged='1';
       grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
+      revealPhotoWall(fb, grid);
 
       noticeState.grids[String(si)] = grid;
       loadGrid(grid, si);
@@ -1303,7 +1370,7 @@ const PHOTO_ENGINE_S3 = `<script>
                 body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:bodyBlob.size,contentType:ct,deviceId:getDeviceId()})
               }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
             })
-            .then(function(){ loadGrid(grid, si); })
+            .then(function(){ loadGrid(grid, si, {force:true}); })
             .catch(function(err){ alert(err.message||'Upload failed'); });
           });
         });
@@ -1317,11 +1384,33 @@ const PHOTO_ENGINE_S3 = `<script>
     setTimeout(bootPhotoS3, 200);
     setTimeout(bootPhotoS3, 500);
     setTimeout(bootPhotoS3, 1200);
+    // Retry loop: keeps trying until all upload controls are wired (handles late-rendering AI pages).
+    // Stops early once no unwired upload controls remain, capped at 30 iterations.
     var n=0;
     var iv=setInterval(function(){
       bootPhotoS3();
       n++;
-      if(n>=30) clearInterval(iv);
+      // Stop early if every upload button in the DOM is already wired
+      var hasUnwired=false;
+      try {
+        var els=document.querySelectorAll('button,label,a,[role="button"]');
+        for(var _i=0;_i<els.length;_i++){
+          var _el=els[_i];
+          var _ns=_el.nextElementSibling;
+          var _wired=_ns&&_ns.getAttribute&&_ns.getAttribute('data-oneday-engine')==='1';
+          if(!_wired){
+            var _fo=(_el.getAttribute('for')||'');
+            var _t=(_el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+            var _c=(_el.getAttribute('class')||'').toLowerCase();
+            var _isUpload=(_el.tagName==='LABEL'&&/^photo-input/i.test(_fo))||
+              ((/add|upload|share/.test(_t))&&(/(photo|pic|memory|moment)/.test(_t)))||
+              _t.indexOf('add photo')!==-1||_t.indexOf('upload photo')!==-1||
+              _c.indexOf('btn-upload')!==-1||_c.indexOf('upload-btn')!==-1;
+            if(_isUpload){ hasUnwired=true; break; }
+          }
+        }
+      } catch(e){}
+      if(!hasUnwired||n>=30) clearInterval(iv);
     }, 200);
   });
   window.addEventListener('load', function(){ setTimeout(bootPhotoS3, 0); });
@@ -1850,6 +1939,15 @@ export async function getServerSideProps({ params, res, query }) {
 })();
 <\/script>`;
   const manifestLinks = `<link rel="manifest" href="/api/manifest.webmanifest?start=/e/${encodeURIComponent(id)}"><meta name="theme-color" content="#7c5cfc"><link rel="apple-touch-icon" href="/icon.svg">`;
+  const photoStabilityStyleTag = `<style id="oneday-photo-stability">
+#photos .upload-btn,
+section[id*="photo" i] .upload-btn,
+label[for^="photo-input"] {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+</style>`;
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
     watermark +
@@ -1870,7 +1968,7 @@ export async function getServerSideProps({ params, res, query }) {
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
 
   let html = data.html;
-  html = injectBeforeHeadClose(html, manifestLinks);
+  html = injectBeforeHeadClose(html, manifestLinks + photoStabilityStyleTag);
   if (useCloudIx) {
     html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
   }
