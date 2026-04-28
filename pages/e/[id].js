@@ -3,7 +3,7 @@ import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
 import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
 import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
 import { buildThemePresetStyleTag, normalizeThemePreset } from '../../lib/eventThemePresets';
-import { normalizePhase1Content } from '../../lib/eventStructuredPhase1';
+import { extractLiveEventDetailsFromHtml, normalizePhase1Content } from '../../lib/eventStructuredPhase1';
 import { isEventHost } from '../../lib/eventAdminAuth';
 
 function injectAfterBodyOpen(html, snippet) {
@@ -65,7 +65,12 @@ function buildCountdownCorrectionScript(eventDate) {
     el.textContent=String(value).padStart(digits || 2,'0');
   }
   function render(){
-    var cleanedTarget=String(targetRaw||'').replace(/^\\s*[^a-z0-9]+/i,'').replace(/\\s+at\\s+/i,' ');
+    var cleanedTarget=String(targetRaw||'')
+      .replace(/\\*/g,'')
+      .replace(/^\\s*[^a-z0-9]+/i,'')
+      .replace(/\\s+(?:at|·|•|-)\\s+/i,' ')
+      .replace(/\\s+/g,' ')
+      .trim();
     var targetDate=new Date(cleanedTarget);
     if(isNaN(targetDate.getTime())) return;
     var diff=targetDate.getTime()-Date.now();
@@ -1789,8 +1794,12 @@ export async function getServerSideProps({ params, res, query }) {
   const phase1Source = allowDraftPreview && data.content_phase1_draft ? data.content_phase1_draft : data.content_phase1;
   const phase1Content = normalizePhase1Content(phase1Source || {}, data.title || '');
   const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
+  const liveEventDetails = extractLiveEventDetailsFromHtml(data.html || '', {
+    title: data.title || '',
+    eventDate: data.event_date || '',
+  });
   const countdownCorrectionScript = buildCountdownCorrectionScript(
-    data.event_date || phase1Content.eventDetails?.dateTime
+    data.event_date || phase1Content.eventDetails?.dateTime || liveEventDetails.dateTime
   );
 
   // Pro pages: small corner badge. Free pages: full watermark bar with upgrade CTA.
