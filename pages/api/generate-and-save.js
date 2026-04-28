@@ -486,7 +486,14 @@ export default async function handler(req, res) {
     let html;
     try {
       html = fixInlineHandlerScoping(extractHtml(rawHtml));
-      html = injectPhotoUpload(html);
+      // Only inject the localStorage photo engine when S3 is NOT configured.
+      // When S3 is in use, pages/e/[id].js injects PHOTO_ENGINE_S3 at serve time;
+      // having both engines run simultaneously causes grid.innerHTML="" conflicts.
+      const useS3Photo = !!(process.env.AWS_S3_BUCKET && process.env.AWS_REGION &&
+        process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+      if (!useS3Photo) {
+        html = injectPhotoUpload(html);
+      }
     } catch (processErr) {
       console.error('[generate-and-save] HTML post-process error:', processErr?.message || processErr);
       return res.status(500).json({

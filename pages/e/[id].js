@@ -23,6 +23,26 @@ function injectBeforeHeadClose(html, snippet) {
   return html.slice(0, idx) + snippet + html.slice(idx);
 }
 
+/**
+ * Remove the localStorage-based photo engine that generate-and-save / edit-event inject
+ * into the stored HTML. When the S3 engine is in use both scripts run simultaneously,
+ * the localStorage engine calls grid.innerHTML="" on every load (even when storage is empty)
+ * which clears the grid and causes the visible flash on page refresh and after uploads.
+ */
+function stripLegacyPhotoEngine(html) {
+  const MARKER = 'var key="photos_"+eid+"_"+idx;';
+  if (!html.includes(MARKER)) return html;
+  const idx = html.indexOf(MARKER);
+  // Walk backwards from the marker to find the opening <script> tag
+  const scriptStart = html.lastIndexOf('<script>', idx);
+  if (scriptStart === -1) return html;
+  // Walk forward from the marker to find the closing </script>
+  const closeTag = '</script>';
+  const scriptEnd = html.indexOf(closeTag, idx);
+  if (scriptEnd === -1) return html;
+  return html.slice(0, scriptStart) + html.slice(scriptEnd + closeTag.length);
+}
+
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
   return Boolean(
@@ -1978,6 +1998,11 @@ label[for^="photo-input"] {
     (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
 
   let html = data.html;
+  // Strip the localStorage photo engine baked into the stored HTML — it conflicts with PHOTO_ENGINE_S3
+  // by calling grid.innerHTML="" on every page load, causing the visible flash on refresh.
+  if (useS3) {
+    html = stripLegacyPhotoEngine(html);
+  }
   html = injectBeforeHeadClose(html, manifestLinks + photoStabilityStyleTag);
   if (useCloudIx) {
     html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);

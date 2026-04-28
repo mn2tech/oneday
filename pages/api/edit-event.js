@@ -249,7 +249,14 @@ export default async function handler(req, res) {
 
     const rawHtml = message.content[0]?.text || '';
     let updatedHtml = fixInlineHandlerScoping(extractHtml(rawHtml));
-    updatedHtml = injectPhotoUpload(updatedHtml);
+    // Only inject the localStorage photo engine when S3 is NOT configured.
+    // When S3 is in use, pages/e/[id].js injects PHOTO_ENGINE_S3 at serve time;
+    // having both engines run simultaneously causes grid.innerHTML="" conflicts.
+    const useS3Photo = !!(process.env.AWS_S3_BUCKET && process.env.AWS_REGION &&
+      process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+    if (!useS3Photo) {
+      updatedHtml = injectPhotoUpload(updatedHtml);
+    }
 
     const lower = updatedHtml.toLowerCase();
     if (!lower.includes('<!doctype')) {
