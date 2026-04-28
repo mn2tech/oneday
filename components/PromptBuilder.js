@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import styles from '../styles/PromptBuilder.module.css';
 
-const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby Shower', 'Bridal Shower', 'Graduation', 'Corporate', 'Party', 'Other'];
+const EVENT_TYPES = ['Wedding', 'Birthday', 'Nalugu/Haldi', 'Anniversary', 'Baby Shower', 'Bridal Shower', 'Graduation', 'Conference', 'Corporate', 'Party', 'Other'];
 
 const COLOR_THEMES = [
   { name: 'Gold & Purple', colors: ['#b8860b', '#6d28d9', '#f5e6a3'] },
@@ -41,7 +41,16 @@ const DEFAULT_FORM = {
   dressCode: '',
   colorTheme: '',
   specialNotes: '',
+  // Conference-specific
+  confOrg: '',
+  confSpeakers: '',
+  confTracks: '',
+  confWebsite: '',
 };
+
+function isConference(f) {
+  return f.eventType === 'Conference';
+}
 
 // ── Assemble the final prompt from form fields ────────────────────────────────
 function assemblePrompt(f) {
@@ -50,16 +59,29 @@ function assemblePrompt(f) {
 
   // Opening sentence
   let opening = '';
-  if (type && f.names) opening = `A ${type} celebration for ${f.names}`;
-  else if (type) opening = `A ${type} event`;
-  else if (f.names) opening = `An event for ${f.names}`;
-  else opening = 'An event';
+  if (isConference(f)) {
+    opening = f.names ? `${f.names} Conference` : 'A Conference';
+    if (f.confOrg) opening += ` by ${f.confOrg}`;
+  } else {
+    if (type && f.names) opening = `A ${type} celebration for ${f.names}`;
+    else if (type) opening = `A ${type} event`;
+    else if (f.names) opening = `An event for ${f.names}`;
+    else opening = 'An event';
+  }
   if (f.date && f.time) opening += ` on ${f.date} at ${f.time}`;
   else if (f.date) opening += ` on ${f.date}`;
   parts.push(opening + '.');
 
   if (f.hostedBy) parts.push(`Hosted by ${f.hostedBy}.`);
   if (f.venue) parts.push(`The event will be held at ${f.venue}.`);
+
+  // Conference-specific fields
+  if (isConference(f)) {
+    if (f.confSpeakers) parts.push(`Featured speakers: ${f.confSpeakers}.`);
+    if (f.confTracks) parts.push(`Tracks/sessions: ${f.confTracks}.`);
+    if (f.confWebsite) parts.push(`Official website: ${f.confWebsite}.`);
+    parts.push('This is a conference page — include: an attendee "Who\'s Here" networking wall where people can post their name, company and what they\'re looking for; a speakers section; a session schedule; a live photo wall; a community message/insights wall; and a resource hub for slides and links. Use a professional, energetic design.');
+  }
 
   const schedule = f.scheduleItems.filter(s => s.description.trim());
   if (schedule.length > 0) {
@@ -203,14 +225,58 @@ export default function PromptBuilder({ onComplete }) {
 
         {/* Names */}
         <div className={styles.field}>
-          <label className={styles.label}>Name(s) / Honoree(s) <span className={styles.required}>*</span></label>
+          <label className={styles.label}>
+            {isConference(form) ? <>Conference name <span className={styles.required}>*</span></> : <>Name(s) / Honoree(s) <span className={styles.required}>*</span></>}
+          </label>
           <input
             className={styles.input}
-            placeholder="e.g. Nadia, Sarah & James, The Johnson Family"
+            placeholder={isConference(form) ? 'e.g. SAS Innovate, TechConnect 2026, DevSummit' : 'e.g. Nadia, Sarah & James, The Johnson Family'}
             value={form.names}
             onChange={e => set('names', e.target.value)}
           />
         </div>
+
+        {/* Conference-specific fields */}
+        {isConference(form) && (
+          <>
+            <div className={styles.field}>
+              <label className={styles.label}>Organization / Company <span className={styles.optional}>(optional)</span></label>
+              <input
+                className={styles.input}
+                placeholder="e.g. SAS Institute, Google, NM2TECH"
+                value={form.confOrg}
+                onChange={e => set('confOrg', e.target.value)}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Featured speakers <span className={styles.optional}>(optional)</span></label>
+              <input
+                className={styles.input}
+                placeholder="e.g. Jane Smith (CEO), Dr. Alex Lee, Michael Johnson"
+                value={form.confSpeakers}
+                onChange={e => set('confSpeakers', e.target.value)}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Tracks / Sessions <span className={styles.optional}>(optional)</span></label>
+              <input
+                className={styles.input}
+                placeholder="e.g. AI & Data, Cloud Innovation, Leadership"
+                value={form.confTracks}
+                onChange={e => set('confTracks', e.target.value)}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Official website <span className={styles.optional}>(optional)</span></label>
+              <input
+                className={styles.input}
+                placeholder="e.g. https://sasinnovate.com"
+                value={form.confWebsite}
+                onChange={e => set('confWebsite', e.target.value)}
+              />
+            </div>
+          </>
+        )}
 
         {/* Hosted by */}
         <div className={styles.field}>
