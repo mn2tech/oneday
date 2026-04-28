@@ -24,23 +24,37 @@ function injectBeforeHeadClose(html, snippet) {
 }
 
 /**
- * Remove the localStorage-based photo engine that generate-and-save / edit-event inject
- * into the stored HTML. When the S3 engine is in use both scripts run simultaneously,
- * the localStorage engine calls grid.innerHTML="" on every load (even when storage is empty)
- * which clears the grid and causes the visible flash on page refresh and after uploads.
+ * Remove ALL localStorage-based photo scripts from the stored HTML.
+ * Two kinds exist: (1) AI-generated scripts using `'photos_'+eventId+'_'+n`
+ * and (2) the `injectPhotoUpload` script using `"photos_"+eid+"_"+idx`.
+ * When PHOTO_ENGINE_S3 is active, both conflict: they call grid.innerHTML=""
+ * on every DOMContentLoaded (even when storage is empty), wiping the grid and
+ * causing the visible flash on every page refresh and after uploads.
+ *
+ * Safe: only strips scripts containing BOTH 'photos_' and localStorage access.
+ * PHOTO_ENGINE_S3 / INTERACTIONS_CLOUD / SHARED_CLOUD_LOCALSTORAGE_BLOCK
+ * do not use localStorage with 'photos_' keys, so they are never touched.
  */
 function stripLegacyPhotoEngine(html) {
-  const MARKER = 'var key="photos_"+eid+"_"+idx;';
-  if (!html.includes(MARKER)) return html;
-  const idx = html.indexOf(MARKER);
-  // Walk backwards from the marker to find the opening <script> tag
-  const scriptStart = html.lastIndexOf('<script>', idx);
-  if (scriptStart === -1) return html;
-  // Walk forward from the marker to find the closing </script>
-  const closeTag = '</script>';
-  const scriptEnd = html.indexOf(closeTag, idx);
-  if (scriptEnd === -1) return html;
-  return html.slice(0, scriptStart) + html.slice(scriptEnd + closeTag.length);
+  if (!html.includes("photos_")) return html; // fast exit
+  const OPEN = '<script';
+  const CLOSE = '</script>';
+  const result = [];
+  let pos = 0;
+  while (pos < html.length) {
+    const scriptStart = html.indexOf(OPEN, pos);
+    if (scriptStart === -1) { result.push(html.slice(pos)); break; }
+    result.push(html.slice(pos, scriptStart)); // content before this script
+    const scriptEnd = html.indexOf(CLOSE, scriptStart);
+    if (scriptEnd === -1) { result.push(html.slice(scriptStart)); break; }
+    const scriptBlock = html.slice(scriptStart, scriptEnd + CLOSE.length);
+    // Remove any script that reads/writes localStorage using a photos_ key
+    const isPhotoLS = scriptBlock.includes("photos_") &&
+      (scriptBlock.includes("localStorage.getItem") || scriptBlock.includes("localStorage.setItem"));
+    if (!isPhotoLS) result.push(scriptBlock);
+    pos = scriptEnd + CLOSE.length;
+  }
+  return result.join('');
 }
 
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
