@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 import { generateAdminToken, hashAdminToken } from '../../lib/eventAdminAuth';
 import { normalizeDeviceId } from '../../lib/deviceOwnership';
 import { normalizeStripeEnvKey, looksLikeStripeSecretKey } from '../../lib/stripePublishableKey';
+import { sendEventCreatedNotification } from '../../lib/notifications';
 
 // Lazily initialised inside the handler so env vars are always resolved at request time
 function getStripe() {
@@ -538,6 +539,16 @@ export default async function handler(req, res) {
 
     // 4. Send confirmation email (non-blocking)
     const emailResult = await sendConfirmationEmail(resend, email, appUrl, manageUrl);
+    const eventCreatedNotification = await sendEventCreatedNotification({
+      event: {
+        id,
+        title,
+        email,
+        plan: resolvedPlan,
+        tier: eventTier,
+      },
+      publicUrl: appUrl,
+    });
 
     return res.status(200).json({
       id,
@@ -545,6 +556,8 @@ export default async function handler(req, res) {
       manageUrl,
       emailStatus: emailResult?.status || 'failed',
       emailReason: emailResult?.reason || null,
+      eventCreatedNotificationStatus: eventCreatedNotification?.status || 'failed',
+      eventCreatedNotificationReason: eventCreatedNotification?.reason || null,
     });
 
   } catch (err) {
