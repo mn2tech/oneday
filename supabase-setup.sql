@@ -54,11 +54,22 @@ create table if not exists event_photos (
   content_type     text,
   byte_size        integer,
   owner_device_id  text,
+  sort_order       bigint      default (floor(extract(epoch from now()) * 1000))::bigint,
   created_at       timestamptz default now()
 );
 
+alter table event_photos
+  add column if not exists sort_order bigint default (floor(extract(epoch from now()) * 1000))::bigint;
+
+update event_photos
+set sort_order = (floor(extract(epoch from created_at) * 1000))::bigint
+where sort_order is null;
+
 create index if not exists idx_event_photos_event_section
   on event_photos (event_id, section_index);
+
+create index if not exists idx_event_photos_event_section_sort
+  on event_photos (event_id, section_index, sort_order desc, created_at desc);
 
 alter table event_photos enable row level security;
 -- Inserts/reads happen only via Next.js API using the service role key (bypasses RLS).

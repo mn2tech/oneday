@@ -10,6 +10,11 @@ function getSupabase() {
   );
 }
 
+function isMissingSortOrder(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return error?.code === '42703' || msg.includes('sort_order') || msg.includes('schema cache');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -35,21 +40,39 @@ export default async function handler(req, res) {
     adminToken: hostToken,
   });
 
-  let q = supabase
-    .from('event_photos')
-    .select('id, s3_key, section_index, created_at, owner_device_id')
-    .eq('event_id', eventId)
-    .order('created_at', { ascending: false });
+  const buildQuery = (withSortOrder) => {
+    let q = supabase
+      .from('event_photos')
+      .select(withSortOrder ? 'id, s3_key, section_index, sort_order, created_at, owner_device_id' : 'id, s3_key, section_index, created_at, owner_device_id')
+      .eq('event_id', eventId);
 
-  if (sectionIndex !== undefined && sectionIndex !== '') {
-    const sec = Number(sectionIndex);
-    if (!Number.isInteger(sec) || sec < 0) {
-      return res.status(400).json({ error: 'Invalid sectionIndex.' });
+    if (withSortOrder) {
+      q = q.order('sort_order', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false });
+    } else {
+      q = q.order('created_at', { ascending: false });
     }
-    q = q.eq('section_index', sec);
+
+    if (sectionIndex !== undefined && sectionIndex !== '') {
+      const sec = Number(sectionIndex);
+      if (!Number.isInteger(sec) || sec < 0) {
+        return { error: { status: 400, payload: { error: 'Invalid sectionIndex.' } } };
+      }
+      q = q.eq('section_index', sec);
+    }
+
+    return { query: q };
+  };
+
+  let built = buildQuery(true);
+  if (built.error) {
+    return res.status(built.error.status).json(built.error.payload);
   }
 
-  const { data: rows, error } = await q;
+  let { data: rows, error } = await built.query;
+  if (error && isMissingSortOrder(error)) {
+    built = buildQuery(false);
+    ({ data: rows, error } = await built.query);
+  }
 
   if (error) {
     console.error('[event-photos/list]', error);

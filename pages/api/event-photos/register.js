@@ -12,6 +12,11 @@ function getSupabase() {
   );
 }
 
+function isMissingSortOrder(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return error?.code === '42703' || msg.includes('sort_order') || msg.includes('schema cache');
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -70,18 +75,31 @@ export default async function handler(req, res) {
     });
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  const insertPayload = {
+    event_id: eventId,
+    section_index: sec,
+    s3_key: key,
+    content_type: contentType || 'image/jpeg',
+    byte_size: Math.round(size),
+    owner_device_id: dev,
+    sort_order: Date.now(),
+  };
+
+  let { data: inserted, error: insErr } = await supabase
     .from('event_photos')
-    .insert({
-      event_id: eventId,
-      section_index: sec,
-      s3_key: key,
-      content_type: contentType || 'image/jpeg',
-      byte_size: Math.round(size),
-      owner_device_id: dev,
-    })
+    .insert(insertPayload)
     .select('id')
     .single();
+
+  if (insErr && isMissingSortOrder(insErr)) {
+    const fallbackPayload = { ...insertPayload };
+    delete fallbackPayload.sort_order;
+    ({ data: inserted, error: insErr } = await supabase
+      .from('event_photos')
+      .insert(fallbackPayload)
+      .select('id')
+      .single());
+  }
 
   if (insErr) {
     console.error('[event-photos/register] insert', insErr);

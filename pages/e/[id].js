@@ -911,6 +911,64 @@ const PHOTO_ENGINE_S3 = `<script>
       im.src=objUrl;
     }
 
+    function orgBody(extra){
+      var body={eventId:eid,deviceId:getDeviceId()};
+      var ht=getHostToken();
+      if(ht) body.adminToken=ht;
+      Object.keys(extra||{}).forEach(function(k){ body[k]=extra[k]; });
+      return body;
+    }
+    function findPhotoNode(grid, photoId){
+      var nodes=grid.querySelectorAll('[data-photo-id]');
+      for(var i=0;i<nodes.length;i++){
+        if(nodes[i].getAttribute('data-photo-id')===String(photoId)) return nodes[i];
+      }
+      return null;
+    }
+    function savePhotoOrder(grid, si){
+      var ids=Array.prototype.slice.call(grid.querySelectorAll('[data-photo-id]')).map(function(el){
+        return el.getAttribute('data-photo-id');
+      }).filter(Boolean);
+      if(ids.length<2) return;
+      fetch('/api/event-photos/organize',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(orgBody({action:'reorder',sectionIndex:si,orderedPhotoIds:ids}))
+      }).then(function(r){
+        return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not save photo order'); return j; });
+      }).then(function(){
+        grid.dataset.onedayPhotoSig='';
+        loadGrid(grid, si);
+      }).catch(function(err){
+        alert(err.message||'Could not save photo order');
+        grid.dataset.onedayPhotoSig='';
+        loadGrid(grid, si);
+      });
+    }
+    function movePhotoToSection(photoId, fromSi, grid){
+      var keys=Object.keys(noticeState.grids).map(function(k){ return Number(k); }).filter(function(n){ return !isNaN(n); }).sort(function(a,b){ return a-b; });
+      var maxSection=Math.max(2, keys.length);
+      var raw=prompt('Move to photo wall number (1-'+maxSection+')', String(fromSi===0?2:1));
+      if(raw==null) return;
+      var target=Number(raw)-1;
+      if(!Number.isInteger(target)||target<0||target>10||target===fromSi){ alert('Choose a different wall number.'); return; }
+      fetch('/api/event-photos/organize',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(orgBody({action:'move',photoId:photoId,targetSectionIndex:target}))
+      }).then(function(r){
+        return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not move photo'); return j; });
+      }).then(function(){
+        grid.dataset.onedayPhotoSig='';
+        loadGrid(grid, fromSi);
+        var targetGrid=noticeState.grids[String(target)];
+        if(targetGrid&&document.body.contains(targetGrid)){
+          targetGrid.dataset.onedayPhotoSig='';
+          loadGrid(targetGrid, target);
+        }
+      }).catch(function(err){ alert(err.message||'Could not move photo'); });
+    }
+
     function loadGrid(grid, si){
       if(!grid || grid.dataset.onedayLoading === '1') return;
       grid.dataset.onedayLoading = '1';
@@ -923,6 +981,7 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(d){
           var photos = (d && d.photos) ? d.photos : [];
+          var isHost=!!(d && d.is_host);
           // URLs may be presigned and rotate often; compare using stable IDs only.
           var sig = photos.map(function(p){
             return String(p.id || '');
@@ -942,6 +1001,31 @@ const PHOTO_ENGINE_S3 = `<script>
           photos.forEach(function(p,i){
             var w=document.createElement('div');
             w.style.cssText='position:relative;aspect-ratio:1 / 1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.08);border-radius:10px;overflow:hidden;box-sizing:border-box;cursor:zoom-in;';
+            if(p.id) w.setAttribute('data-photo-id', p.id);
+            if(isHost&&p.id){
+              w.draggable=true;
+              w.title='Drag to reorder photos';
+              w.style.cursor='grab';
+              w.addEventListener('dragstart', function(ev){
+                grid.__onedayDragPhotoId=p.id;
+                try{ ev.dataTransfer.setData('text/plain', p.id); ev.dataTransfer.effectAllowed='move'; }catch(e){}
+                w.style.opacity='0.55';
+              });
+              w.addEventListener('dragend', function(){ w.style.opacity=''; grid.__onedayDragPhotoId=''; });
+              w.addEventListener('dragover', function(ev){ ev.preventDefault(); try{ ev.dataTransfer.dropEffect='move'; }catch(e){} });
+              w.addEventListener('drop', function(ev){
+                ev.preventDefault();
+                var dragId=grid.__onedayDragPhotoId;
+                try{ dragId=ev.dataTransfer.getData('text/plain')||dragId; }catch(e){}
+                if(!dragId||dragId===p.id) return;
+                var dragged=findPhotoNode(grid, dragId);
+                if(!dragged||dragged===w) return;
+                var rect=w.getBoundingClientRect();
+                var before=(ev.clientY<(rect.top+rect.height/2));
+                grid.insertBefore(dragged, before?w:w.nextSibling);
+                savePhotoOrder(grid, si);
+              });
+            }
             var im=document.createElement('img');
             im.src=p.url;
             im.alt='';
@@ -957,6 +1041,17 @@ const PHOTO_ENGINE_S3 = `<script>
             d.onclick=function(ev){
               ev.stopPropagation();
               quickDownload(p.url,'oneday-photo-'+(i+1)+'.jpg');
+            };
+            var m=document.createElement('button');
+            m.textContent='⇄';
+            m.title='Move photo to another wall';
+            m.style.cssText='position:absolute;top:4px;left:34px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            if(!p.owned_by_me||!p.id){
+              m.style.display='none';
+            }
+            m.onclick=function(ev){
+              ev.stopPropagation();
+              movePhotoToSection(p.id, si, grid);
             };
             var b=document.createElement('button');
             b.innerHTML='&times;';
@@ -982,7 +1077,7 @@ const PHOTO_ENGINE_S3 = `<script>
             w.onclick=function(){ viewer.open(viewerItems, i); };
             w.appendChild(im);
             appendEventCaption(w);
-            w.appendChild(d); w.appendChild(b); grid.appendChild(w);
+            w.appendChild(d); w.appendChild(m); w.appendChild(b); grid.appendChild(w);
           });
           hideEmptyPhotoCopy(grid, photos.length > 0);
           trackPhotoCount(si, photos.length, grid);
