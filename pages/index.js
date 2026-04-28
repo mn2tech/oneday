@@ -196,7 +196,7 @@ function CheckoutForm({ plan, email, onSuccess, termsAccepted }) {
 export default function Home() {
   const [step, setStep] = useState(1); // 1=prompt, 2=plan, 3=payment, 4=loading
   const [prompt, setPrompt] = useState('');
-  const [eventMeta, setEventMeta] = useState({}); // { names, eventType, hostedBy }
+  const [eventMeta, setEventMeta] = useState({}); // { names, eventType, hostedBy, date, time }
   const [email, setEmail] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('standard');
   const [selectedTier, setSelectedTier] = useState('pro');

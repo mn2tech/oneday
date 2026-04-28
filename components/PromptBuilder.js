@@ -513,6 +513,8 @@ export default function PromptBuilder({ onComplete }) {
           names: form.names,
           eventType: form.eventType === 'Other' ? form.customEventType : form.eventType,
           hostedBy: form.hostedBy,
+          date: form.date,
+          time: form.time,
         })}
         disabled={assembledPrompt.trim().length < 10}
       >

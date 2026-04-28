@@ -23,6 +23,75 @@ function injectBeforeHeadClose(html, snippet) {
   return html.slice(0, idx) + snippet + html.slice(idx);
 }
 
+function buildCountdownCorrectionScript(eventDate) {
+  const target = String(eventDate || '').trim();
+  if (!target) return '';
+  return `<script>
+(function(){
+  var targetRaw=${JSON.stringify(target)};
+  function byId(ids){
+    for(var i=0;i<ids.length;i++){
+      var el=document.getElementById(ids[i]);
+      if(el) return el;
+    }
+    return null;
+  }
+  function countdownRoot(){
+    return document.getElementById('countdown') || document.querySelector('[class*="countdown"]');
+  }
+  function byLabel(labels){
+    var root=countdownRoot() || document;
+    var nodes=Array.prototype.slice.call(root.querySelectorAll('*'));
+    for(var i=0;i<nodes.length;i++){
+      var label=(nodes[i].textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+      if(labels.indexOf(label)===-1) continue;
+      var box=nodes[i].parentElement;
+      if(!box) continue;
+      var options=Array.prototype.slice.call(box.children).filter(function(el){
+        if(el===nodes[i]) return false;
+        var text=(el.textContent||'').replace(/\\s+/g,' ').trim();
+        return text.length<=6;
+      });
+      var preferred=options.find(function(el){
+        return /num|value|digit|time/i.test(el.className||'') || /^[-–—0-9]+$/.test((el.textContent||'').trim());
+      });
+      if(preferred) return preferred;
+      if(options[0]) return options[0];
+    }
+    return null;
+  }
+  function write(el,value,digits){
+    if(!el) return;
+    el.textContent=String(value).padStart(digits || 2,'0');
+  }
+  function render(){
+    var cleanedTarget=String(targetRaw||'').replace(/^\\s*[^a-z0-9]+/i,'').replace(/\\s+at\\s+/i,' ');
+    var targetDate=new Date(cleanedTarget);
+    if(isNaN(targetDate.getTime())) return;
+    var diff=targetDate.getTime()-Date.now();
+    if(diff<=0){
+      var root=countdownRoot();
+      if(root && !root.getAttribute('data-oneday-countdown-complete')){
+        root.setAttribute('data-oneday-countdown-complete','1');
+        root.textContent='The Celebration is Live!';
+      }
+      return;
+    }
+    write(byId(['cd-days','countdown-days','days']) || byLabel(['days','day']), Math.floor(diff/86400000), 2);
+    write(byId(['cd-hrs','cd-hours','countdown-hours','hours']) || byLabel(['hours','hour','hrs','hr']), Math.floor((diff%86400000)/3600000), 2);
+    write(byId(['cd-min','cd-mins','cd-minutes','countdown-minutes','minutes']) || byLabel(['mins','min','minutes','minute']), Math.floor((diff%3600000)/60000), 2);
+    write(byId(['cd-sec','cd-secs','cd-seconds','countdown-seconds','seconds']) || byLabel(['secs','sec','seconds','second']), Math.floor((diff%60000)/1000), 2);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',render);
+  } else {
+    render();
+  }
+  setInterval(render,1000);
+})();
+<\/script>`;
+}
+
 /**
  * Remove ALL localStorage-based photo scripts from the stored HTML.
  * Two kinds exist: (1) AI-generated scripts using `'photos_'+eventId+'_'+n`
@@ -1675,7 +1744,7 @@ export async function getServerSideProps({ params, res, query }) {
 
   let { data } = await supabase
     .from('event_apps')
-    .select('html, title, is_live, theme_preset, content_phase1, content_phase1_draft, tier, created_at')
+    .select('html, title, event_date, is_live, theme_preset, content_phase1, content_phase1_draft, tier, created_at')
     .eq('id', id)
     .single();
   if (!data) {
@@ -1720,6 +1789,9 @@ export async function getServerSideProps({ params, res, query }) {
   const phase1Source = allowDraftPreview && data.content_phase1_draft ? data.content_phase1_draft : data.content_phase1;
   const phase1Content = normalizePhase1Content(phase1Source || {}, data.title || '');
   const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
+  const countdownCorrectionScript = buildCountdownCorrectionScript(
+    data.event_date || phase1Content.eventDetails?.dateTime
+  );
 
   // Pro pages: small corner badge. Free pages: full watermark bar with upgrade CTA.
   const watermark = isFree
@@ -2001,6 +2073,8 @@ label[for^="photo-input"] {
     eidScript +
     '\n' +
     phase1ApplyScript +
+    '\n' +
+    countdownCorrectionScript +
     '\n' +
     hostEditLauncher +
     '\n' +

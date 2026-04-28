@@ -106,6 +106,89 @@ function buildSlug(meta) {
   return parts.filter(Boolean).join('-').slice(0, 50) || null;
 }
 
+const MONTH_INDEX = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function parseDateParts(raw) {
+  const cleaned = String(raw || '')
+    .trim()
+    .replace(/(\d+)(st|nd|rd|th)\b/gi, '$1')
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ');
+  if (!cleaned) return null;
+
+  let match = cleaned.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (match) return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+
+  match = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (match) {
+    const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
+    return { year, month: Number(match[1]), day: Number(match[2]) };
+  }
+
+  match = cleaned.match(/^([a-z]+)\s+(\d{1,2})\s+(\d{4})$/i);
+  if (match) {
+    const month = MONTH_INDEX[match[1].toLowerCase()];
+    if (month) return { year: Number(match[3]), month, day: Number(match[2]) };
+  }
+
+  match = cleaned.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/i);
+  if (match) {
+    const month = MONTH_INDEX[match[2].toLowerCase()];
+    if (month) return { year: Number(match[3]), month, day: Number(match[1]) };
+  }
+
+  const parsed = new Date(cleaned);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return {
+    year: parsed.getFullYear(),
+    month: parsed.getMonth() + 1,
+    day: parsed.getDate(),
+  };
+}
+
+function parseTimeParts(raw) {
+  const cleaned = String(raw || '').trim().toLowerCase();
+  if (!cleaned) return { hour: 0, minute: 0, hasTime: false };
+  const match = cleaned.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
+  if (!match) return { hour: 0, minute: 0, hasTime: false };
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  const meridiem = match[3];
+  if (meridiem === 'pm' && hour < 12) hour += 12;
+  if (meridiem === 'am' && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return { hour: 0, minute: 0, hasTime: false };
+  return { hour, minute, hasTime: true };
+}
+
+function normalizeEventDateTime(meta) {
+  const dateParts = parseDateParts(meta?.date);
+  if (!dateParts) return null;
+  const timeParts = parseTimeParts(meta?.time);
+  const isoLocal = `${dateParts.year}-${pad2(dateParts.month)}-${pad2(dateParts.day)}T${pad2(timeParts.hour)}:${pad2(timeParts.minute)}:00`;
+  return {
+    isoLocal,
+    hasTime: timeParts.hasTime,
+  };
+}
+
 async function getUniqueId(supabase, meta) {
   const base = buildSlug(meta);
   if (!base) return nanoid(8);
@@ -259,8 +342,11 @@ function extractHtml(raw) {
   return html;
 }
 
-function buildUserPrompt(prompt) {
-  return `Create a complete event app (with Poll and Message Wall included) for the following event:\n\n${prompt}`;
+function buildUserPrompt(prompt, eventDateTime) {
+  const countdownInstruction = eventDateTime?.isoLocal
+    ? `\n\nCOUNTDOWN TARGET: Use exactly "${eventDateTime.isoLocal}" as the JavaScript countdown target. This is the event's local date${eventDateTime.hasTime ? ' and start time' : ''}; do not invent a different date or time.`
+    : '';
+  return `Create a complete event app (with Poll and Message Wall included) for the following event:${countdownInstruction}\n\n${prompt}`;
 }
 
 /** Anthropic returns an array of content blocks; the first block is not always text. */
@@ -330,6 +416,7 @@ export default async function handler(req, res) {
 
   const { prompt, plan, tier, email, paymentIntentId, eventMeta, deviceId } = req.body || {};
   const creatorDeviceId = normalizeDeviceId(deviceId);
+  const eventDateTime = normalizeEventDateTime(eventMeta);
   // isFree: client sends tier='free' OR paymentIntentId starts with 'free_' (belt-and-suspenders)
   const isFree = tier === 'free' || (typeof paymentIntentId === 'string' && paymentIntentId.startsWith('free_'));
   const eventTier = isFree ? 'free' : 'pro';
@@ -425,7 +512,7 @@ export default async function handler(req, res) {
         max_tokens: 24000,
         system: SYSTEM_PROMPT,
         messages: [
-          { role: 'user', content: buildUserPrompt(prompt) },
+          { role: 'user', content: buildUserPrompt(prompt, eventDateTime) },
         ],
       });
     } catch (aiErr) {
@@ -526,6 +613,7 @@ export default async function handler(req, res) {
       title,
       html,
       prompt,
+      event_date: eventDateTime?.isoLocal || null,
       plan: resolvedPlan,
       tier: eventTier,
       edit_count: 0,
