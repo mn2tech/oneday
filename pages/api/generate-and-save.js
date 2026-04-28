@@ -421,7 +421,7 @@ export default async function handler(req, res) {
     try {
       message = await anthropic.messages.create({
         model: anthropicModel(),
-        max_tokens: 16000,
+        max_tokens: 24000,
         system: SYSTEM_PROMPT,
         messages: [
           { role: 'user', content: buildUserPrompt(prompt) },
