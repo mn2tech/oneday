@@ -199,6 +199,68 @@ const CONFERENCE_FALLBACK_SCRIPT = `<script>
 })();
 <\/script>`;
 
+const PHOTO_WALL_REPAIR_SCRIPT = `<script>
+(function(){
+  function run(){
+    var pathSegs=(window.location.pathname||'').split('/').filter(function(s){ return s&&s.length; });
+    var eid=(window.__ONEDAY_EID__ || (pathSegs.length ? pathSegs[pathSegs.length-1] : '') || 'event').slice(0,80);
+    function getDeviceId(){
+      try{
+        var k='onet_device_global_v1';
+        var v=localStorage.getItem(k);
+        if(v&&v.length>=16) return v.slice(0,128);
+      }catch(e){}
+      return '00000000000000000000000000000000';
+    }
+    function hideEmpty(grid){
+      var root=grid.closest('section')||grid.parentElement;
+      if(!root) return;
+      Array.prototype.slice.call(root.querySelectorAll('[id*="photoEmpty"],[class*="photo-empty"],p,div,span')).forEach(function(el){
+        if(grid.contains(el)) return;
+        var t=(el.textContent||'').toLowerCase();
+        if(t.indexOf('no photo')!==-1||t.indexOf('be the first')!==-1||t.indexOf('share a memory')!==-1) el.style.display='none';
+      });
+    }
+    function renderGrid(grid, photos){
+      if(!grid||!Array.isArray(photos)||!photos.length) return;
+      if(grid.querySelector('img')) { hideEmpty(grid); return; }
+      grid.style.display='grid';
+      if(!grid.style.gridTemplateColumns) grid.style.gridTemplateColumns='repeat(auto-fill,minmax(160px,1fr))';
+      if(!grid.style.gap) grid.style.gap='8px';
+      photos.forEach(function(p,idx){
+        if(!p||!p.url) return;
+        var wrap=document.createElement('div');
+        wrap.style.cssText='position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.08);border-radius:10px;overflow:hidden;';
+        if(p.id) wrap.setAttribute('data-photo-id',p.id);
+        var img=document.createElement('img');
+        img.src=p.url;
+        img.alt='Event photo '+(idx+1);
+        img.loading='lazy';
+        img.decoding='async';
+        img.style.cssText='width:100%;height:100%;object-fit:contain;display:block;border-radius:8px;';
+        wrap.appendChild(img);
+        grid.appendChild(wrap);
+      });
+      hideEmpty(grid);
+    }
+    var grids=Array.prototype.slice.call(document.querySelectorAll('[id^="photoGrid"],[class*="photo-grid"],[id*="photo-grid"],[class*="photoGrid"]'));
+    grids.slice(0,2).forEach(function(grid,idx){
+      if(!grid||grid.dataset.onedayRepairLoaded==='1') return;
+      grid.dataset.onedayRepairLoaded='1';
+      fetch('/api/event-photos/list?eventId='+encodeURIComponent(eid)+'&sectionIndex='+idx+'&deviceId='+encodeURIComponent(getDeviceId()))
+        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not load photos'); return j; }); })
+        .then(function(data){ renderGrid(grid, data&&data.photos ? data.photos : []); })
+        .catch(function(err){ console.warn('[OneDay] photo wall repair failed', err); });
+    });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){ setTimeout(run,250); });
+  } else {
+    setTimeout(run,250);
+  }
+})();
+<\/script>`;
+
 /**
  * Remove ALL localStorage-based photo scripts from the stored HTML.
  * Two kinds exist: (1) AI-generated scripts using `'photos_'+eventId+'_'+n`
@@ -2196,7 +2258,7 @@ label[for^="photo-input"] {
     GUEST_PUSH_OPT_IN +
     '\n' +
     (useCloudIx ? INTERACTIONS_CLOUD : '') +
-    (useS3 ? PHOTO_ENGINE_S3 : PHOTO_ENGINE_LEGACY);
+    (useS3 ? PHOTO_ENGINE_S3 + '\n' + PHOTO_WALL_REPAIR_SCRIPT : PHOTO_ENGINE_LEGACY);
 
   let html = data.html;
   // Strip the localStorage photo engine baked into the stored HTML — it conflicts with PHOTO_ENGINE_S3
