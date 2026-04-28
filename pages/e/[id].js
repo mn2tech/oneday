@@ -23,17 +23,6 @@ function injectBeforeHeadClose(html, snippet) {
   return html.slice(0, idx) + snippet + html.slice(idx);
 }
 
-/** Runs before embedded inline scripts’ DOMContentLoaded handlers (capture phase). Inline HTML often defines renderPhotos after our tail injection — capture reapplies noops before bubble handlers clear photo grids. */
-const PHOTO_WALL_EMBEDDED_GUARD = `<script>
-(function(){
-  document.addEventListener('DOMContentLoaded',function(){
-    try{
-      window.renderPhotos=function(){};
-      window.setupPhotoInput=function(){};
-    }catch(e){}
-  },true);
-})();<\/script>`;
-
 /** When env is set, injected script uploads to S3 + Supabase so all guests see the same photos. */
 function eventPhotosUseS3() {
   return Boolean(
@@ -72,10 +61,6 @@ function getSupabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 const PHOTO_ENGINE_LEGACY = `<script>
 (function(){
-  try{
-    window.renderPhotos=function(){};
-    window.setupPhotoInput=function(){};
-  }catch(e){}
   function bootPhotoLegacy(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -95,7 +80,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     // 1. Kill Claude's native renderers so they never overwrite our grid
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -144,7 +129,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
         '<button type="button" data-v-play style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Play</button>'+
         '<button type="button" data-v-full style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Full</button>'+
         '<span data-v-count style="padding:0 4px;white-space:nowrap;"></span>'+
-        '<a data-v-download href="#" role="button" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;cursor:pointer;">Download</a>'+
+        '<a data-v-download href="#" target="_blank" rel="noopener" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;">Download</a>'+
         '</div>';
       document.body.appendChild(root);
 
@@ -160,15 +145,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var btnFull=root.querySelector('[data-v-full]');
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
-
-      if(dl){
-        dl.addEventListener('click', function(e){
-          e.preventDefault();
-          var cur=state.items[state.idx]||{};
-          if(!cur.url) return;
-          quickDownload(cur.url, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-        });
-      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -212,7 +188,8 @@ const PHOTO_ENGINE_LEGACY = `<script>
         var cur=state.items[state.idx]||{};
         img.src=cur.url||'';
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
-        dl.href=cur.id?('/api/event-photos/download?photoId='+encodeURIComponent(String(cur.id))+'&eventId='+encodeURIComponent(eid)):'#';
+        dl.href=cur.url||'#';
+        dl.setAttribute('download', cur.name||('photo-'+(state.idx+1)+'.jpg'));
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -322,22 +299,13 @@ const PHOTO_ENGINE_LEGACY = `<script>
 
     function quickDownload(url, name){
       if(!url) return;
-      var nm=String(name||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      fetch(url,{mode:'cors',credentials:'omit'})
-        .then(function(r){ if(!r.ok) throw new Error('fetch'); return r.blob(); })
-        .then(function(blob){
-          var u=URL.createObjectURL(blob);
-          var a=document.createElement('a');
-          a.href=u;
-          a.setAttribute('download', nm);
-          a.style.display='none';
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(function(){ try{ a.remove(); }catch(e1){} try{ URL.revokeObjectURL(u); }catch(e2){} }, 2000);
-        })
-        .catch(function(){
-          try{ window.open(url,'_blank','noopener,noreferrer'); }catch(e3){}
-        });
+      var a=document.createElement('a');
+      a.href=url;
+      a.setAttribute('download', name||'photo.jpg');
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
 
     // Match original OneDay behavior (+ case-insensitive text + file-picker labels).
@@ -579,10 +547,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
 /** S3-backed gallery: same UI hooks as legacy; photos load from /api/event-photos/list for all visitors. */
 const PHOTO_ENGINE_S3 = `<script>
 (function(){
-  try{
-    window.renderPhotos=function(){};
-    window.setupPhotoInput=function(){};
-  }catch(e){}
   function bootPhotoS3(){
     var pathSegs = (window.location.pathname || '').split('/').filter(function(s){ return s && s.length; });
     var idFromPath = pathSegs.length ? pathSegs[pathSegs.length - 1] : '';
@@ -602,7 +566,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     ['buildPhotoGrid','renderPhotoGrid','refreshPhotos','displayPhotos',
-     'handlePhotoUpload','onPhotoUpload','photoUploadHandler','renderPhotos','setupPhotoInput'].forEach(function(fn){
+     'handlePhotoUpload','onPhotoUpload','photoUploadHandler'].forEach(function(fn){
       if(typeof window[fn]==='function') window[fn]=function(){};
     });
 
@@ -680,7 +644,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<button type="button" data-v-play style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Play</button>'+
         '<button type="button" data-v-full style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:52px;height:32px;cursor:pointer;">Full</button>'+
         '<span data-v-count style="padding:0 4px;white-space:nowrap;"></span>'+
-        '<a data-v-download href="#" role="button" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;cursor:pointer;">Download</a>'+
+        '<a data-v-download href="#" target="_blank" rel="noopener" style="text-decoration:none;color:#fff;border-radius:999px;background:rgba(255,255,255,.12);padding:8px 12px;line-height:16px;">Download</a>'+
         '</div>';
       document.body.appendChild(root);
 
@@ -696,15 +660,6 @@ const PHOTO_ENGINE_S3 = `<script>
       var btnFull=root.querySelector('[data-v-full]');
       var countEl=root.querySelector('[data-v-count]');
       var dl=root.querySelector('[data-v-download]');
-
-      if(dl){
-        dl.addEventListener('click', function(e){
-          e.preventDefault();
-          var cur=state.items[state.idx]||{};
-          if(!cur.url) return;
-          quickDownload(cur.id, cur.name||('photo-'+(state.idx+1)+'.jpg'));
-        });
-      }
 
       function applyZoom(){
         img.style.transform='scale('+state.zoom+')';
@@ -748,7 +703,8 @@ const PHOTO_ENGINE_S3 = `<script>
         var cur=state.items[state.idx]||{};
         img.src=cur.url||'';
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
-        dl.href='#';
+        dl.href=cur.url||'#';
+        dl.setAttribute('download', cur.name||('photo-'+(state.idx+1)+'.jpg'));
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -856,11 +812,15 @@ const PHOTO_ENGINE_S3 = `<script>
       return window.__onedayPhotoViewer;
     }
 
-    function quickDownload(photoId, displayName){
-      if(!photoId) return;
-      var nm=String(displayName||'photo.jpg').replace(/[^a-zA-Z0-9._\- ]+/g,'_').trim()||'photo.jpg';
-      var u='/api/event-photos/download?photoId='+encodeURIComponent(String(photoId))+'&eventId='+encodeURIComponent(eid)+'&name='+encodeURIComponent(nm);
-      window.location.assign(u);
+    function quickDownload(url, name){
+      if(!url) return;
+      var a=document.createElement('a');
+      a.href=url;
+      a.setAttribute('download', name||'photo.jpg');
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
 
     function hideEmptyPhotoCopy(grid, hasPhotos){
@@ -975,7 +935,7 @@ const PHOTO_ENGINE_S3 = `<script>
           }
           var viewer=ensurePhotoViewer();
           var viewerItems=photos.map(function(p,ix){
-            return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg',id:p.id};
+            return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg'};
           });
           grid.innerHTML='';
           photos.forEach(function(p,i){
@@ -995,7 +955,7 @@ const PHOTO_ENGINE_S3 = `<script>
             d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             d.onclick=function(ev){
               ev.stopPropagation();
-              quickDownload(p.id,'oneday-photo-'+(i+1)+'.jpg');
+              quickDownload(p.url,'oneday-photo-'+(i+1)+'.jpg');
             };
             var b=document.createElement('button');
             b.innerHTML='&times;';
@@ -1028,6 +988,7 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .catch(function(err){
           console.error('[OneDay] event-photos/list', err);
+          if(!grid.dataset.onedayPhotoSig) grid.innerHTML='';
         })
         .finally(function(){
           grid.dataset.onedayLoading = '0';
@@ -1714,10 +1675,9 @@ export async function getServerSideProps({ params, res, query }) {
 
   let html = data.html;
   html = injectBeforeHeadClose(html, manifestLinks);
-  html = injectAfterBodyOpen(
-    html,
-    PHOTO_WALL_EMBEDDED_GUARD + (useCloudIx ? SHARED_CLOUD_LOCALSTORAGE_BLOCK : '')
-  );
+  if (useCloudIx) {
+    html = injectAfterBodyOpen(html, SHARED_CLOUD_LOCALSTORAGE_BLOCK);
+  }
   const bodyIdx = html.lastIndexOf('</body>');
   html =
     bodyIdx !== -1
