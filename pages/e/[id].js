@@ -1265,12 +1265,22 @@ const PHOTO_ENGINE_S3 = `<script>
       }
     }
     function revealPhotoWall(btn, grid){
-      showManagedNode(btn, 'inline-flex');
-      showManagedNode(btn.closest('.photo-sec-header') || btn.parentElement, 'block');
-      showManagedNode(btn.closest('.photo-sec') || btn.closest('[class*="photo-sec"]'), 'block');
+      // Only touch elements that are genuinely hidden — skip already-visible ones so we
+      // don't cause a style-flash that makes the photo wall appear to "jump" on page load.
+      function revealIfHidden(el, fallbackDisplay){
+        if(!el) return;
+        var cs=window.getComputedStyle ? getComputedStyle(el) : null;
+        var isHidden=el.hidden||el.getAttribute('aria-hidden')==='true'||
+          (cs&&(cs.display==='none'||cs.visibility==='hidden'||parseFloat(cs.opacity)===0));
+        if(isHidden) showManagedNode(el, fallbackDisplay);
+      }
+      revealIfHidden(btn, 'inline-flex');
+      revealIfHidden(btn.closest('.photo-sec-header')||btn.parentElement, 'block');
+      revealIfHidden(btn.closest('.photo-sec')||btn.closest('[class*="photo-sec"]'), 'block');
       if(grid){
-        showManagedNode(grid.closest('.photo-sections') || grid.parentElement, 'block');
-        showManagedNode(grid, 'grid');
+        revealIfHidden(grid.closest('.photo-sections')||grid.parentElement, 'block');
+        // Always ensure the grid itself uses display:grid for the tile layout.
+        if(grid.style) grid.style.display='grid';
       }
     }
     var buttons=Array.from(document.querySelectorAll('button,label,a,[role="button"]')).filter(function(el){
