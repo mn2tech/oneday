@@ -407,14 +407,6 @@ const PHOTO_ENGINE_LEGACY = `<script>
           var im=document.createElement('img');
           im.src=item.src;
           im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
-          var d=document.createElement('button');
-          d.textContent='⬇';
-          d.title='Download';
-          d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
-          d.onclick=function(e){
-            e.stopPropagation();
-            quickDownload(item.src,'oneday-photo-'+(i+1)+'.jpg');
-          };
           var b=document.createElement('button');
           b.innerHTML='&times;';
           b.title='Remove photo';
@@ -432,7 +424,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
           w.onclick=function(){ viewer.open(viewerItems, i); };
           w.appendChild(im);
           appendEventCaption(w);
-          w.appendChild(d); w.appendChild(b); grid.appendChild(w);
+          w.appendChild(b); grid.appendChild(w);
         });
       }
 
@@ -1034,18 +1026,10 @@ const PHOTO_ENGINE_S3 = `<script>
             im.setAttribute('fetchpriority','low');
             im.sizes='(max-width:640px) 45vw, 200px';
             im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;';
-            var d=document.createElement('button');
-            d.textContent='⬇';
-            d.title='Download';
-            d.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
-            d.onclick=function(ev){
-              ev.stopPropagation();
-              quickDownload(p.url,'oneday-photo-'+(i+1)+'.jpg');
-            };
             var m=document.createElement('button');
             m.textContent='⇄';
             m.title='Move photo to another wall';
-            m.style.cssText='position:absolute;top:4px;left:34px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
+            m.style.cssText='position:absolute;top:4px;left:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             if(!p.owned_by_me||!p.id){
               m.style.display='none';
             }
@@ -1077,7 +1061,7 @@ const PHOTO_ENGINE_S3 = `<script>
             w.onclick=function(){ viewer.open(viewerItems, i); };
             w.appendChild(im);
             appendEventCaption(w);
-            w.appendChild(d); w.appendChild(m); w.appendChild(b); grid.appendChild(w);
+            w.appendChild(m); w.appendChild(b); grid.appendChild(w);
           });
           hideEmptyPhotoCopy(grid, photos.length > 0);
           trackPhotoCount(si, photos.length, grid);
