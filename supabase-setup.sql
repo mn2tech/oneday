@@ -38,6 +38,7 @@ $$;
 alter table event_apps enable row level security;
 
 -- Allow public reads for published apps
+drop policy if exists "Public can read live apps" on event_apps;
 create policy "Public can read live apps"
   on event_apps for select
   using (is_live = true);
