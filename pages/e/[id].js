@@ -1764,6 +1764,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     function isPhotoUploadControl(el){
+      if(!el || el.getAttribute('data-oneday-ignore-upload')==='1' || el.getAttribute('aria-hidden')==='true') return false;
       var fo=(el.getAttribute('for')||'');
       if(el.tagName==='LABEL'&&/^photo-input/i.test(fo)) return true;
       var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
@@ -1818,6 +1819,27 @@ const PHOTO_ENGINE_S3 = `<script>
       if(alreadyWired(el)) return false;
       return isPhotoUploadControl(el);
     });
+    function shareUploadScore(el, idx){
+      var block=el&&(el.closest('section')||el.closest('div')||el.parentElement);
+      var text=((block&&block.textContent)||el.textContent||'').replace(/\s+/g,' ').toLowerCase();
+      var score=idx;
+      if(/media wall|photo wall|photo & video|photos & videos|guest photos|all guest|gallery|upload section/.test(text)) score+=30;
+      if(/hero|signboard|event qr code|scan to share|leave a wish/.test(text)) score-=30;
+      if(idx>0) score+=8;
+      return score;
+    }
+    function chooseShareUploadButton(list){
+      if(!list||!list.length) return null;
+      var best=list[0], bestScore=shareUploadScore(best,0);
+      list.forEach(function(el, idx){
+        var score=shareUploadScore(el, idx);
+        if(score>=bestScore){
+          best=el;
+          bestScore=score;
+        }
+      });
+      return best;
+    }
     function disableExtraUploadControl(el, keepButtons){
       if(!el) return;
       var block=el.closest('section')||el.closest('div')||el.parentElement;
@@ -1851,7 +1873,14 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     // No fallback creation. Only wire explicit upload controls present in the generated page.
-    var maxSections = isShareEventMode() ? 1 : 2;
+    var shareMode=isShareEventMode();
+    if(shareMode&&buttons.length>1){
+      var keep=chooseShareUploadButton(buttons);
+      var drop=buttons.filter(function(el){ return el!==keep; });
+      drop.forEach(function(el){ disableExtraUploadControl(el, [keep]); });
+      buttons=keep?[keep]:[];
+    }
+    var maxSections = shareMode ? 1 : 2;
     if(buttons.length>maxSections){
       var keepButtons=buttons.slice(0,maxSections);
       buttons.slice(maxSections).forEach(function(el){
@@ -1860,7 +1889,7 @@ const PHOTO_ENGINE_S3 = `<script>
       buttons=buttons.slice(0,maxSections);
     }
 
-    if(isShareEventMode()){
+    if(shareMode){
       ensureShareQrCode(buttons[0]);
       loadShareWishes(false);
     }
