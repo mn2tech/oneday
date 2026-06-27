@@ -949,6 +949,16 @@ const PHOTO_ENGINE_S3 = `<script>
       }
       return false;
     }
+    function normalizeShareInvitationCopy(){
+      if(!isShareEventMode()) return;
+      Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,p,span,div,a,button')).forEach(function(el){
+        if(!el||el.children.length>0) return;
+        var text=(el.textContent||'').replace(/\s+/g,' ').trim();
+        if(/^you(?:'|’| are|re)?\s+invited[!.]?$/i.test(text)||/^you're invited[!.]?$/i.test(text)){
+          el.textContent='Welcome';
+        }
+      });
+    }
     function ensureShareQrCode(anchorControl){
       if(!isShareEventMode()) return null;
       var existing=document.getElementById('oneday-share-qr');
@@ -1968,6 +1978,7 @@ const PHOTO_ENGINE_S3 = `<script>
     }
 
     if(shareMode){
+      normalizeShareInvitationCopy();
       ensureShareQrCode(buttons[0]);
       loadShareWishes(false);
     }

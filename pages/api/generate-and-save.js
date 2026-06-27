@@ -337,6 +337,13 @@ function injectShareEventCleanup(html) {
 (function(){
   function run(){
     document.documentElement.setAttribute('data-oneday-event-mode','share');
+    Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,p,span,div,a,button')).forEach(function(el){
+      if(!el||el.children.length>0) return;
+      var text=(el.textContent||'').replace(/\\s+/g,' ').trim();
+      if(/^you(?:'|’| are|re)?\\s+invited[!.]?$/i.test(text)||/^you're invited[!.]?$/i.test(text)){
+        el.textContent='Welcome';
+      }
+    });
     var killWords=/\\b(rsvp|guest\\s*list|who'?s\\s+coming|attendance|attendee\\s+registration|i'?m\\s+here|poll|vote|message\\s*wall|guest\\s*book)\\b/i;
     Array.prototype.slice.call(document.querySelectorAll('section,[id],[class]')).forEach(function(el){
       if(!el||el===document.body) return;
@@ -386,7 +393,7 @@ function buildUserPrompt(prompt, eventDateTime, eventMeta) {
     ? `\n\nCOUNTDOWN TARGET: Use exactly "${eventDateTime.isoLocal}" as the JavaScript countdown target. This is the event's local date${eventDateTime.hasTime ? ' and start time' : ''}; do not invent a different date or time.`
     : '';
   const shareInstruction = eventMeta?.eventMode === 'share'
-    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use this exact guest-facing sequence: 1) Scan the visible event QR code. 2) Enter name and write a short congratulations note/wish for the host. 3) Upload photos or videos in one single media upload section. 4) View the shared media wall and wishes board. Include only: a bold signboard-style hero, event name/date/host if provided, a visible QR code/signboard area, a large "Scan to Share Photos & Videos" / "Leave a Wish, Then Upload" call-to-action, a simple greeting/wish step, one single media wall upload section, and a wishes board. Do NOT create multiple upload sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard QR code.'
+    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use "Welcome" as the greeting headline, never "You are invited" or invitation wording. Use this exact guest-facing sequence: 1) Scan the visible event QR code. 2) Enter name and write a short congratulations note/wish for the host. 3) Upload photos or videos in one single media upload section. 4) View the shared media wall and wishes board. Include only: a bold signboard-style hero, event name/date/host if provided, a visible QR code/signboard area, a large "Scan to Share Photos & Videos" / "Leave a Wish, Then Upload" call-to-action, a simple greeting/wish step, one single media wall upload section, and a wishes board. Do NOT create multiple upload sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard QR code.'
     : '';
   const intro = eventMeta?.eventMode === 'share'
     ? 'Create a complete Share Event app for the following event:'
