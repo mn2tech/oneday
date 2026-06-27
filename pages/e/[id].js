@@ -1138,10 +1138,41 @@ const PHOTO_ENGINE_S3 = `<script>
         var sk3=oz.querySelector('#owiz-skip3');
         var errEl=oz.querySelector('#owiz-msg-err');
         function showErr(msg){ if(errEl){ errEl.textContent=msg; errEl.style.display='block'; } }
+        function completeMessageStep(){
+          markShareStep('message',true);
+          dismissShareWizard();
+        }
+        function submitLocalMessageFallback(authorName, msgText){
+          try{
+            var fn = window.submitMessage || window.sendMessage || window.addMessage ||
+              window.submitGuestMessage || window.postGuestMessage;
+            var msgInput = document.querySelector(
+              '#msgText,textarea[id*="msg" i],section[id*="message" i] textarea,[class*="message" i] textarea'
+            );
+            var nameInput = document.querySelector(
+              '#msgName,input[id*="msgname" i],section[id*="message" i] input[type="text"],[class*="message" i] input[type="text"]'
+            );
+            if(msgInput) msgInput.value = msgText;
+            if(nameInput && authorName) nameInput.value = authorName;
+            if(typeof fn === 'function'){
+              fn();
+              return true;
+            }
+            var sendBtn = document.querySelector(
+              '.btn-post,.btn-send,.btn-submit-msg,[class*="btn-post"],[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"],[id*="postMessage"],button[class*="post-message"]'
+            );
+            if(sendBtn){
+              sendBtn.click();
+              return true;
+            }
+          }catch(e){}
+          return false;
+        }
         if(sk3) sk3.onclick=function(){ markShareStep('message',true); dismissShareWizard(); };
         if(postBtn) postBtn.onclick=function(){
           var nameEl=oz.querySelector('#owiz-name');
           var msgEl=oz.querySelector('#owiz-msg');
+          var authorName=(nameEl&&nameEl.value.trim())||'Guest';
           var msgText=(msgEl&&msgEl.value||'').trim();
           if(!msgText){ showErr('Please write a message before posting.'); return; }
           postBtn.disabled=true; postBtn.textContent='Posting…';
@@ -1151,22 +1182,38 @@ const PHOTO_ENGINE_S3 = `<script>
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({
               eventId:eid,
-              authorName:(nameEl&&nameEl.value.trim())||'Guest',
+              authorName:authorName,
               body:msgText,
               deviceId:getDeviceId()
             })
           })
-          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+          .then(function(r){
+            return r.json().catch(function(){ return {}; }).then(function(d){
+              return {ok:r.ok,status:r.status,d:d||{}};
+            });
+          })
           .then(function(res){
             if(res.ok){
-              markShareStep('message',true);
-              dismissShareWizard();
+              completeMessageStep();
             } else {
+              var shouldFallback = res.status===503 || res.status===404 || (res.d&&res.d.code==='TABLE_MISSING');
+              if(shouldFallback && submitLocalMessageFallback(authorName, msgText)){
+                completeMessageStep();
+                return;
+              }
               showErr(res.d&&res.d.error||'Could not post. Please try again.');
               postBtn.disabled=false; postBtn.textContent='Post to Board';
             }
           })
-          .catch(function(){ showErr('Network error. Please try again.'); postBtn.disabled=false; postBtn.textContent='Post to Board'; });
+          .catch(function(){
+            if(submitLocalMessageFallback(authorName, msgText)){
+              completeMessageStep();
+              return;
+            }
+            showErr('Network error. Please try again.');
+            postBtn.disabled=false;
+            postBtn.textContent='Post to Board';
+          });
         };
       }
     }
