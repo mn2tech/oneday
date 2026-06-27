@@ -78,9 +78,9 @@ const isLocked = today > lockDate;
 SECTIONS:
 1. Hero — title, date, location, JS countdown timer, "Hosted by [name]" line
 2. Schedule — vertical timeline
-3. Photo Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
-   HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
-   JS (REQUIRED — do not skip): attach addEventListener('change') to each file input. Inside handler: loop files, check size ≤5MB, use FileReader.readAsDataURL(), in onload save base64 to localStorage array at key "photos_[eventId]_N", then call renderPhotos(N) to rebuild the grid. renderPhotos(N) reads localStorage, creates <img> elements with object-fit:contain and a max-height so the full image is visible (not cropped), in a CSS grid, each with a × button that removes from localStorage and re-renders. Call renderPhotos(N) on DOMContentLoaded to restore saved photos.
+3. Photo & Video Wall — 2 sections with event-appropriate labels (e.g. Ceremony & Reception for weddings, Celebration & Fun for birthdays). Each section MUST include ALL of the following:
+   HTML: <label for="photo-input-N" class="upload-btn">+ Add Photos & Videos</label> styled as a button, plus <input type="file" id="photo-input-N" accept="image/*,video/mp4,video/webm,video/quicktime" multiple style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"> — NEVER use display:none on file inputs.
+   The OneDay shared media engine will wire uploads and render photos/videos for all visitors; do not use display:none on file inputs.
 4. RSVP — For conferences: replace the standard RSVP with an attendee "Who's Here" registration — fields: Name, Company/Role, "What are you looking for?" (networking / hiring / learning / partnerships). For other events: form (hidden if rsvpClosed): name, adults (min 1), kids (min 0), Submit button. If rsvpClosed show "RSVP is now closed" message. Do NOT use localStorage for RSVP on OneDay (host uses event_rsvps). Wire window.handleRSVP; show live totals in #rsvpCount when the host injects sync.
 5. Poll — For conferences: make it a session rating or "Which track are you most excited about?" poll. For other events: 2+ general options. Use #pollOpt0, pollCount0, pollBar0, etc. Wire window.vote(0), window.vote(1), … read-only UI after vote if locked.
 6. Message Wall — For conferences: label it "Insights & Takeaways" — attendees share key learnings. For other events: general messages. textarea + name input + "Post Message" Submit button (hidden if locked). Container #messages with #msgText, #msgName, #msgList (start empty). Do NOT use localStorage for messages. Assign window.submitMessage to post (host replaces with shared API), window.editMsg / deleteMsg / saveMsg / cancelEdit for row actions. Name field optional (default "Guest"). IMPORTANT: edit/delete/save/cancel MUST be on window (see JS RULES above).
@@ -332,6 +332,45 @@ function injectPhotoUpload(html) {
   return html.slice(0, bodyIdx) + '\n' + injection + '\n</body>' + html.slice(bodyIdx + 7);
 }
 
+function injectShareEventCleanup(html) {
+  const injection = `<script>
+(function(){
+  function run(){
+    document.documentElement.setAttribute('data-oneday-event-mode','share');
+    var killWords=/\\b(rsvp|guest\\s*list|who'?s\\s+coming|attendance|attendee\\s+registration|i'?m\\s+here|poll|vote|message\\s*wall|guest\\s*book)\\b/i;
+    Array.prototype.slice.call(document.querySelectorAll('section,[id],[class]')).forEach(function(el){
+      if(!el||el===document.body) return;
+      var id=(el.id||'').toLowerCase();
+      var cls=(el.className||'').toString().toLowerCase();
+      var text=(el.textContent||'').replace(/\\s+/g,' ').trim();
+      var structural=/\\b(rsvp|poll|whohere|who-here|guest-list|attendee|attendance|guestbook|guest-book|message-wall)\\b/i.test(id+' '+cls);
+      var heading=el.matches&&el.matches('section')&&killWords.test(text.slice(0,180));
+      if(structural||heading){
+        el.style.display='none';
+        el.setAttribute('data-oneday-share-hidden','1');
+      }
+    });
+    Array.prototype.slice.call(document.querySelectorAll('a[href*="rsvp" i],a[href*="poll" i],a[href*="whohere" i],a[href*="attendee" i]')).forEach(function(a){
+      a.style.display='none';
+      a.setAttribute('data-oneday-share-hidden','1');
+    });
+    var photos=document.getElementById('photos')||document.querySelector('[id*="photo" i],section[class*="photo" i]');
+    if(photos){
+      var first=photos.querySelector('button,label,a,[role="button"]');
+      if(first&&/(photo|video|media)/i.test(first.textContent||'')){
+        first.textContent='Add Photos & Videos';
+      }
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run);
+  else run();
+})();
+<\/script>`;
+  const bodyIdx = html.lastIndexOf('</body>');
+  if (bodyIdx === -1) return html + '\n' + injection;
+  return html.slice(0, bodyIdx) + '\n' + injection + '\n</body>' + html.slice(bodyIdx + 7);
+}
+
 function extractHtml(raw) {
   let html = raw.trim();
   html = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -342,11 +381,17 @@ function extractHtml(raw) {
   return html;
 }
 
-function buildUserPrompt(prompt, eventDateTime) {
+function buildUserPrompt(prompt, eventDateTime, eventMeta) {
   const countdownInstruction = eventDateTime?.isoLocal
     ? `\n\nCOUNTDOWN TARGET: Use exactly "${eventDateTime.isoLocal}" as the JavaScript countdown target. This is the event's local date${eventDateTime.hasTime ? ' and start time' : ''}; do not invent a different date or time.`
     : '';
-  return `Create a complete event app (with Poll and Message Wall included) for the following event:${countdownInstruction}\n\n${prompt}`;
+  const shareInstruction = eventMeta?.eventMode === 'share'
+    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Make QR-code scanning and media upload the primary experience. The guest flow must be: enter name, write a short congratulations note/wish for the host, then upload photos or videos. Include only: a bold signboard-style hero, event name/date/host if provided, a large "Scan to Share Photos & Videos" / "Leave a Wish, Then Upload" call-to-action, a simple greeting/wish step, and a two-section media wall. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard QR code.'
+    : '';
+  const intro = eventMeta?.eventMode === 'share'
+    ? 'Create a complete Share Event app for the following event:'
+    : 'Create a complete event app (with Poll and Message Wall included) for the following event:';
+  return `${intro}${countdownInstruction}${shareInstruction}\n\n${prompt}`;
 }
 
 /** Anthropic returns an array of content blocks; the first block is not always text. */
@@ -512,7 +557,7 @@ export default async function handler(req, res) {
         max_tokens: 24000,
         system: SYSTEM_PROMPT,
         messages: [
-          { role: 'user', content: buildUserPrompt(prompt, eventDateTime) },
+          { role: 'user', content: buildUserPrompt(prompt, eventDateTime, eventMeta) },
         ],
       });
     } catch (aiErr) {
@@ -580,6 +625,9 @@ export default async function handler(req, res) {
         process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
       if (!useS3Photo) {
         html = injectPhotoUpload(html);
+      }
+      if (eventMeta?.eventMode === 'share') {
+        html = injectShareEventCleanup(html);
       }
     } catch (processErr) {
       console.error('[generate-and-save] HTML post-process error:', processErr?.message || processErr);

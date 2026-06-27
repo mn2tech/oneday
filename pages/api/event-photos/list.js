@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   const buildQuery = (withSortOrder) => {
     let q = supabase
       .from('event_photos')
-      .select(withSortOrder ? 'id, s3_key, section_index, sort_order, created_at, owner_device_id' : 'id, s3_key, section_index, created_at, owner_device_id')
+      .select(withSortOrder ? 'id, s3_key, section_index, content_type, sort_order, created_at, owner_device_id' : 'id, s3_key, section_index, content_type, created_at, owner_device_id')
       .eq('event_id', eventId);
 
     if (withSortOrder) {
@@ -94,6 +94,7 @@ export default async function handler(req, res) {
       id: row.id,
       url,
       section_index: row.section_index,
+      content_type: row.content_type || '',
       owned_by_me: isOwnerRow(row.owner_device_id, viewerDevice) || isHost,
     });
   }

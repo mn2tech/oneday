@@ -29,6 +29,7 @@ const EMPTY_SCHEDULE = () => ({ id: nextScheduleId(), time: '', description: '' 
 const EMPTY_PHOTO_SUBSECTION = () => ({ id: nextScheduleId(), title: '' });
 
 const DEFAULT_FORM = {
+  eventMode: 'invitation',
   eventType: '',
   customEventType: '',
   names: '',
@@ -52,6 +53,10 @@ function isConference(f) {
   return f.eventType === 'Conference';
 }
 
+function isShareEvent(f) {
+  return f.eventMode === 'share';
+}
+
 // ── Assemble the final prompt from form fields ────────────────────────────────
 function assemblePrompt(f) {
   const type = f.eventType === 'Other' ? f.customEventType : f.eventType;
@@ -73,10 +78,14 @@ function assemblePrompt(f) {
   parts.push(opening + '.');
 
   if (f.hostedBy) parts.push(`Hosted by ${f.hostedBy}.`);
-  if (f.venue) parts.push(`The event will be held at ${f.venue}.`);
+  if (!isShareEvent(f) && f.venue) parts.push(`The event will be held at ${f.venue}.`);
+
+  if (isShareEvent(f)) {
+    parts.push('Create this as a Share Event: a simple event-day signboard and photo and video sharing page for guests who scan a QR code. Keep the page focused on three steps: enter your name, write a congratulations note or wish for the host, then share photos and videos. Make uploads the main action. Include signboard-style hero text like "Scan to Share Photos & Videos" and "Leave a Wish, Then Upload", a large QR-friendly call-to-action, and a media wall with the requested sections.');
+  }
 
   // Conference-specific fields
-  if (isConference(f)) {
+  if (!isShareEvent(f) && isConference(f)) {
     if (f.confSpeakers) parts.push(`Featured speakers: ${f.confSpeakers}.`);
     if (f.confTracks) parts.push(`Tracks/sessions: ${f.confTracks}.`);
     if (f.confWebsite) parts.push(`Official website: ${f.confWebsite}.`);
@@ -84,7 +93,7 @@ function assemblePrompt(f) {
   }
 
   const schedule = f.scheduleItems.filter(s => s.description.trim());
-  if (schedule.length > 0) {
+  if (!isShareEvent(f) && schedule.length > 0) {
     const schedStr = schedule.map(s => s.time ? `${s.time} – ${s.description}` : s.description).join(', ');
     parts.push(`Schedule: ${schedStr}.`);
   }
@@ -93,11 +102,11 @@ function assemblePrompt(f) {
     .map(s => s.title.trim())
     .filter(Boolean);
   if (photoSubsections.length > 0) {
-    parts.push(`Photo wall subsections should be: ${photoSubsections.join(', ')}.`);
+    parts.push(`${isShareEvent(f) ? 'Media wall' : 'Photo wall'} subsections should be: ${photoSubsections.join(', ')}.`);
   }
 
-  if (f.dressCode) parts.push(`Dress code: ${f.dressCode}.`);
-  if (f.colorTheme) parts.push(`Color theme: ${f.colorTheme}.`);
+  if (!isShareEvent(f) && f.dressCode) parts.push(`Dress code: ${f.dressCode}.`);
+  if (!isShareEvent(f) && f.colorTheme) parts.push(`Color theme: ${f.colorTheme}.`);
   if (f.specialNotes.trim()) parts.push(f.specialNotes.trim());
 
   return parts.join(' ');
@@ -130,14 +139,14 @@ function getChecks(f) {
       }
     }
   }
-  if (!f.venue.trim()) checks.push({ level: 'warning', field: 'venue', message: 'No venue — AI will invent one. Add a real venue for accuracy.' });
-  if (!f.time.trim()) checks.push({ level: 'suggestion', field: 'time', message: 'Adding a start time makes the countdown more precise' });
-  if (f.scheduleItems.filter(s => s.description.trim()).length === 0)
+  if (!isShareEvent(f) && !f.venue.trim()) checks.push({ level: 'warning', field: 'venue', message: 'No venue — AI will invent one. Add a real venue for accuracy.' });
+  if (!isShareEvent(f) && !f.time.trim()) checks.push({ level: 'suggestion', field: 'time', message: 'Adding a start time makes the countdown more precise' });
+  if (!isShareEvent(f) && f.scheduleItems.filter(s => s.description.trim()).length === 0)
     checks.push({ level: 'warning', field: 'schedule', message: 'No schedule items — add a few for a richer timeline section' });
   if (f.photoSubsections.filter(s => s.title.trim()).length === 0)
     checks.push({ level: 'suggestion', field: 'photoSubsections', message: 'Add photo wall subsections so guests know where to upload memories' });
-  if (!f.dressCode.trim()) checks.push({ level: 'suggestion', field: 'dressCode', message: 'A dress code adds a nice personal touch' });
-  if (!f.colorTheme.trim()) checks.push({ level: 'suggestion', field: 'colorTheme', message: 'A color theme helps the AI match the design to your event' });
+  if (!isShareEvent(f) && !f.dressCode.trim()) checks.push({ level: 'suggestion', field: 'dressCode', message: 'A dress code adds a nice personal touch' });
+  if (!isShareEvent(f) && !f.colorTheme.trim()) checks.push({ level: 'suggestion', field: 'colorTheme', message: 'A color theme helps the AI match the design to your event' });
 
   return checks;
 }
@@ -197,6 +206,35 @@ export default function PromptBuilder({ onComplete }) {
   if (view === 'form') {
     return (
       <div className={styles.root}>
+        {/* Event mode */}
+        <div className={styles.field}>
+          <label className={styles.label}>What are you creating?</label>
+          <div className={styles.modeGrid}>
+            <button
+              type="button"
+              className={`${styles.modeCard} ${form.eventMode === 'invitation' ? styles.modeCardActive : ''}`}
+              onClick={() => set('eventMode', 'invitation')}
+            >
+              <span className={styles.modeTitle}>Full Invitation</span>
+              <span className={styles.modeText}>Invite guests with schedule, RSVP, messages, poll, and photo wall.</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.modeCard} ${form.eventMode === 'share' ? styles.modeCardActive : ''}`}
+              onClick={() => set('eventMode', 'share')}
+            >
+              <span className={styles.modeTitle}>Share Event</span>
+              <span className={styles.modeText}>Event-day QR photo and video sharing page. No RSVP or invitation flow.</span>
+            </button>
+          </div>
+        </div>
+
+        {isShareEvent(form) && (
+          <div className={styles.shareHint}>
+            Share Event is for an event-day signboard or QR code. Guests scan, add photos and videos, and view the shared media wall.
+          </div>
+        )}
+
         {/* Event type */}
         <div className={styles.field}>
           <label className={styles.label}>Event type <span className={styles.required}>*</span></label>
@@ -237,7 +275,7 @@ export default function PromptBuilder({ onComplete }) {
         </div>
 
         {/* Conference-specific fields */}
-        {isConference(form) && (
+        {!isShareEvent(form) && isConference(form) && (
           <>
             <div className={styles.field}>
               <label className={styles.label}>Organization / Company <span className={styles.optional}>(optional)</span></label>
@@ -300,71 +338,79 @@ export default function PromptBuilder({ onComplete }) {
               onChange={e => set('date', e.target.value)}
             />
           </div>
-          <div className={styles.field} style={{ flex: 1 }}>
-            <label className={styles.label}>Start time</label>
-            <input
-              className={styles.input}
-              placeholder="e.g. 4:00 PM"
-              value={form.time}
-              onChange={e => set('time', e.target.value)}
-            />
-          </div>
+          {!isShareEvent(form) && (
+            <div className={styles.field} style={{ flex: 1 }}>
+              <label className={styles.label}>Start time</label>
+              <input
+                className={styles.input}
+                placeholder="e.g. 4:00 PM"
+                value={form.time}
+                onChange={e => set('time', e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Venue */}
-        <div className={styles.field}>
-          <label className={styles.label}>Venue / Location</label>
-          <input
-            className={styles.input}
-            placeholder="e.g. The Grand Bali Resort, Ballroom A, New York"
-            value={form.venue}
-            onChange={e => set('venue', e.target.value)}
-          />
-        </div>
+        {!isShareEvent(form) && (
+          <div className={styles.field}>
+            <label className={styles.label}>Venue / Location</label>
+            <input
+              className={styles.input}
+              placeholder="e.g. The Grand Bali Resort, Ballroom A, New York"
+              value={form.venue}
+              onChange={e => set('venue', e.target.value)}
+            />
+          </div>
+        )}
 
         {/* Schedule */}
-        <div className={styles.field}>
-          <label className={styles.label}>Schedule items</label>
-          <div className={styles.scheduleList}>
-            {form.scheduleItems.map((item, i) => (
-              <div key={item.id} className={styles.scheduleRow}>
-                <input
-                  className={styles.scheduleTime}
-                  placeholder="Time"
-                  value={item.time}
-                  onChange={e => setScheduleItem(item.id, 'time', e.target.value)}
-                />
-                <input
-                  className={styles.scheduleDesc}
-                  placeholder={`e.g. ${['Welcome ceremony', 'Dinner & speeches', 'Dancing', 'Cake cutting'][i] || 'Activity'}`}
-                  value={item.description}
-                  onChange={e => setScheduleItem(item.id, 'description', e.target.value)}
-                />
-                {form.scheduleItems.length > 1 && (
-                  <button
-                    type="button"
-                    className={styles.removeBtn}
-                    onClick={() => removeScheduleItem(item.id)}
-                    aria-label="Remove"
-                  >×</button>
-                )}
-              </div>
-            ))}
+        {!isShareEvent(form) && (
+          <div className={styles.field}>
+            <label className={styles.label}>Schedule items</label>
+            <div className={styles.scheduleList}>
+              {form.scheduleItems.map((item, i) => (
+                <div key={item.id} className={styles.scheduleRow}>
+                  <input
+                    className={styles.scheduleTime}
+                    placeholder="Time"
+                    value={item.time}
+                    onChange={e => setScheduleItem(item.id, 'time', e.target.value)}
+                  />
+                  <input
+                    className={styles.scheduleDesc}
+                    placeholder={`e.g. ${['Welcome ceremony', 'Dinner & speeches', 'Dancing', 'Cake cutting'][i] || 'Activity'}`}
+                    value={item.description}
+                    onChange={e => setScheduleItem(item.id, 'description', e.target.value)}
+                  />
+                  {form.scheduleItems.length > 1 && (
+                    <button
+                      type="button"
+                      className={styles.removeBtn}
+                      onClick={() => removeScheduleItem(item.id)}
+                      aria-label="Remove"
+                    >×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" className={styles.addBtn} onClick={addScheduleItem}>
+              + Add item
+            </button>
           </div>
-          <button type="button" className={styles.addBtn} onClick={addScheduleItem}>
-            + Add item
-          </button>
-        </div>
+        )}
 
         {/* Photo Wall subsections */}
         <div className={styles.field}>
-          <label className={styles.label}>Photo wall subsections</label>
+          <label className={styles.label}>
+            {isShareEvent(form) ? 'Photo & video sharing sections' : 'Photo wall subsections'}
+          </label>
           <div className={styles.scheduleList}>
             {form.photoSubsections.map((item, i) => (
               <div key={item.id} className={styles.scheduleRow}>
                 <input
                   className={styles.scheduleDesc}
-                  placeholder={`e.g. ${['Ceremony', 'Reception', 'Family moments', 'After party'][i] || 'Photo subsection'}`}
+                  placeholder={`e.g. ${isShareEvent(form) ? ['Guest Photos & Videos', 'Selfies', 'Dance Floor', 'Family Clips'][i] || 'Media section' : ['Ceremony', 'Reception', 'Family moments', 'After party'][i] || 'Photo subsection'}`}
                   value={item.title}
                   onChange={e => setPhotoSubsection(item.id, e.target.value)}
                 />
@@ -380,55 +426,59 @@ export default function PromptBuilder({ onComplete }) {
             ))}
           </div>
           <button type="button" className={styles.addBtn} onClick={addPhotoSubsection}>
-            + Add subsection
+            + Add section
           </button>
         </div>
 
         {/* Dress code & Color theme */}
-        <div className={styles.row}>
-          <div className={styles.field} style={{ flex: 1 }}>
-            <label className={styles.label}>Dress code</label>
-            <input
-              className={styles.input}
-              placeholder="e.g. Black tie, Tropical formal"
-              value={form.dressCode}
-              onChange={e => set('dressCode', e.target.value)}
-            />
-          </div>
-          <div className={styles.field} style={{ flex: 1 }}>
-            <label className={styles.label}>Color theme</label>
-            <input
-              className={styles.input}
-              placeholder="e.g. Gold & purple"
-              value={form.colorTheme}
-              onChange={e => set('colorTheme', e.target.value)}
-            />
-            <div className={styles.colorChips}>
-              {COLOR_THEMES.map(theme => (
-                <button
-                  key={theme.name}
-                  type="button"
-                  className={`${styles.colorChip} ${form.colorTheme === theme.name ? styles.colorChipActive : ''}`}
-                  onClick={() => set('colorTheme', theme.name)}
-                >
-                  <span className={styles.colorSwatches}>
-                    {theme.colors.map(color => (
-                      <span key={color} className={styles.colorSwatch} style={{ background: color }} />
-                    ))}
-                  </span>
-                  <span>{theme.name}</span>
-                </button>
-              ))}
+        {!isShareEvent(form) && (
+          <div className={styles.row}>
+            <div className={styles.field} style={{ flex: 1 }}>
+              <label className={styles.label}>Dress code</label>
+              <input
+                className={styles.input}
+                placeholder="e.g. Black tie, Tropical formal"
+                value={form.dressCode}
+                onChange={e => set('dressCode', e.target.value)}
+              />
+            </div>
+            <div className={styles.field} style={{ flex: 1 }}>
+              <label className={styles.label}>Color theme</label>
+              <input
+                className={styles.input}
+                placeholder="e.g. Gold & purple"
+                value={form.colorTheme}
+                onChange={e => set('colorTheme', e.target.value)}
+              />
+              <div className={styles.colorChips}>
+                {COLOR_THEMES.map(theme => (
+                  <button
+                    key={theme.name}
+                    type="button"
+                    className={`${styles.colorChip} ${form.colorTheme === theme.name ? styles.colorChipActive : ''}`}
+                    onClick={() => set('colorTheme', theme.name)}
+                  >
+                    <span className={styles.colorSwatches}>
+                      {theme.colors.map(color => (
+                        <span key={color} className={styles.colorSwatch} style={{ background: color }} />
+                      ))}
+                    </span>
+                    <span>{theme.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Special notes */}
         <div className={styles.field}>
-          <label className={styles.label}>Special notes <span className={styles.optional}>(optional)</span></label>
+          <label className={styles.label}>
+            {isShareEvent(form) ? 'Signboard note' : 'Special notes'} <span className={styles.optional}>(optional)</span>
+          </label>
           <textarea
             className={styles.textarea}
-            placeholder="e.g. Traditional turmeric ceremony, marigold decorations, vegetarian menu"
+            placeholder={isShareEvent(form) ? 'e.g. Scan to share your favorite photos and videos from tonight' : 'e.g. Traditional turmeric ceremony, marigold decorations, vegetarian menu'}
             value={form.specialNotes}
             onChange={e => set('specialNotes', e.target.value)}
             rows={3}
@@ -510,6 +560,7 @@ export default function PromptBuilder({ onComplete }) {
         type="button"
         className={styles.primaryBtn}
         onClick={() => onComplete(assembledPrompt, {
+          eventMode: form.eventMode,
           names: form.names,
           eventType: form.eventType === 'Other' ? form.customEventType : form.eventType,
           hostedBy: form.hostedBy,

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { objectPublicUrl, presignedGet, isS3Configured } from '../../../lib/s3';
-import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../../lib/photoLimits';
+import { isAllowedMediaType, maxBytesForContentType } from '../../../lib/photoLimits';
 import { normalizeDeviceId } from '../../../lib/deviceOwnership';
 import { guestPushEnabled, sendGuestPush } from '../../../lib/guestPushNotifications';
 import { sendHostPhotoNotification } from '../../../lib/notifications';
@@ -27,6 +27,7 @@ export default async function handler(req, res) {
   }
 
   const { eventId, sectionIndex, key, byteSize, contentType, deviceId } = req.body || {};
+  const normalizedContentType = String(contentType || '').toLowerCase();
 
   const dev = normalizeDeviceId(deviceId);
   if (!dev) {
@@ -51,9 +52,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid key.' });
   }
 
+  if (!isAllowedMediaType(normalizedContentType)) {
+    return res.status(400).json({ error: 'Unsupported file type.' });
+  }
+
   const size = Number(byteSize);
-  if (!Number.isFinite(size) || size < 1 || size > MAX_PHOTO_BYTES) {
-    return res.status(400).json({ error: 'Invalid file size (max 5MB).' });
+  const maxBytes = maxBytesForContentType(normalizedContentType);
+  if (!Number.isFinite(size) || size < 1 || size > maxBytes) {
+    return res.status(400).json({ error: `Invalid file size (max ${Math.round(maxBytes / 1024 / 1024)}MB).` });
   }
 
   const supabase = getSupabase();
@@ -79,7 +85,7 @@ export default async function handler(req, res) {
     event_id: eventId,
     section_index: sec,
     s3_key: key,
-    content_type: contentType || 'image/jpeg',
+    content_type: normalizedContentType,
     byte_size: Math.round(size),
     owner_device_id: dev,
     sort_order: Date.now(),
@@ -125,7 +131,7 @@ export default async function handler(req, res) {
       });
     }
     return res.status(500).json({
-      error: 'Failed to save photo metadata.',
+      error: 'Failed to save media metadata.',
       code: 'INSERT_FAILED',
       postgresCode: insErr.code,
       hint: insErr.hint || null,
@@ -139,7 +145,7 @@ export default async function handler(req, res) {
       url = await presignedGet(key, 3600);
     } catch (e) {
       console.error('[event-photos/register] presignedGet', e);
-      return res.status(500).json({ error: 'Could not build image URL.' });
+      return res.status(500).json({ error: 'Could not build media URL.' });
     }
   }
 
@@ -148,7 +154,7 @@ export default async function handler(req, res) {
     photo: {
       id: inserted.id,
       section_index: sec,
-      content_type: contentType || 'image/jpeg',
+              content_type: normalizedContentType,
       byte_size: Math.round(size),
       url,
       key,
@@ -172,8 +178,8 @@ export default async function handler(req, res) {
         const candidates = (subs || []).filter((row) => String(row?.device_id || '') !== dev);
         const pushResult = await sendGuestPush({
           subscriptions: candidates,
-          title: eventRow?.title ? `New photo in ${eventRow.title}` : 'New photo added',
-          body: 'A guest uploaded a new photo. Tap to view it.',
+          title: eventRow?.title ? `New media in ${eventRow.title}` : 'New media added',
+          body: 'A guest uploaded a new photo or video. Tap to view it.',
           url: eventUrl,
         });
         if (pushResult.invalidEndpoints.length) {

@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { createClient } from '@supabase/supabase-js';
 import { presignedPut, isS3Configured } from '../../../lib/s3';
+import { isAllowedMediaType } from '../../../lib/photoLimits';
 
 function getSupabase() {
   return createClient(
@@ -9,13 +10,14 @@ function getSupabase() {
   );
 }
 
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-
 function extForMime(mime) {
   if (mime === 'image/jpeg') return 'jpg';
   if (mime === 'image/png') return 'png';
   if (mime === 'image/webp') return 'webp';
   if (mime === 'image/gif') return 'gif';
+  if (mime === 'video/mp4') return 'mp4';
+  if (mime === 'video/webm') return 'webm';
+  if (mime === 'video/quicktime') return 'mov';
   return 'jpg';
 }
 
@@ -29,6 +31,7 @@ export default async function handler(req, res) {
   }
 
   const { eventId, sectionIndex, contentType } = req.body || {};
+  const normalizedContentType = String(contentType || '').toLowerCase();
 
   if (!eventId || typeof eventId !== 'string' || eventId.length > 80) {
     return res.status(400).json({ error: 'Invalid eventId.' });
@@ -39,8 +42,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid sectionIndex.' });
   }
 
-  if (!contentType || !ALLOWED_TYPES.has(contentType)) {
-    return res.status(400).json({ error: 'Only JPEG, PNG, WebP, and GIF images are allowed.' });
+  if (!isAllowedMediaType(normalizedContentType)) {
+    return res.status(400).json({ error: 'Only JPEG, PNG, WebP, GIF, MP4, WebM, and MOV files are allowed.' });
   }
 
   const supabase = getSupabase();
@@ -54,16 +57,16 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: 'Event not found.' });
   }
 
-  const ext = extForMime(contentType);
+  const ext = extForMime(normalizedContentType);
   const key = `events/${eventId}/${sec}/${nanoid(12)}.${ext}`;
 
   try {
-    const uploadUrl = await presignedPut(key, contentType, 3600);
+    const uploadUrl = await presignedPut(key, normalizedContentType, 3600);
     return res.status(200).json({
       uploadUrl,
       key,
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': normalizedContentType,
       },
     });
   } catch (e) {

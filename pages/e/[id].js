@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { INTERACTIONS_CLOUD } from '../../lib/interactionsCloudHtml';
 import { SHARED_CLOUD_LOCALSTORAGE_BLOCK } from '../../lib/messagesLocalStorageBlockHtml';
-import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES } from '../../lib/photoLimits';
+import { MAX_EVENT_PHOTOS, MAX_PHOTO_BYTES, MAX_VIDEO_BYTES } from '../../lib/photoLimits';
 import { buildThemePresetStyleTag, normalizeThemePreset } from '../../lib/eventThemePresets';
 import { extractLiveEventDetailsFromHtml, normalizePhase1Content } from '../../lib/eventStructuredPhase1';
 import { isEventHost } from '../../lib/eventAdminAuth';
@@ -221,9 +221,14 @@ const PHOTO_WALL_REPAIR_SCRIPT = `<script>
         if(t.indexOf('no photo')!==-1||t.indexOf('be the first')!==-1||t.indexOf('share a memory')!==-1) el.style.display='none';
       });
     }
+    function isVideo(p){
+      var ct=(p&&p.content_type||'').toLowerCase();
+      var url=(p&&p.url||'').split('?')[0].toLowerCase();
+      return ct.indexOf('video/')===0||/\\.(mp4|webm|mov)$/i.test(url);
+    }
     function renderGrid(grid, photos){
       if(!grid||!Array.isArray(photos)||!photos.length) return;
-      if(grid.querySelector('img')) { hideEmpty(grid); return; }
+      if(grid.querySelector('img,video')) { hideEmpty(grid); return; }
       grid.style.display='grid';
       if(!grid.style.gridTemplateColumns) grid.style.gridTemplateColumns='repeat(auto-fill,minmax(160px,1fr))';
       if(!grid.style.gap) grid.style.gap='8px';
@@ -232,13 +237,23 @@ const PHOTO_WALL_REPAIR_SCRIPT = `<script>
         var wrap=document.createElement('div');
         wrap.style.cssText='position:relative;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.08);border-radius:10px;overflow:hidden;';
         if(p.id) wrap.setAttribute('data-photo-id',p.id);
-        var img=document.createElement('img');
-        img.src=p.url;
-        img.alt='Event photo '+(idx+1);
-        img.loading='lazy';
-        img.decoding='async';
-        img.style.cssText='width:100%;height:100%;object-fit:contain;display:block;border-radius:8px;';
-        wrap.appendChild(img);
+        if(isVideo(p)){
+          var vid=document.createElement('video');
+          vid.src=p.url;
+          vid.controls=true;
+          vid.preload='metadata';
+          vid.playsInline=true;
+          vid.style.cssText='width:100%;height:100%;object-fit:contain;display:block;border-radius:8px;';
+          wrap.appendChild(vid);
+        } else {
+          var img=document.createElement('img');
+          img.src=p.url;
+          img.alt='Event photo '+(idx+1);
+          img.loading='lazy';
+          img.decoding='async';
+          img.style.cssText='width:100%;height:100%;object-fit:contain;display:block;border-radius:8px;';
+          wrap.appendChild(img);
+        }
         grid.appendChild(wrap);
       });
       hideEmpty(grid);
@@ -588,9 +603,11 @@ const PHOTO_ENGINE_LEGACY = `<script>
       var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
       var c=(el.getAttribute('class')||'').toLowerCase();
       return (
-        ((/add|upload|share/.test(t)) && (/(photo|pic|memory|moment)/.test(t))) ||
+        ((/add|upload|share/.test(t)) && (/(photo|video|media|pic|memory|moment)/.test(t))) ||
         t.indexOf('add photo')!==-1 ||
+        t.indexOf('add video')!==-1 ||
         t.indexOf('upload photo')!==-1 ||
+        t.indexOf('upload video')!==-1 ||
         c.indexOf('btn-upload')!==-1 ||
         c.indexOf('upload-btn')!==-1
       );
@@ -915,6 +932,85 @@ const PHOTO_ENGINE_S3 = `<script>
       var t=getHostToken();
       return t ? '&hostToken='+encodeURIComponent(t) : '';
     }
+    function isVideoMedia(item){
+      var ct=(item&&item.content_type||item&&item.type||'').toLowerCase();
+      var url=(item&&item.url||'').split('?')[0].toLowerCase();
+      return ct.indexOf('video/')===0||/\\.(mp4|webm|mov)$/i.test(url);
+    }
+    function isShareEventMode(){
+      return document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share';
+    }
+    function greetingKey(){
+      return 'oneday_share_greeting_'+eid;
+    }
+    function hasShareGreeting(){
+      try{
+        var saved=JSON.parse(localStorage.getItem(greetingKey())||'null');
+        return !!(saved&&saved.name&&saved.wish);
+      }catch(e){ return false; }
+    }
+    function ensureGreetingModal(){
+      var root=document.getElementById('oneday-share-greeting-modal');
+      if(root) return root;
+      root=document.createElement('div');
+      root.id='oneday-share-greeting-modal';
+      root.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(8,10,16,.72);display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';
+      root.innerHTML=
+        '<div style="width:min(94vw,440px);background:#fff;color:#111827;border-radius:22px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.38);font-family:Inter,system-ui,-apple-system,sans-serif;">'+
+        '<h2 style="margin:0 0 8px;font-size:22px;line-height:1.2;">Leave a wish for the host</h2>'+
+        '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.5;">Add your name and a short congratulations note before sharing photos or videos.</p>'+
+        '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Your name</label>'+
+        '<input data-g-name maxlength="120" placeholder="e.g. Priya Sharma" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.3 Inter,system-ui,sans-serif;margin-bottom:14px;color:#111827;background:#fff;">'+
+        '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Congratulations / wish</label>'+
+        '<textarea data-g-wish maxlength="2000" rows="4" placeholder="Write a blessing, congratulations note, or memory..." style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.45 Inter,system-ui,sans-serif;resize:vertical;color:#111827;background:#fff;"></textarea>'+
+        '<div data-g-error style="display:none;color:#dc2626;font:700 13px/1.4 Inter,system-ui,sans-serif;margin-top:10px;"></div>'+
+        '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">'+
+        '<button type="button" data-g-cancel style="border:1px solid #d1d5db;background:#fff;color:#334155;border-radius:999px;padding:10px 14px;font:800 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Cancel</button>'+
+        '<button type="button" data-g-submit style="border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:11px 16px;font:900 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Continue to Upload</button>'+
+        '</div>'+
+        '</div>';
+      document.body.appendChild(root);
+      root.querySelector('[data-g-cancel]').onclick=function(){ root.style.display='none'; };
+      root.addEventListener('click', function(ev){ if(ev.target===root) root.style.display='none'; });
+      return root;
+    }
+    function collectShareGreeting(next){
+      if(!isShareEventMode()||hasShareGreeting()){ next(); return; }
+      var modal=ensureGreetingModal();
+      var nameEl=modal.querySelector('[data-g-name]');
+      var wishEl=modal.querySelector('[data-g-wish]');
+      var errEl=modal.querySelector('[data-g-error]');
+      var submit=modal.querySelector('[data-g-submit]');
+      function showError(msg){
+        errEl.textContent=msg;
+        errEl.style.display='block';
+      }
+      function hideError(){ errEl.style.display='none'; }
+      submit.onclick=function(){
+        var name=(nameEl.value||'').trim();
+        var wish=(wishEl.value||'').trim();
+        hideError();
+        if(!name){ showError('Please enter your name.'); nameEl.focus(); return; }
+        if(!wish){ showError('Please write a congratulations note or wish.'); wishEl.focus(); return; }
+        submit.disabled=true;
+        submit.textContent='Saving...';
+        fetch('/api/event-messages/create',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({eventId:eid,authorName:name,body:wish,deviceId:getDeviceId()})
+        })
+        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not save wish'); return j; }); })
+        .then(function(){
+          try{ localStorage.setItem(greetingKey(), JSON.stringify({name:name,wish:wish,at:Date.now()})); }catch(e){}
+          modal.style.display='none';
+          next();
+        })
+        .catch(function(err){ showError(err.message||'Could not save your wish. Please try again.'); })
+        .finally(function(){ submit.disabled=false; submit.textContent='Continue to Upload'; });
+      };
+      modal.style.display='flex';
+      setTimeout(function(){ nameEl.focus(); },30);
+    }
 
     function ensurePhotoViewer(){
       if(window.__onedayPhotoViewer) return window.__onedayPhotoViewer;
@@ -927,6 +1023,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<button type="button" data-v-prev style="position:absolute;left:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8249;</button>'+
         '<button type="button" data-v-next style="position:absolute;right:14px;top:50%;transform:translateY(-50%);border:none;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;width:44px;height:44px;font-size:24px;cursor:pointer;">&#8250;</button>'+
         '<img data-v-img alt="" decoding="async" fetchpriority="high" style="max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);transform-origin:center center;transition:transform .16s ease;">'+
+        '<video data-v-video controls playsinline style="display:none;max-width:min(96vw,1400px);max-height:calc(100vh - 230px);width:auto;height:auto;object-fit:contain;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.55);background:#000;"></video>'+
         '<div data-v-thumbs style="position:absolute;left:50%;bottom:66px;transform:translateX(-50%);display:flex;gap:6px;max-width:min(96vw,1000px);overflow:auto;padding:6px 8px;background:rgba(8,10,16,.58);border-radius:12px;"></div>'+
         '<div data-v-bar style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(15,18,26,.72);padding:8px 10px;border-radius:999px;color:#fff;font:600 13px/1.2 system-ui,sans-serif;max-width:calc(100vw - 24px);">'+
         '<button type="button" data-v-zoom-out style="border:none;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;min-width:34px;height:32px;cursor:pointer;">-</button>'+
@@ -940,6 +1037,7 @@ const PHOTO_ENGINE_S3 = `<script>
       document.body.appendChild(root);
 
       var img=root.querySelector('[data-v-img]');
+      var video=root.querySelector('[data-v-video]');
       var thumbs=root.querySelector('[data-v-thumbs]');
       var btnClose=root.querySelector('[data-v-close]');
       var btnPrev=root.querySelector('[data-v-prev]');
@@ -975,14 +1073,21 @@ const PHOTO_ENGINE_S3 = `<script>
           var t=document.createElement('button');
           t.type='button';
           t.style.cssText='border:2px solid transparent;padding:0;border-radius:8px;overflow:hidden;background:transparent;cursor:pointer;flex:0 0 auto;width:56px;height:56px;';
-          var th=document.createElement('img');
-          th.alt='';
-          th.src=it.url||'';
-          th.loading='lazy';
-          th.decoding='async';
-          th.setAttribute('fetchpriority','low');
-          th.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
-          t.appendChild(th);
+          if(isVideoMedia(it)){
+            var badge=document.createElement('span');
+            badge.textContent='▶';
+            badge.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111827;color:#fff;font-size:22px;';
+            t.appendChild(badge);
+          } else {
+            var th=document.createElement('img');
+            th.alt='';
+            th.src=it.url||'';
+            th.loading='lazy';
+            th.decoding='async';
+            th.setAttribute('fetchpriority','low');
+            th.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+            t.appendChild(th);
+          }
           t.onclick=function(){ state.idx=ix; refresh(); };
           thumbs.appendChild(t);
         });
@@ -992,10 +1097,22 @@ const PHOTO_ENGINE_S3 = `<script>
         if(state.idx<0) state.idx=state.items.length-1;
         if(state.idx>=state.items.length) state.idx=0;
         var cur=state.items[state.idx]||{};
-        img.src=cur.url||'';
+        if(isVideoMedia(cur)){
+          img.style.display='none';
+          img.src='';
+          video.style.display='block';
+          video.src=cur.url||'';
+          video.load();
+        } else {
+          try{ video.pause(); }catch(e){}
+          video.removeAttribute('src');
+          video.style.display='none';
+          img.style.display='block';
+          img.src=cur.url||'';
+        }
         countEl.textContent=(state.idx+1)+' / '+state.items.length;
         dl.href=cur.url||'#';
-        dl.setAttribute('download', cur.name||('photo-'+(state.idx+1)+'.jpg'));
+        dl.setAttribute('download', cur.name||('media-'+(state.idx+1)));
         Array.prototype.forEach.call(thumbs.children,function(el,ix){
           el.style.borderColor=(ix===state.idx)?'#fff':'transparent';
         });
@@ -1007,13 +1124,14 @@ const PHOTO_ENGINE_S3 = `<script>
         [-1,1].forEach(function(step){
           var i=(state.idx+step+state.items.length)%state.items.length;
           var next=state.items[i];
-          if(!next||!next.url) return;
+          if(!next||!next.url||isVideoMedia(next)) return;
           var imgPre=new Image();
           imgPre.src=next.url;
         });
       }
       function close(){
         stopSlide();
+        try{ video.pause(); }catch(e){}
         root.style.display='none';
         document.body.style.overflow='';
       }
@@ -1142,7 +1260,7 @@ const PHOTO_ENGINE_S3 = `<script>
       var root=ensurePhotoNotice();
       var msg=root.querySelector('[data-msg]');
       var view=root.querySelector('[data-view]');
-      msg.textContent=count+' new photo'+(count===1?'':'s')+' added to the photo wall.';
+      msg.textContent=count+' new item'+(count===1?'':'s')+' added to the media wall.';
       view.onclick=function(){
         root.style.display='none';
         try{ (grid.closest('section')||grid).scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){}
@@ -1255,7 +1373,7 @@ const PHOTO_ENGINE_S3 = `<script>
     function movePhotoToSection(photoId, fromSi, grid){
       var keys=Object.keys(noticeState.grids).map(function(k){ return Number(k); }).filter(function(n){ return !isNaN(n); }).sort(function(a,b){ return a-b; });
       var maxSection=Math.max(2, keys.length);
-      var raw=prompt('Move to photo wall number (1-'+maxSection+')', String(fromSi===0?2:1));
+      var raw=prompt('Move to media wall number (1-'+maxSection+')', String(fromSi===0?2:1));
       if(raw==null) return;
       var target=Number(raw)-1;
       if(!Number.isInteger(target)||target<0||target>10||target===fromSi){ alert('Choose a different wall number.'); return; }
@@ -1401,7 +1519,8 @@ const PHOTO_ENGINE_S3 = `<script>
           }
           var viewer=ensurePhotoViewer();
           var viewerItems=photos.map(function(p,ix){
-            return {url:p.url,name:'oneday-photo-'+(ix+1)+'.jpg'};
+            var video=isVideoMedia(p);
+            return {url:p.url,type:p.content_type||'',name:'oneday-'+(video?'video':'photo')+'-'+(ix+1)+(video?'.mp4':'.jpg')};
           });
           // Build all photo nodes into a fragment first, THEN swap — prevents visible
           // flash where the grid goes empty while we're building DOM nodes.
@@ -1436,16 +1555,32 @@ const PHOTO_ENGINE_S3 = `<script>
               });
               enablePointerPhotoDrag(w, grid, si, p);
             }
-            var im=document.createElement('img');
-            im.src=p.url;
-            im.alt='';
-            im.loading='lazy';
-            im.decoding='async';
-            im.setAttribute('fetchpriority','low');
-            im.sizes='(max-width:640px) 45vw, 200px';
-            im.draggable=false;
-            im.oncontextmenu=function(ev){ ev.preventDefault(); };
-            im.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;';
+            var media;
+            if(isVideoMedia(p)){
+              media=document.createElement('video');
+              media.src=p.url;
+              media.muted=true;
+              media.playsInline=true;
+              media.preload='metadata';
+              media.oncontextmenu=function(ev){ ev.preventDefault(); };
+              media.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;background:#000;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;';
+              var play=document.createElement('span');
+              play.textContent='▶';
+              play.setAttribute('aria-hidden','true');
+              play.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:42px;height:42px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;pointer-events:none;';
+              w.appendChild(play);
+            } else {
+              media=document.createElement('img');
+              media.src=p.url;
+              media.alt='';
+              media.loading='lazy';
+              media.decoding='async';
+              media.setAttribute('fetchpriority','low');
+              media.sizes='(max-width:640px) 45vw, 200px';
+              media.draggable=false;
+              media.oncontextmenu=function(ev){ ev.preventDefault(); };
+              media.style.cssText='width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;border-radius:8px;display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;';
+            }
             var m=document.createElement('button');
             m.textContent='⇄';
             m.title='Move photo to another wall';
@@ -1459,7 +1594,7 @@ const PHOTO_ENGINE_S3 = `<script>
             };
             var b=document.createElement('button');
             b.innerHTML='&times;';
-            b.title='Remove photo';
+            b.title='Remove media';
             b.style.cssText='position:absolute;top:4px;right:4px;z-index:3;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;';
             if(!p.owned_by_me){
               b.style.display='none';
@@ -1479,7 +1614,7 @@ const PHOTO_ENGINE_S3 = `<script>
               }).catch(function(err){ alert(err.message||'Could not remove photo'); });
             };
             w.onclick=function(){ viewer.open(viewerItems, i); };
-            w.appendChild(im);
+            w.appendChild(media);
             appendEventCaption(w);
             w.appendChild(m); w.appendChild(b); _frag.appendChild(w);
           });
@@ -1580,7 +1715,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(fb.tagName==='LABEL') fb.removeAttribute('for');
 
       var inp=document.createElement('input');
-      inp.type='file'; inp.accept='image/*'; inp.multiple=true;
+      inp.type='file'; inp.accept='image/*,video/mp4,video/webm,video/quicktime'; inp.multiple=true;
       inp.setAttribute('data-oneday-engine','1');
       inp.style.cssText='position:absolute;opacity:0;width:1px;height:1px;overflow:hidden;';
       fb.parentNode.insertBefore(inp,fb.nextSibling);
@@ -1596,8 +1731,11 @@ const PHOTO_ENGINE_S3 = `<script>
       }
 
       fb.style.cursor='pointer';
-      fb.textContent = 'Add Photos';
-      fb.onclick=function(e){ e.preventDefault(); inp.click(); };
+      fb.textContent = 'Add Photos & Videos';
+      fb.onclick=function(e){
+        e.preventDefault();
+        collectShareGreeting(function(){ inp.click(); });
+      };
 
       var grid=findNextGrid(fb);
       if(!grid||grid.dataset.onedayManaged){
@@ -1626,13 +1764,17 @@ const PHOTO_ENGINE_S3 = `<script>
         if(!files.length) return;
         this.value='';
         files.forEach(function(file){
-          var origCt=file.type||'image/jpeg';
-          if(origCt.indexOf('image/')!==0) return;
-          if(file.size>${MAX_PHOTO_BYTES}){ alert(file.name+' exceeds 5 MB — please resize it first.'); return; }
+          var origCt=(file.type||'').toLowerCase();
+          var isVideo=origCt.indexOf('video/')===0;
+          var isImage=origCt.indexOf('image/')===0;
+          if(!isImage&&!isVideo) return;
+          var maxBytes=isVideo?${MAX_VIDEO_BYTES}:${MAX_PHOTO_BYTES};
+          var maxMb=isVideo?${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)}:${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)};
+          if(file.size>maxBytes){ alert(file.name+' exceeds '+maxMb+' MB.'); return; }
           optimizePhotoForUpload(file, function(opt){
             var bodyBlob=opt && opt.blob ? opt.blob : file;
             var ct=opt && opt.contentType ? opt.contentType : origCt;
-            if(bodyBlob.size>${MAX_PHOTO_BYTES}){ alert(file.name+' is still too large after processing — try a smaller image.'); return; }
+            if(bodyBlob.size>maxBytes){ alert(file.name+' is still too large after processing — try a smaller file.'); return; }
             fetch('/api/event-photos/presign',{
               method:'POST',
               headers:{'Content-Type':'application/json'},
@@ -2097,7 +2239,7 @@ export async function getServerSideProps({ params, res, query }) {
   }
   function isMainPhotoHeadingText(text){
     var t=(text||'').trim().toLowerCase();
-    return /photo wall|photo gallery|gallery|memories|moments/.test(t);
+    return /photo wall|video wall|media wall|photo gallery|gallery|memories|moments/.test(t);
   }
   function findPhotoSubHeading(section, control){
     if(!section) return null;
@@ -2158,7 +2300,7 @@ export async function getServerSideProps({ params, res, query }) {
         var cloneControls=Array.prototype.slice.call(clone.querySelectorAll('button,label,a,[role="button"]')).filter(isPhotoControl);
         cloneControls.forEach(function(btn){
           if(btn.tagName==='LABEL') btn.removeAttribute('for');
-          btn.textContent='Add Photos';
+          btn.textContent='Add Photos & Videos';
           btn.removeAttribute('onclick');
         });
         anchor.parentNode.insertBefore(clone, anchor.nextSibling);
