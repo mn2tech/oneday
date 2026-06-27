@@ -1007,6 +1007,145 @@ const PHOTO_ENGINE_S3 = `<script>
         if(el.matches('canvas,svg,img')||isDecorativeQrGrid(el)) hideSharePlaceholder(el);
       });
     }
+    function shareStepsKey(){
+      return 'oneday_share_steps_'+eid;
+    }
+    function getShareSteps(){
+      try{
+        return Object.assign({welcome:false,wish:false,upload:false}, JSON.parse(localStorage.getItem(shareStepsKey())||'{}'));
+      }catch(e){ return {welcome:false,wish:false,upload:false}; }
+    }
+    function markShareStep(name, val){
+      var s=getShareSteps();
+      s[name]=!!val;
+      try{ localStorage.setItem(shareStepsKey(), JSON.stringify(s)); }catch(e){}
+    }
+    function syncShareStepsFromProgress(){
+      if(hasShareGreeting()){
+        markShareStep('welcome', true);
+        markShareStep('wish', true);
+      }
+    }
+    function maxUnlockedShareStep(){
+      syncShareStepsFromProgress();
+      var s=getShareSteps();
+      if(s.upload) return 99;
+      if(s.wish||hasShareGreeting()) return 3;
+      if(s.welcome) return 2;
+      return 1;
+    }
+    function findShareStepBlocks(){
+      var blocks=[];
+      var seen=new Set();
+      function addBlock(step, el){
+        if(!el||seen.has(el)) return;
+        if(el.id==='oneday-share-greeting-modal'||el.closest('#oneday-share-greeting-modal')) return;
+        if(el.id==='oneday-share-qr'||el.id==='oneday-share-wishes') return;
+        seen.add(el);
+        blocks.push({step:step, el:el});
+      }
+      Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,p,strong,span,div')).forEach(function(h){
+        var m=(h.textContent||'').match(/^step\\s*(\\d+)\\b/i);
+        if(!m) return;
+        var step=parseInt(m[1],10);
+        if(!step||step<1) return;
+        var el=h.closest('section')||h.closest('article')||h.parentElement;
+        addBlock(step, el);
+      });
+      if(blocks.length) return blocks.sort(function(a,b){ return a.step-b.step; });
+      var sections=Array.prototype.slice.call(document.querySelectorAll('body > section, body > main > section, body > div > section'));
+      sections=sections.filter(function(s){ return s.id!=='oneday-share-qr'&&s.id!=='oneday-share-wishes'; });
+      if(sections[0]) addBlock(1, sections[0]);
+      sections.forEach(function(s){
+        var t=(s.textContent||'').toLowerCase();
+        if(/wish|greeting|congratulations|leave a wish/.test(t)) addBlock(2, s);
+        if(/photo|video|media|upload|gallery/.test(t)&&!/wishes for the honoree/.test(t)) addBlock(3, s);
+      });
+      return blocks.sort(function(a,b){ return a.step-b.step; });
+    }
+    function lockShareStepBlock(el){
+      if(!el) return;
+      el.setAttribute('data-oneday-share-locked','1');
+      el.style.setProperty('display','none','important');
+    }
+    function unlockShareStepBlock(el){
+      if(!el) return;
+      el.removeAttribute('data-oneday-share-locked');
+      el.style.removeProperty('display');
+    }
+    function ensureStepContinueButton(stepEl){
+      if(!stepEl||getShareSteps().welcome||stepEl.querySelector('[data-oneday-step-continue]')) return;
+      var btn=document.createElement('button');
+      btn.type='button';
+      btn.setAttribute('data-oneday-step-continue','1');
+      btn.textContent='Continue to Step 2';
+      btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin-top:18px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:12px 18px;font:900 14px/1 Inter,system-ui,sans-serif;cursor:pointer;';
+      btn.onclick=function(){
+        markShareStep('welcome', true);
+        applyShareStepFlow();
+        var step2=document.querySelector('[data-oneday-share-step="2"]');
+        if(step2) step2.scrollIntoView({behavior:'smooth',block:'start'});
+      };
+      stepEl.appendChild(btn);
+    }
+    function ensureStepWishButton(stepEl){
+      if(!stepEl||hasShareGreeting()||stepEl.querySelector('[data-oneday-step-wish]')) return;
+      var btn=document.createElement('button');
+      btn.type='button';
+      btn.setAttribute('data-oneday-step-wish','1');
+      btn.textContent='Leave Your Wish';
+      btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin-top:18px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:12px 18px;font:900 14px/1 Inter,system-ui,sans-serif;cursor:pointer;';
+      btn.onclick=function(){ openShareWishFlow(); };
+      stepEl.appendChild(btn);
+    }
+    function openShareWishFlow(){
+      collectShareGreeting(function(){
+        markShareStep('wish', true);
+        applyShareStepFlow();
+        var step3=document.querySelector('[data-oneday-share-step="3"]');
+        if(step3) step3.scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    }
+    function applyShareStepFlow(){
+      if(!isShareEventMode()) return;
+      syncShareStepsFromProgress();
+      var max=maxUnlockedShareStep();
+      var blocks=findShareStepBlocks();
+      blocks.forEach(function(b){
+        b.el.setAttribute('data-oneday-share-step', String(b.step));
+        if(b.step<=max){
+          unlockShareStepBlock(b.el);
+          if(b.step===1){
+            if(!getShareSteps().welcome) ensureStepContinueButton(b.el);
+            else{
+              var cont=b.el.querySelector('[data-oneday-step-continue]');
+              if(cont) cont.style.display='none';
+            }
+          }
+          if(b.step===2&&max>=2){
+            if(!hasShareGreeting()) ensureStepWishButton(b.el);
+            else{
+              var wb=b.el.querySelector('[data-oneday-step-wish]');
+              if(wb) wb.style.display='none';
+            }
+          }
+        } else {
+          lockShareStepBlock(b.el);
+        }
+      });
+      var showExtras=getShareSteps().upload;
+      ['oneday-share-wishes','oneday-share-qr'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(!el) return;
+        if(showExtras){
+          el.style.removeProperty('display');
+          el.removeAttribute('data-oneday-share-locked');
+        } else {
+          el.style.setProperty('display','none','important');
+          el.setAttribute('data-oneday-share-locked','1');
+        }
+      });
+    }
     function ensureShareQrCode(){
       if(!isShareEventMode()) return null;
       var existing=document.getElementById('oneday-share-qr');
@@ -1015,7 +1154,7 @@ const PHOTO_ENGINE_S3 = `<script>
       var qrUrl=shareQrImageUrl();
       var sec=document.createElement('section');
       sec.id='oneday-share-qr';
-      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;';
+      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;display:none;';
       sec.innerHTML=
         '<div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:22px;align-items:center;text-align:left;">'+
         '<div style="background:#fff;border-radius:22px;padding:14px;box-shadow:0 18px 48px rgba(0,0,0,.24);">'+
@@ -1117,7 +1256,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(existing) return existing;
       var sec=document.createElement('section');
       sec.id='oneday-share-wishes';
-      sec.style.cssText='margin:28px auto;padding:22px;width:min(92vw,980px);box-sizing:border-box;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;';
+      sec.style.cssText='margin:28px auto;padding:22px;width:min(92vw,980px);box-sizing:border-box;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;display:none;';
       sec.innerHTML=
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
         '<div><h2 style="margin:0 0 6px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Wishes for the Honoree</h2>'+
@@ -1131,7 +1270,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
       else document.body.appendChild(sec);
       sec.querySelector('[data-w-refresh]').onclick=function(){ loadShareWishes(true); };
-      setTimeout(function(){ ensureShareQrCode(); },0);
+      setTimeout(function(){ ensureShareQrCode(); applyShareStepFlow(); },0);
       return sec;
     }
     function renderShareWishes(messages){
@@ -1240,6 +1379,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(!isShareEventMode()){ next(); return; }
       if(hasShareGreeting()){
         loadShareWishes(true);
+        applyShareStepFlow();
         next();
         return;
       }
@@ -1269,8 +1409,11 @@ const PHOTO_ENGINE_S3 = `<script>
         .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not save wish'); return j; }); })
         .then(function(){
           markShareGreeting(name, wish);
+          markShareStep('welcome', true);
+          markShareStep('wish', true);
           modal.style.display='none';
           loadShareWishes(true);
+          applyShareStepFlow();
           next();
         })
         .catch(function(err){ showError(err.message||'Could not save your wish. Please try again.'); })
@@ -2036,7 +2179,9 @@ const PHOTO_ENGINE_S3 = `<script>
     if(shareMode){
       normalizeShareInvitationCopy();
       cleanupFakeShareQrCodes();
+      syncShareStepsFromProgress();
       loadShareWishes(false);
+      applyShareStepFlow();
     }
     if (!buttons.length) return;
 
@@ -2129,13 +2274,14 @@ const PHOTO_ENGINE_S3 = `<script>
                 body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:bodyBlob.size,contentType:ct,deviceId:getDeviceId()})
               }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
             })
-            .then(function(){ loadGrid(grid, si, {force:true}); })
+            .then(function(){ loadGrid(grid, si, {force:true}); markShareStep('upload', true); applyShareStepFlow(); })
             .catch(function(err){ alert(err.message||'Upload failed'); });
           });
         });
       });
     });
 
+    if(isShareEventMode()) applyShareStepFlow();
   }
 
   document.addEventListener('DOMContentLoaded', function(){
