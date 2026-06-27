@@ -1027,8 +1027,8 @@ const PHOTO_ENGINE_S3 = `<script>
     }
     function getShareSteps(){
       try{
-        return Object.assign({welcome:false,upload:false}, JSON.parse(localStorage.getItem(shareStepsKey())||'{}'));
-      }catch(e){ return {welcome:false,upload:false}; }
+        return Object.assign({welcome:false,upload:false,message:false}, JSON.parse(localStorage.getItem(shareStepsKey())||'{}'));
+      }catch(e){ return {welcome:false,upload:false,message:false}; }
     }
     function markShareStep(name, val){
       var s=getShareSteps();
@@ -1078,36 +1078,39 @@ const PHOTO_ENGINE_S3 = `<script>
       var dots='<div style="display:flex;gap:7px;margin-bottom:22px;">'+
         '<div style="width:28px;height:6px;border-radius:3px;background:currentColor;opacity:'+(step>=1?'.9':'.25')+'"></div>'+
         '<div style="width:28px;height:6px;border-radius:3px;background:currentColor;opacity:'+(step>=2?'.9':'.25')+'"></div>'+
+        '<div style="width:28px;height:6px;border-radius:3px;background:currentColor;opacity:'+(step>=3?'.9':'.25')+'"></div>'+
         '</div>';
       if(step===1){
         oz.innerHTML=
           '<div style="width:100%;max-width:480px;padding-top:max(8vh,32px);">'+
           dots+
-          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 1 of 2</p>'+
+          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 1 of 3</p>'+
           '<h1 style="margin:0 0 14px;font-size:clamp(30px,7vw,56px);line-height:1.05;font-weight:900;">'+escapeHtmlWizard(title)+'</h1>'+
-          '<p style="margin:0 0 40px;font-size:clamp(15px,2.8vw,20px);line-height:1.55;opacity:.82;">Tap below to share your photos and videos from today.</p>'+
-          '<button type="button" id="owiz-start" style="display:block;width:100%;max-width:340px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);">Start Sharing →</button>'+
+          '<p style="margin:0 0 40px;font-size:clamp(15px,2.8vw,20px);line-height:1.55;opacity:.82;">Tap below to share your photos, videos, and a message from today.</p>'+
+          '<button type="button" id="owiz-start" style="display:block;width:100%;max-width:340px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);">Get Started →</button>'+
           '</div>';
         var s=oz.querySelector('#owiz-start');
         if(s) s.onclick=function(){ markShareStep('welcome',true); renderShareWizard(2); };
-      } else {
+      } else if(step===2){
         oz.innerHTML=
           '<div style="width:100%;max-width:480px;padding-top:max(5vh,24px);text-align:center;">'+
           dots+
-          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 2 of 2</p>'+
+          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 2 of 3</p>'+
           '<h2 style="margin:0 0 10px;font-size:clamp(24px,5vw,42px);line-height:1.1;font-weight:900;">Share Photos & Videos</h2>'+
           '<p style="margin:0 0 20px;font-size:clamp(14px,2.5vw,17px);line-height:1.5;opacity:.8;">Scan the QR code with your phone, or tap the button to upload directly.</p>'+
           '<div style="background:#fff;border-radius:24px;padding:14px;box-shadow:0 18px 52px rgba(0,0,0,.32);width:min(66vw,230px);margin:0 auto 22px;">'+
           '<img alt="Scan to share photos and videos" src="'+qrUrl+'" style="display:block;width:100%;height:auto;border-radius:16px;">'+
           '</div>'+
           '<button type="button" id="owiz-upload" style="display:block;width:100%;max-width:340px;margin:0 auto 14px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);">Add Photos & Videos</button>'+
-          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'+
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">'+
           '<a href="'+qrUrl+'" download="oneday-event-qr.png" style="display:inline-flex;align-items:center;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:inherit;text-decoration:none;padding:9px 15px;font:800 12px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
           '<button type="button" id="owiz-copy" style="border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:inherit;border-radius:999px;padding:9px 15px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
           '</div>'+
+          '<button type="button" id="owiz-skip2" style="background:none;border:0;color:inherit;opacity:.55;font:600 13px/1 Inter,system-ui,sans-serif;cursor:pointer;text-decoration:underline;">Skip for now →</button>'+
           '</div>';
         var ul=oz.querySelector('#owiz-upload');
         var cp=oz.querySelector('#owiz-copy');
+        var sk2=oz.querySelector('#owiz-skip2');
         if(ul) ul.onclick=function(){
           var inp=document.querySelector('input[data-oneday-engine="1"]')||document.querySelector('input[type="file"]');
           if(inp) inp.click();
@@ -1117,17 +1120,67 @@ const PHOTO_ENGINE_S3 = `<script>
             navigator.clipboard.writeText(pageUrl).then(function(){ cp.textContent='Copied!'; setTimeout(function(){ cp.textContent='Copy Link'; },1600); }).catch(function(){});
           }
         };
+        if(sk2) sk2.onclick=function(){ markShareStep('upload',true); renderShareWizard(3); };
+      } else {
+        oz.innerHTML=
+          '<div style="width:100%;max-width:480px;padding-top:max(5vh,24px);">'+
+          dots+
+          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 3 of 3</p>'+
+          '<h2 style="margin:0 0 10px;font-size:clamp(24px,5vw,38px);line-height:1.1;font-weight:900;">Leave a Message</h2>'+
+          '<p style="margin:0 0 20px;font-size:clamp(14px,2.5vw,17px);line-height:1.5;opacity:.8;">Add a message to the board for everyone to see.</p>'+
+          '<input id="owiz-name" type="text" placeholder="Your name (optional)" maxlength="80" style="display:block;width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.22);border-radius:14px;background:rgba(255,255,255,.08);color:inherit;padding:13px 16px;font:500 15px/1 Inter,system-ui,sans-serif;margin-bottom:10px;outline:none;">'+
+          '<textarea id="owiz-msg" placeholder="Write something..." maxlength="1000" rows="4" style="display:block;width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.22);border-radius:14px;background:rgba(255,255,255,.08);color:inherit;padding:13px 16px;font:500 15px/1.5 Inter,system-ui,sans-serif;margin-bottom:16px;resize:vertical;outline:none;"></textarea>'+
+          '<p id="owiz-msg-err" style="margin:0 0 10px;color:#f87171;font-size:13px;display:none;"></p>'+
+          '<button type="button" id="owiz-post" style="display:block;width:100%;max-width:340px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);margin-bottom:12px;">Post to Board</button>'+
+          '<button type="button" id="owiz-skip3" style="display:block;background:none;border:0;color:inherit;opacity:.55;font:600 13px/1 Inter,system-ui,sans-serif;cursor:pointer;text-decoration:underline;margin:0 auto;">Skip</button>'+
+          '</div>';
+        var postBtn=oz.querySelector('#owiz-post');
+        var sk3=oz.querySelector('#owiz-skip3');
+        var errEl=oz.querySelector('#owiz-msg-err');
+        function showErr(msg){ if(errEl){ errEl.textContent=msg; errEl.style.display='block'; } }
+        if(sk3) sk3.onclick=function(){ markShareStep('message',true); dismissShareWizard(); };
+        if(postBtn) postBtn.onclick=function(){
+          var nameEl=oz.querySelector('#owiz-name');
+          var msgEl=oz.querySelector('#owiz-msg');
+          var msgText=(msgEl&&msgEl.value||'').trim();
+          if(!msgText){ showErr('Please write a message before posting.'); return; }
+          postBtn.disabled=true; postBtn.textContent='Posting…';
+          if(errEl) errEl.style.display='none';
+          fetch('/api/event-messages/create',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              eventId:eid,
+              authorName:(nameEl&&nameEl.value.trim())||'Guest',
+              body:msgText,
+              deviceId:getDeviceId()
+            })
+          })
+          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+          .then(function(res){
+            if(res.ok){
+              markShareStep('message',true);
+              dismissShareWizard();
+            } else {
+              showErr(res.d&&res.d.error||'Could not post. Please try again.');
+              postBtn.disabled=false; postBtn.textContent='Post to Board';
+            }
+          })
+          .catch(function(){ showErr('Network error. Please try again.'); postBtn.disabled=false; postBtn.textContent='Post to Board'; });
+        };
       }
     }
     function bootShareWizard(){
       if(!isShareEventMode()) return;
       if(document.getElementById('oneday-wizard-overlay')) return;
       var steps=getShareSteps();
-      if(steps.upload){
+      if(steps.message){
         placeShareUploadQr(findUploadSection(),99);
         return;
       }
-      renderShareWizard(steps.welcome ? 2 : 1);
+      if(steps.upload) renderShareWizard(3);
+      else if(steps.welcome) renderShareWizard(2);
+      else renderShareWizard(1);
     }
     function removeLegacyShareQr(){
       var legacy=document.getElementById('oneday-share-qr');
@@ -2050,7 +2103,7 @@ const PHOTO_ENGINE_S3 = `<script>
                 body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:bodyBlob.size,contentType:ct,deviceId:getDeviceId()})
               }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
             })
-            .then(function(){ loadGrid(grid, si, {force:true}); dismissShareWizard(); })
+            .then(function(){ loadGrid(grid, si, {force:true}); markShareStep('upload',true); renderShareWizard(3); })
             .catch(function(err){ alert(err.message||'Upload failed'); });
           });
         });
