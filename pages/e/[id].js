@@ -1817,16 +1817,45 @@ const PHOTO_ENGINE_S3 = `<script>
       if(alreadyWired(el)) return false;
       return isPhotoUploadControl(el);
     });
+    function disableExtraUploadControl(el, keepButtons){
+      if(!el) return;
+      var block=el.closest('section')||el.closest('div')||el.parentElement;
+      var containsKept=block&&keepButtons.some(function(btn){ return block.contains(btn); });
+      var forId=el.getAttribute&&el.getAttribute('for');
+      var linked=forId ? document.getElementById(forId) : null;
+      if(linked&&linked.matches&&linked.matches('input[type=file]')){
+        linked.disabled=true;
+        linked.value='';
+        linked.style.setProperty('display','none','important');
+        linked.setAttribute('aria-hidden','true');
+        linked.setAttribute('tabindex','-1');
+      }
+      if(block){
+        Array.prototype.slice.call(block.querySelectorAll('input[type=file]')).forEach(function(inp){
+          if(containsKept&&keepButtons.some(function(btn){ return btn.getAttribute&&btn.getAttribute('for')===inp.id; })) return;
+          inp.disabled=true;
+          inp.value='';
+          inp.style.setProperty('display','none','important');
+          inp.setAttribute('aria-hidden','true');
+          inp.setAttribute('tabindex','-1');
+        });
+      }
+      if(block&&!containsKept) block.style.display='none';
+      else {
+        el.style.setProperty('display','none','important');
+        el.setAttribute('aria-hidden','true');
+        el.setAttribute('tabindex','-1');
+        if(el.tagName==='LABEL') el.removeAttribute('for');
+        el.onclick=function(ev){ if(ev&&ev.preventDefault) ev.preventDefault(); return false; };
+      }
+    }
 
     // No fallback creation. Only wire explicit upload controls present in the generated page.
     var maxSections = isShareEventMode() ? 1 : 2;
     if(buttons.length>maxSections){
       var keepButtons=buttons.slice(0,maxSections);
       buttons.slice(maxSections).forEach(function(el){
-        var block=el.closest('section')||el.closest('div')||el.parentElement;
-        var containsKept=block&&keepButtons.some(function(btn){ return block.contains(btn); });
-        if(block&&!containsKept) block.style.display='none';
-        else el.style.display='none';
+        disableExtraUploadControl(el, keepButtons);
       });
       buttons=buttons.slice(0,maxSections);
     }
