@@ -16,11 +16,16 @@ assert.match(eventPage, /beforeinstallprompt/);
 assert.match(eventPage, /navigator\.serviceWorker\.register\('\/sw\.js'\)/);
 assert.match(eventPage, /oneday-install-card/);
 assert.match(eventPage, /\/api\/manifest\.webmanifest\?start=\/e\//);
-assert.match(eventPage, /injectBeforeHeadClose\(html, manifestLinks\)/);
+assert.match(eventPage, /injectBeforeHeadClose\(html, manifestLinks \+ photoStabilityStyleTag\)/);
 
 assert.match(eventPage, /__onedayPhotoNoticeState/);
 assert.match(eventPage, /setInterval\(function\(\)\{/);
-assert.match(eventPage, /new photo'\+\(count===1\?'':'s'\)\+' added to the photo wall/);
+assert.match(eventPage, /new item'\+\(count===1\?'':'s'\)\+' added to the media wall/);
 assert.match(eventPage, /trackPhotoCount\(si, photos\.length, grid\)/);
+assert.match(eventPage, /ensureShareMessageBoard/);
+assert.match(eventPage, /oneday-share-messages/);
+assert.match(eventPage, /Messages from today/);
+assert.match(eventPage, /refreshShareMessages\(\)/);
+assert.match(eventPage, /__onedayLoadMessages/);
 
 console.log('pwa event-page tests passed');
