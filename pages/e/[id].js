@@ -1044,6 +1044,27 @@ const PHOTO_ENGINE_S3 = `<script>
     function escapeHtmlWizard(s){
       return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+    function ensureShareMessageBoard(){
+      if(!isShareEventMode()) return null;
+      var existing=document.getElementById('msgList')||document.querySelector('#messageList,#msg-list,[class*="message-list"]');
+      if(existing) return existing;
+      var section=document.createElement('section');
+      section.id='oneday-share-messages';
+      section.setAttribute('data-oneday-share-message-board','1');
+      section.style.cssText='margin:28px auto 36px;padding:20px;width:min(92vw,760px);border-radius:22px;background:rgba(10,10,20,.58);border:1px solid rgba(168,85,247,.25);box-shadow:0 14px 40px rgba(0,0,0,.18);font-family:Inter,system-ui,-apple-system,sans-serif;';
+      section.innerHTML='<h2 style="margin:0 0 8px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Messages from today</h2>'+
+        '<p style="margin:0 0 16px;opacity:.72;">Guest notes appear here after they post.</p>'+
+        '<div id="msgList" style="display:block;"></div>';
+      var anchor=findUploadSection();
+      if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(section, anchor.nextSibling);
+      else document.body.appendChild(section);
+      return section.querySelector('#msgList');
+    }
+    function refreshShareMessages(){
+      ensureShareMessageBoard();
+      if(typeof window.__onedayLoadMessages==='function') window.__onedayLoadMessages();
+      try{ document.dispatchEvent(new CustomEvent('oneday:messages-refresh')); }catch(e){}
+    }
     function dismissShareWizard(){
       var oz=document.getElementById('oneday-wizard-overlay');
       if(oz){
@@ -1054,6 +1075,7 @@ const PHOTO_ENGINE_S3 = `<script>
       try{ document.body.style.overflow=''; }catch(e){}
       markShareStep('upload',true);
       placeShareUploadQr(findUploadSection(),99);
+      ensureShareMessageBoard();
     }
     function renderShareWizard(step){
       var oz=document.getElementById('oneday-wizard-overlay');
@@ -1160,6 +1182,7 @@ const PHOTO_ENGINE_S3 = `<script>
           .then(function(res){
             if(res.ok){
               markShareStep('message',true);
+              refreshShareMessages();
               dismissShareWizard();
             } else {
               showErr(res.d&&res.d.error||'Could not post. Please try again.');
@@ -1176,6 +1199,7 @@ const PHOTO_ENGINE_S3 = `<script>
       var steps=getShareSteps();
       if(steps.message){
         placeShareUploadQr(findUploadSection(),99);
+        refreshShareMessages();
         return;
       }
       if(steps.upload) renderShareWizard(3);
