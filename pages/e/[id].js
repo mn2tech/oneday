@@ -942,7 +942,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share') return true;
       var text='';
       try{ text=(document.body&&document.body.textContent||'').replace(/\s+/g,' ').toLowerCase(); }catch(e){}
-      var looksShare=/share event|leave a wish|wishes for the host|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
+      var looksShare=/share event|leave a wish|wishes for the host|wishes for the honoree|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
       if(looksShare&&document.documentElement){
         document.documentElement.setAttribute('data-oneday-event-mode','share');
         return true;
@@ -959,7 +959,7 @@ const PHOTO_ENGINE_S3 = `<script>
         }
       });
     }
-    function ensureShareQrCode(anchorControl){
+    function ensureShareQrCode(){
       if(!isShareEventMode()) return null;
       var existing=document.getElementById('oneday-share-qr');
       if(existing) return existing;
@@ -976,7 +976,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<div>'+
         '<p style="margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;opacity:.72;">Event QR Code</p>'+
         '<h2 style="margin:0 0 10px;font-size:clamp(28px,5vw,48px);line-height:1.02;">Scan to Share Photos & Videos</h2>'+
-        '<p style="margin:0 0 14px;opacity:.82;font-size:clamp(15px,2.5vw,18px);line-height:1.5;">Guests scan this code, leave a wish for the host, and upload photos or videos.</p>'+
+        '<p style="margin:0 0 14px;opacity:.82;font-size:clamp(15px,2.5vw,18px);line-height:1.5;">Guests scan this code, leave a wish for the honoree, and upload photos or videos.</p>'+
         '<div style="word-break:break-all;font-size:12px;line-height:1.45;opacity:.72;background:rgba(0,0,0,.12);border-radius:12px;padding:10px 12px;">'+pageUrl+'</div>'+
         '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">'+
         '<a href="'+qrUrl+'" download="oneday-event-qr.png" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);color:inherit;text-decoration:none;padding:10px 14px;font:900 13px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
@@ -990,10 +990,17 @@ const PHOTO_ENGINE_S3 = `<script>
           navigator.clipboard.writeText(pageUrl).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Link'; },1600); }).catch(function(){});
         }
       };
-      var anchor=anchorControl&&(anchorControl.closest('section')||anchorControl.parentElement);
-      if(!anchor) anchor=document.getElementById('photos')||document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
-      if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor);
-      else document.body.insertBefore(sec, document.body.firstChild);
+      var anchor=document.getElementById('oneday-share-wishes')||
+        document.querySelector('[data-oneday-managed="1"]')||
+        document.getElementById('photos')||
+        document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
+      if(anchor){
+        var block=anchor.closest&&anchor.closest('section') ? anchor.closest('section') : anchor;
+        if(block&&block.parentNode) block.parentNode.insertBefore(sec, block.nextSibling);
+        else document.body.appendChild(sec);
+      } else {
+        document.body.appendChild(sec);
+      }
       return sec;
     }
     function greetingKey(){
@@ -1022,7 +1029,7 @@ const PHOTO_ENGINE_S3 = `<script>
       root.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(8,10,16,.72);display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';
       root.innerHTML=
         '<div style="width:min(94vw,440px);background:#fff;color:#111827;border-radius:22px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.38);font-family:Inter,system-ui,-apple-system,sans-serif;">'+
-        '<h2 style="margin:0 0 8px;font-size:22px;line-height:1.2;">Leave a wish for the host</h2>'+
+        '<h2 style="margin:0 0 8px;font-size:22px;line-height:1.2;">Leave a wish for the honoree</h2>'+
         '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.5;">Add your name and a short congratulations note before sharing photos or videos.</p>'+
         '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Your name</label>'+
         '<input data-g-name maxlength="120" placeholder="e.g. Priya Sharma" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.3 Inter,system-ui,sans-serif;margin-bottom:14px;color:#111827;background:#fff;">'+
@@ -1065,7 +1072,7 @@ const PHOTO_ENGINE_S3 = `<script>
       sec.style.cssText='margin:28px auto;padding:22px;width:min(92vw,980px);box-sizing:border-box;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;';
       sec.innerHTML=
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
-        '<div><h2 style="margin:0 0 6px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Wishes for the Host</h2>'+
+        '<div><h2 style="margin:0 0 6px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Wishes for the Honoree</h2>'+
         '<p style="margin:0;opacity:.78;font-size:14px;line-height:1.5;">Guest congratulations and blessings appear here after they scan and upload.</p></div>'+
         '<button type="button" data-w-refresh style="border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:9px 13px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Refresh</button>'+
         '</div>'+
@@ -1076,6 +1083,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
       else document.body.appendChild(sec);
       sec.querySelector('[data-w-refresh]').onclick=function(){ loadShareWishes(true); };
+      setTimeout(function(){ ensureShareQrCode(); },0);
       return sec;
     }
     function renderShareWishes(messages){
@@ -1979,7 +1987,6 @@ const PHOTO_ENGINE_S3 = `<script>
 
     if(shareMode){
       normalizeShareInvitationCopy();
-      ensureShareQrCode(buttons[0]);
       loadShareWishes(false);
     }
     if (!buttons.length) return;
