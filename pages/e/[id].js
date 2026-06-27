@@ -2361,11 +2361,12 @@ export async function getServerSideProps({ params, res, query }) {
   // Detect share events at serve-time from saved HTML so old events that predate
   // injectShareEventCleanup still get the wizard without relying on text detection.
   const isShareEventPage =
-    /data-oneday-event-mode="share"/.test(data.html || '') ||
-    /event mode: share event/i.test(data.html || '') ||
-    /scan to share photos/i.test(data.html || '') ||
-    /add photos & videos/i.test(data.html || '') ||
-    /share event/i.test(data.html || '');
+    // JS setAttribute call baked in by injectShareEventCleanup
+    /'data-oneday-event-mode','share'/.test(data.html || '') ||
+    // AI-generated text from the share event prompt
+    /scan to share/i.test(data.html || '') ||
+    /share event/i.test(data.html || '') ||
+    /event mode.*share/i.test(data.html || '');
   const shareModeBootstrap = isShareEventPage
     ? `<script>document.documentElement.setAttribute('data-oneday-event-mode','share');<\/script>`
     : '';
