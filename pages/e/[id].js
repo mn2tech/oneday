@@ -943,6 +943,15 @@ const PHOTO_ENGINE_S3 = `<script>
     function greetingKey(){
       return 'oneday_share_greeting_'+eid;
     }
+    function markShareGreeting(name, wish){
+      try{
+        localStorage.setItem(greetingKey(), JSON.stringify({
+          name: String(name || 'Guest').trim() || 'Guest',
+          wish: String(wish || '').trim() || 'Shared a wish',
+          at: Date.now()
+        }));
+      }catch(e){}
+    }
     function hasShareGreeting(){
       try{
         var saved=JSON.parse(localStorage.getItem(greetingKey())||'null');
@@ -1008,6 +1017,9 @@ const PHOTO_ENGINE_S3 = `<script>
         list.appendChild(empty);
         return;
       }
+      messages.forEach(function(m){
+        if(m&&m.owned_by_me&&m.body) markShareGreeting(m.author_name, m.body);
+      });
       messages.slice().reverse().forEach(function(m){
         var card=document.createElement('article');
         card.style.cssText='padding:14px 15px;border-radius:16px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);';
@@ -1035,7 +1047,12 @@ const PHOTO_ENGINE_S3 = `<script>
         .finally(function(){ board.dataset.loading='0'; });
     }
     function collectShareGreeting(next){
-      if(!isShareEventMode()||hasShareGreeting()){ next(); return; }
+      if(!isShareEventMode()){ next(); return; }
+      if(hasShareGreeting()){
+        loadShareWishes(true);
+        next();
+        return;
+      }
       var modal=ensureGreetingModal();
       var nameEl=modal.querySelector('[data-g-name]');
       var wishEl=modal.querySelector('[data-g-wish]');
@@ -1061,7 +1078,7 @@ const PHOTO_ENGINE_S3 = `<script>
         })
         .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not save wish'); return j; }); })
         .then(function(){
-          try{ localStorage.setItem(greetingKey(), JSON.stringify({name:name,wish:wish,at:Date.now()})); }catch(e){}
+          markShareGreeting(name, wish);
           modal.style.display='none';
           loadShareWishes(true);
           next();
@@ -1757,18 +1774,19 @@ const PHOTO_ENGINE_S3 = `<script>
     });
 
     // No fallback creation. Only wire explicit upload controls present in the generated page.
-    if(buttons.length>2){
-      buttons.slice(2).forEach(function(el){
+    var maxSections = isShareEventMode() ? 1 : 2;
+    if(buttons.length>maxSections){
+      buttons.slice(maxSections).forEach(function(el){
         var block=el.closest('section')||el.closest('div')||el.parentElement;
         if(block) block.style.display='none';
       });
-      buttons=buttons.slice(0,2);
+      buttons=buttons.slice(0,maxSections);
     }
 
     if(isShareEventMode()) loadShareWishes(false);
     if (!buttons.length) return;
 
-    var MAX_SECTIONS = 2;
+    var MAX_SECTIONS = maxSections;
     buttons.slice(0, MAX_SECTIONS).forEach(function(btn, idx){
       var si = idx;
       var fb=btn.cloneNode(true);

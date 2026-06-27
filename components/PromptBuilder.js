@@ -81,7 +81,7 @@ function assemblePrompt(f) {
   if (!isShareEvent(f) && f.venue) parts.push(`The event will be held at ${f.venue}.`);
 
   if (isShareEvent(f)) {
-    parts.push('Create this as a Share Event: a simple event-day signboard and photo and video sharing page for guests who scan a QR code. Keep the page focused on three steps: enter your name, write a congratulations note or wish for the host, then share photos and videos. Make uploads the main action. Include signboard-style hero text like "Scan to Share Photos & Videos" and "Leave a Wish, Then Upload", a large QR-friendly call-to-action, and a media wall with the requested sections.');
+    parts.push('Create this as a Share Event: a simple event-day signboard and photo and video sharing page for guests who scan a QR code. Keep the page focused on three steps: enter your name, write a congratulations note or wish for the host, then share photos and videos. Make one upload section the main action. Include signboard-style hero text like "Scan to Share Photos & Videos" and "Leave a Wish, Then Upload", a large QR-friendly call-to-action, and one media wall section.');
   }
 
   // Conference-specific fields
@@ -99,6 +99,7 @@ function assemblePrompt(f) {
   }
 
   const photoSubsections = f.photoSubsections
+    .slice(0, isShareEvent(f) ? 1 : f.photoSubsections.length)
     .map(s => s.title.trim())
     .filter(Boolean);
   if (photoSubsections.length > 0) {
@@ -143,8 +144,11 @@ function getChecks(f) {
   if (!isShareEvent(f) && !f.time.trim()) checks.push({ level: 'suggestion', field: 'time', message: 'Adding a start time makes the countdown more precise' });
   if (!isShareEvent(f) && f.scheduleItems.filter(s => s.description.trim()).length === 0)
     checks.push({ level: 'warning', field: 'schedule', message: 'No schedule items — add a few for a richer timeline section' });
-  if (f.photoSubsections.filter(s => s.title.trim()).length === 0)
-    checks.push({ level: 'suggestion', field: 'photoSubsections', message: 'Add photo wall subsections so guests know where to upload memories' });
+  const photoSectionCount = f.photoSubsections
+    .slice(0, isShareEvent(f) ? 1 : f.photoSubsections.length)
+    .filter(s => s.title.trim()).length;
+  if (photoSectionCount === 0)
+    checks.push({ level: 'suggestion', field: 'photoSubsections', message: isShareEvent(f) ? 'Name the single upload section so guests know where to share media' : 'Add photo wall subsections so guests know where to upload memories' });
   if (!isShareEvent(f) && !f.dressCode.trim()) checks.push({ level: 'suggestion', field: 'dressCode', message: 'A dress code adds a nice personal touch' });
   if (!isShareEvent(f) && !f.colorTheme.trim()) checks.push({ level: 'suggestion', field: 'colorTheme', message: 'A color theme helps the AI match the design to your event' });
 
@@ -403,18 +407,18 @@ export default function PromptBuilder({ onComplete }) {
         {/* Photo Wall subsections */}
         <div className={styles.field}>
           <label className={styles.label}>
-            {isShareEvent(form) ? 'Photo & video sharing sections' : 'Photo wall subsections'}
+            {isShareEvent(form) ? 'Photo & video upload section' : 'Photo wall subsections'}
           </label>
           <div className={styles.scheduleList}>
-            {form.photoSubsections.map((item, i) => (
+            {(isShareEvent(form) ? form.photoSubsections.slice(0, 1) : form.photoSubsections).map((item, i) => (
               <div key={item.id} className={styles.scheduleRow}>
                 <input
                   className={styles.scheduleDesc}
-                  placeholder={`e.g. ${isShareEvent(form) ? ['Guest Photos & Videos', 'Selfies', 'Dance Floor', 'Family Clips'][i] || 'Media section' : ['Ceremony', 'Reception', 'Family moments', 'After party'][i] || 'Photo subsection'}`}
+                  placeholder={`e.g. ${isShareEvent(form) ? 'All Guest Photos & Videos' : ['Ceremony', 'Reception', 'Family moments', 'After party'][i] || 'Photo subsection'}`}
                   value={item.title}
                   onChange={e => setPhotoSubsection(item.id, e.target.value)}
                 />
-                {form.photoSubsections.length > 1 && (
+                {!isShareEvent(form) && form.photoSubsections.length > 1 && (
                   <button
                     type="button"
                     className={styles.removeBtn}
@@ -425,9 +429,11 @@ export default function PromptBuilder({ onComplete }) {
               </div>
             ))}
           </div>
-          <button type="button" className={styles.addBtn} onClick={addPhotoSubsection}>
-            + Add section
-          </button>
+          {!isShareEvent(form) && (
+            <button type="button" className={styles.addBtn} onClick={addPhotoSubsection}>
+              + Add section
+            </button>
+          )}
         </div>
 
         {/* Dress code & Color theme */}
