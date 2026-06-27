@@ -974,6 +974,66 @@ const PHOTO_ENGINE_S3 = `<script>
       root.addEventListener('click', function(ev){ if(ev.target===root) root.style.display='none'; });
       return root;
     }
+    function ensureShareWishesBoard(){
+      if(!isShareEventMode()) return null;
+      var existing=document.getElementById('oneday-share-wishes');
+      if(existing) return existing;
+      var sec=document.createElement('section');
+      sec.id='oneday-share-wishes';
+      sec.style.cssText='margin:28px auto;padding:22px;width:min(92vw,980px);box-sizing:border-box;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;';
+      sec.innerHTML=
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
+        '<div><h2 style="margin:0 0 6px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Wishes for the Host</h2>'+
+        '<p style="margin:0;opacity:.78;font-size:14px;line-height:1.5;">Guest congratulations and blessings appear here after they scan and upload.</p></div>'+
+        '<button type="button" data-w-refresh style="border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:9px 13px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Refresh</button>'+
+        '</div>'+
+        '<div data-w-list style="display:grid;gap:10px;"></div>';
+      var anchor=document.querySelector('[data-oneday-managed="1"]');
+      anchor=anchor&&(anchor.closest('section')||anchor.parentElement);
+      if(!anchor) anchor=document.getElementById('photos')||document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
+      if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
+      else document.body.appendChild(sec);
+      sec.querySelector('[data-w-refresh]').onclick=function(){ loadShareWishes(true); };
+      return sec;
+    }
+    function renderShareWishes(messages){
+      var board=ensureShareWishesBoard();
+      if(!board) return;
+      var list=board.querySelector('[data-w-list]');
+      list.innerHTML='';
+      if(!messages||!messages.length){
+        var empty=document.createElement('p');
+        empty.textContent='No wishes yet. Be the first to leave a congratulations note.';
+        empty.style.cssText='margin:0;padding:16px;border-radius:16px;background:rgba(255,255,255,.10);opacity:.82;';
+        list.appendChild(empty);
+        return;
+      }
+      messages.slice().reverse().forEach(function(m){
+        var card=document.createElement('article');
+        card.style.cssText='padding:14px 15px;border-radius:16px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);';
+        var name=document.createElement('div');
+        name.textContent=m.author_name||'Guest';
+        name.style.cssText='font-weight:900;margin-bottom:6px;';
+        var body=document.createElement('p');
+        body.textContent=m.body||'';
+        body.style.cssText='margin:0;line-height:1.55;white-space:pre-wrap;';
+        card.appendChild(name);
+        card.appendChild(body);
+        list.appendChild(card);
+      });
+    }
+    function loadShareWishes(force){
+      if(!isShareEventMode()) return;
+      var board=ensureShareWishesBoard();
+      if(!board) return;
+      if(board.dataset.loading==='1'&&!force) return;
+      board.dataset.loading='1';
+      fetch('/api/event-messages/list?eventId='+encodeURIComponent(eid)+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
+        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not load wishes'); return j; }); })
+        .then(function(data){ renderShareWishes(data&&data.messages?data.messages:[]); })
+        .catch(function(err){ console.warn('[OneDay] share wishes failed', err); })
+        .finally(function(){ board.dataset.loading='0'; });
+    }
     function collectShareGreeting(next){
       if(!isShareEventMode()||hasShareGreeting()){ next(); return; }
       var modal=ensureGreetingModal();
@@ -1003,6 +1063,7 @@ const PHOTO_ENGINE_S3 = `<script>
         .then(function(){
           try{ localStorage.setItem(greetingKey(), JSON.stringify({name:name,wish:wish,at:Date.now()})); }catch(e){}
           modal.style.display='none';
+          loadShareWishes(true);
           next();
         })
         .catch(function(err){ showError(err.message||'Could not save your wish. Please try again.'); })
@@ -1704,6 +1765,7 @@ const PHOTO_ENGINE_S3 = `<script>
       buttons=buttons.slice(0,2);
     }
 
+    if(isShareEventMode()) loadShareWishes(false);
     if (!buttons.length) return;
 
     var MAX_SECTIONS = 2;
@@ -1756,6 +1818,7 @@ const PHOTO_ENGINE_S3 = `<script>
             var gridRef=noticeState.grids[key];
             if(gridRef&&document.body.contains(gridRef)) loadGrid(gridRef, Number(key));
           });
+          loadShareWishes(false);
         }, 45000);
       }
 
