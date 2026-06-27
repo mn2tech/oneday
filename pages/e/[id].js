@@ -1146,21 +1146,34 @@ const PHOTO_ENGINE_S3 = `<script>
           try{
             var fn = window.submitMessage || window.sendMessage || window.addMessage ||
               window.submitGuestMessage || window.postGuestMessage;
-            var msgInput = document.querySelector(
-              '#msgText,textarea[id*="msg" i],section[id*="message" i] textarea,[class*="message" i] textarea'
-            );
-            var nameInput = document.querySelector(
-              '#msgName,input[id*="msgname" i],section[id*="message" i] input[type="text"],[class*="message" i] input[type="text"]'
-            );
+            function firstOutsideWizard(nodes){
+              for(var i=0;i<nodes.length;i++){
+                var node=nodes[i];
+                if(node && !(node.closest && node.closest('#oneday-wizard-overlay'))) return node;
+              }
+              return null;
+            }
+            var msgInput = document.querySelector('#msgText');
+            if(!msgInput){
+              msgInput = firstOutsideWizard(document.querySelectorAll(
+                'section[id*="message" i] textarea,[class*="message" i] textarea,textarea[id*="msg" i],textarea[name*="msg" i]'
+              ));
+            }
+            var nameInput = document.querySelector('#msgName');
+            if(!nameInput){
+              nameInput = firstOutsideWizard(document.querySelectorAll(
+                'section[id*="message" i] input[type="text"],[class*="message" i] input[type="text"],input[id*="msgname" i],input[name*="msgname" i]'
+              ));
+            }
             if(msgInput) msgInput.value = msgText;
             if(nameInput && authorName) nameInput.value = authorName;
             if(typeof fn === 'function'){
               fn();
               return true;
             }
-            var sendBtn = document.querySelector(
+            var sendBtn = firstOutsideWizard(document.querySelectorAll(
               '.btn-post,.btn-send,.btn-submit-msg,[class*="btn-post"],[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"],[id*="postMessage"],button[class*="post-message"]'
-            );
+            ));
             if(sendBtn){
               sendBtn.click();
               return true;
