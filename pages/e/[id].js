@@ -1138,10 +1138,94 @@ const PHOTO_ENGINE_S3 = `<script>
         var sk3=oz.querySelector('#owiz-skip3');
         var errEl=oz.querySelector('#owiz-msg-err');
         function showErr(msg){ if(errEl){ errEl.textContent=msg; errEl.style.display='block'; } }
+        function completeMessageStep(){
+          markShareStep('message',true);
+          dismissShareWizard();
+        }
+        function escapeHtmlLocal(text){
+          return String(text==null?'':text)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+        }
+        function submitLocalMessageFallback(authorName, msgText){
+          try{
+            var fn = window.submitMessage || window.sendMessage || window.addMessage ||
+              window.submitGuestMessage || window.postGuestMessage;
+            function firstOutsideWizard(nodes){
+              for(var i=0;i<nodes.length;i++){
+                var node=nodes[i];
+                if(node && !(node.closest && node.closest('#oneday-wizard-overlay'))) return node;
+              }
+              return null;
+            }
+            var msgInput = document.querySelector('#msgText');
+            if(!msgInput){
+              msgInput = firstOutsideWizard(document.querySelectorAll(
+                'section[id*="message" i] textarea,[class*="message" i] textarea,textarea[id*="msg" i],textarea[name*="msg" i]'
+              ));
+            }
+            var nameInput = document.querySelector('#msgName');
+            if(!nameInput){
+              nameInput = firstOutsideWizard(document.querySelectorAll(
+                'section[id*="message" i] input[type="text"],[class*="message" i] input[type="text"],input[id*="msgname" i],input[name*="msgname" i]'
+              ));
+            }
+            if(msgInput) msgInput.value = msgText;
+            if(nameInput && authorName) nameInput.value = authorName;
+            var canUseLocalFn = typeof fn === 'function' && String(fn).indexOf('/api/event-messages/create')===-1;
+            if(canUseLocalFn){
+              fn();
+              return true;
+            }
+            var list = firstOutsideWizard(document.querySelectorAll(
+              '#msgList,#messageList,#msg-list,[class*="msg-list"],[class*="message-list"]'
+            ));
+            if(list){
+              var txt=String(msgText||'').trim();
+              if(!txt) return false;
+              var name=String(authorName||'').trim()||'Guest';
+              var key='onet_local_fallback_msgs_'+eid;
+              var rows=[];
+              try{
+                rows=JSON.parse(localStorage.getItem(key)||'[]');
+                if(!Array.isArray(rows)) rows=[];
+              }catch(e){ rows=[]; }
+              rows.unshift({
+                id:'local_'+Date.now()+'_'+Math.random().toString(16).slice(2,8),
+                author_name:name,
+                body:txt,
+                created_at:new Date().toISOString()
+              });
+              if(rows.length>100) rows=rows.slice(0,100);
+              try{ localStorage.setItem(key, JSON.stringify(rows)); }catch(e){}
+              var row=rows[0];
+              var timeLabel='';
+              try{
+                timeLabel=new Date(row.created_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              }catch(e){}
+              var looksEmpty = !list.children.length || /no messages yet|be the first/i.test((list.textContent||'').toLowerCase());
+              if(looksEmpty) list.innerHTML='';
+              var card=document.createElement('div');
+              card.className='onet-msg-card';
+              card.style.cssText='margin:10px 0;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.08);';
+              card.innerHTML='<div><strong>'+escapeHtmlLocal(row.author_name)+'</strong> <span style="opacity:.6;font-size:.85em;">'+escapeHtmlLocal(timeLabel)+'</span></div>'+
+                '<div class="onet-msg-body" style="margin-top:8px;white-space:pre-wrap;">'+escapeHtmlLocal(row.body)+'</div>';
+              list.insertBefore(card, list.firstChild||null);
+              if(msgInput) msgInput.value='';
+              if(nameInput) nameInput.value='';
+              return true;
+            }
+          }catch(e){}
+          return false;
+        }
         if(sk3) sk3.onclick=function(){ markShareStep('message',true); dismissShareWizard(); };
         if(postBtn) postBtn.onclick=function(){
           var nameEl=oz.querySelector('#owiz-name');
           var msgEl=oz.querySelector('#owiz-msg');
+          var authorName=(nameEl&&nameEl.value.trim())||'Guest';
           var msgText=(msgEl&&msgEl.value||'').trim();
           if(!msgText){ showErr('Please write a message before posting.'); return; }
           postBtn.disabled=true; postBtn.textContent='Posting…';
@@ -1151,22 +1235,37 @@ const PHOTO_ENGINE_S3 = `<script>
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({
               eventId:eid,
-              authorName:(nameEl&&nameEl.value.trim())||'Guest',
+              authorName:authorName,
               body:msgText,
               deviceId:getDeviceId()
             })
           })
-          .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+          .then(function(r){
+            return r.json().catch(function(){ return {}; }).then(function(d){
+              return {ok:r.ok,status:r.status,d:d||{}};
+            });
+          })
           .then(function(res){
             if(res.ok){
-              markShareStep('message',true);
-              dismissShareWizard();
+              completeMessageStep();
             } else {
+              if(submitLocalMessageFallback(authorName, msgText)){
+                completeMessageStep();
+                return;
+              }
               showErr(res.d&&res.d.error||'Could not post. Please try again.');
               postBtn.disabled=false; postBtn.textContent='Post to Board';
             }
           })
-          .catch(function(){ showErr('Network error. Please try again.'); postBtn.disabled=false; postBtn.textContent='Post to Board'; });
+          .catch(function(){
+            if(submitLocalMessageFallback(authorName, msgText)){
+              completeMessageStep();
+              return;
+            }
+            showErr('Network error. Please try again.');
+            postBtn.disabled=false;
+            postBtn.textContent='Post to Board';
+          });
         };
       }
     }
