@@ -938,7 +938,15 @@ const PHOTO_ENGINE_S3 = `<script>
       return ct.indexOf('video/')===0||/\\.(mp4|webm|mov)$/i.test(url);
     }
     function isShareEventMode(){
-      return document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share';
+      if(document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share') return true;
+      var text='';
+      try{ text=(document.body&&document.body.textContent||'').replace(/\s+/g,' ').toLowerCase(); }catch(e){}
+      var looksShare=/share event|leave a wish|wishes for the host|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
+      if(looksShare&&document.documentElement){
+        document.documentElement.setAttribute('data-oneday-event-mode','share');
+        return true;
+      }
+      return false;
     }
     function ensureShareQrCode(anchorControl){
       if(!isShareEventMode()) return null;
@@ -1813,9 +1821,12 @@ const PHOTO_ENGINE_S3 = `<script>
     // No fallback creation. Only wire explicit upload controls present in the generated page.
     var maxSections = isShareEventMode() ? 1 : 2;
     if(buttons.length>maxSections){
+      var keepButtons=buttons.slice(0,maxSections);
       buttons.slice(maxSections).forEach(function(el){
         var block=el.closest('section')||el.closest('div')||el.parentElement;
-        if(block) block.style.display='none';
+        var containsKept=block&&keepButtons.some(function(btn){ return block.contains(btn); });
+        if(block&&!containsKept) block.style.display='none';
+        else el.style.display='none';
       });
       buttons=buttons.slice(0,maxSections);
     }
