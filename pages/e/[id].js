@@ -986,9 +986,12 @@ const PHOTO_ENGINE_S3 = `<script>
     }
     function cleanupFakeShareQrCodes(){
       if(!isShareEventMode()) return;
+      var legacy=document.getElementById('oneday-share-qr');
+      if(legacy) legacy.remove();
       Array.prototype.slice.call(document.querySelectorAll('section,article,div')).forEach(function(block){
-        if(!block||block.id==='oneday-share-qr'||block.id==='oneday-share-wishes') return;
+        if(!block||block.id==='oneday-share-qr'||block.id==='oneday-share-wishes'||block.id==='oneday-share-upload-qr') return;
         if(block.closest&&block.closest('#oneday-share-qr')) return;
+        if(block.closest&&block.closest('#oneday-share-upload-qr')) return;
         var meta=((block.id||'')+' '+(block.className||'').toString()).toLowerCase();
         var text=(block.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
         var qrish=/\b(qr|qrcode|qr-code|signboard)\b/.test(meta)||/\b(scan to share photos|event qr code|qr code)\b/.test(text.slice(0,220));
@@ -1003,7 +1006,7 @@ const PHOTO_ENGINE_S3 = `<script>
         });
       });
       Array.prototype.slice.call(document.querySelectorAll('[class*="qr" i],[id*="qr" i]')).forEach(function(el){
-        if(!el||el.id==='oneday-share-qr'||el.closest('#oneday-share-qr')) return;
+        if(!el||el.id==='oneday-share-qr'||el.id==='oneday-share-upload-qr'||el.closest('#oneday-share-qr')||el.closest('#oneday-share-upload-qr')) return;
         if(el.matches('canvas,svg,img')||isDecorativeQrGrid(el)) hideSharePlaceholder(el);
       });
     }
@@ -1040,11 +1043,25 @@ const PHOTO_ENGINE_S3 = `<script>
       function addBlock(step, el){
         if(!el||seen.has(el)) return;
         if(el.id==='oneday-share-greeting-modal'||el.closest('#oneday-share-greeting-modal')) return;
-        if(el.id==='oneday-share-qr'||el.id==='oneday-share-wishes') return;
+        if(el.id==='oneday-share-wishes'||el.id==='oneday-share-upload-qr'||el.id==='oneday-share-qr') return;
         seen.add(el);
         blocks.push({step:step, el:el});
       }
-      Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,p,strong,span,div')).forEach(function(h){
+      function dedupeShareStepBlocks(list){
+        var byStep={};
+        list.forEach(function(b){
+          var prev=byStep[b.step];
+          if(!prev){
+            byStep[b.step]=b;
+            return;
+          }
+          var prevLen=(prev.el.textContent||'').length;
+          var nextLen=(b.el.textContent||'').length;
+          if(nextLen<prevLen||(prev.el.contains&&prev.el.contains(b.el))) byStep[b.step]=b;
+        });
+        return Object.keys(byStep).map(function(k){ return byStep[Number(k)]; }).sort(function(a,b){ return a.step-b.step; });
+      }
+      Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,p,strong,span')).forEach(function(h){
         var m=(h.textContent||'').match(/^step\\s*(\\d+)\\b/i);
         if(!m) return;
         var step=parseInt(m[1],10);
@@ -1052,16 +1069,16 @@ const PHOTO_ENGINE_S3 = `<script>
         var el=h.closest('section')||h.closest('article')||h.parentElement;
         addBlock(step, el);
       });
-      if(blocks.length) return blocks.sort(function(a,b){ return a.step-b.step; });
+      if(blocks.length) return dedupeShareStepBlocks(blocks);
       var sections=Array.prototype.slice.call(document.querySelectorAll('body > section, body > main > section, body > div > section'));
-      sections=sections.filter(function(s){ return s.id!=='oneday-share-qr'&&s.id!=='oneday-share-wishes'; });
+      sections=sections.filter(function(s){ return s.id!=='oneday-share-wishes'&&s.id!=='oneday-share-upload-qr'&&s.id!=='oneday-share-qr'; });
       if(sections[0]) addBlock(1, sections[0]);
       sections.forEach(function(s){
         var t=(s.textContent||'').toLowerCase();
         if(/wish|greeting|congratulations|leave a wish/.test(t)) addBlock(2, s);
         if(/photo|video|media|upload|gallery/.test(t)&&!/wishes for the honoree/.test(t)) addBlock(3, s);
       });
-      return blocks.sort(function(a,b){ return a.step-b.step; });
+      return dedupeShareStepBlocks(blocks);
     }
     function lockShareStepBlock(el){
       if(!el) return;
@@ -1144,49 +1161,81 @@ const PHOTO_ENGINE_S3 = `<script>
           wishesEl.setAttribute('data-oneday-share-locked','1');
         }
       }
-      var qrEl=ensureShareQrCode();
-      if(qrEl){
-        qrEl.style.removeProperty('display');
-        qrEl.removeAttribute('data-oneday-share-locked');
-        if(qrEl.parentNode) qrEl.parentNode.appendChild(qrEl);
+      var step3=document.querySelector('[data-oneday-share-step="3"]')||
+        document.querySelector('[data-oneday-managed="1"]')&&document.querySelector('[data-oneday-managed="1"]').closest('section')||
+        document.getElementById('photos')||
+        document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
+      placeShareUploadQr(step3, max);
+    }
+    function removeLegacyShareQr(){
+      var legacy=document.getElementById('oneday-share-qr');
+      if(legacy) legacy.remove();
+    }
+    function placeShareUploadQr(step3, max){
+      removeLegacyShareQr();
+      var qr=ensureShareUploadQr(step3);
+      if(!qr) return;
+      qr.style.removeProperty('display');
+      qr.removeAttribute('data-oneday-share-locked');
+      if(max>=3&&step3){
+        var insertBefore=step3.querySelector('[data-oneday-managed]')||
+          step3.querySelector('button,label,a,[role="button"]')||
+          step3.firstElementChild;
+        if(insertBefore&&insertBefore.parentNode) insertBefore.parentNode.insertBefore(qr, insertBefore);
+        else step3.insertBefore(qr, step3.firstChild||null);
+      } else if(qr.parentNode) {
+        qr.parentNode.appendChild(qr);
       }
     }
-    function ensureShareQrCode(){
+    function ensureShareUploadQr(anchorSection){
       if(!isShareEventMode()) return null;
-      var existing=document.getElementById('oneday-share-qr');
-      if(existing){
-        if(existing.parentNode) existing.parentNode.appendChild(existing);
-        return existing;
-      }
       var pageUrl=window.location.origin+window.location.pathname;
       var qrUrl=shareQrImageUrl();
-      var sec=document.createElement('section');
-      sec.id='oneday-share-qr';
-      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;';
-      sec.innerHTML=
-        '<div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:22px;align-items:center;text-align:left;">'+
-        '<div style="background:#fff;border-radius:22px;padding:14px;box-shadow:0 18px 48px rgba(0,0,0,.24);">'+
-        '<img alt="Scan QR code to open this event" src="'+qrUrl+'" style="display:block;width:100%;height:auto;border-radius:14px;">'+
+      var existing=document.getElementById('oneday-share-upload-qr');
+      if(existing){
+        if(anchorSection&&existing.parentNode!==anchorSection){
+          var host=anchorSection.querySelector('[data-oneday-managed]')||
+            anchorSection.querySelector('button,label,a,[role="button"]')||
+            anchorSection.firstElementChild;
+          if(host&&host.parentNode) host.parentNode.insertBefore(existing, host);
+          else anchorSection.insertBefore(existing, anchorSection.firstChild||null);
+        }
+        return existing;
+      }
+      var box=document.createElement('div');
+      box.id='oneday-share-upload-qr';
+      box.style.cssText='margin:0 0 18px;padding:18px;border-radius:20px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);display:grid;grid-template-columns:minmax(120px,168px) 1fr;gap:16px;align-items:center;text-align:left;font-family:Inter,system-ui,-apple-system,sans-serif;color:inherit;';
+      box.innerHTML=
+        '<div style="background:#fff;border-radius:16px;padding:10px;box-shadow:0 12px 32px rgba(0,0,0,.18);">'+
+        '<img alt="Scan QR code to upload photos and videos" src="'+qrUrl+'" style="display:block;width:100%;height:auto;border-radius:10px;">'+
         '</div>'+
         '<div>'+
-        '<p style="margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;opacity:.72;">Event QR Code</p>'+
-        '<h2 style="margin:0 0 10px;font-size:clamp(28px,5vw,48px);line-height:1.02;">Scan to Share Photos & Videos</h2>'+
-        '<p style="margin:0 0 14px;opacity:.82;font-size:clamp(15px,2.5vw,18px);line-height:1.5;">Guests scan this code, leave a wish for the honoree, and upload photos or videos.</p>'+
-        '<div style="word-break:break-all;font-size:12px;line-height:1.45;opacity:.72;background:rgba(0,0,0,.12);border-radius:12px;padding:10px 12px;">'+pageUrl+'</div>'+
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">'+
-        '<a href="'+qrUrl+'" download="oneday-event-qr.png" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);color:inherit;text-decoration:none;padding:10px 14px;font:900 13px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
-        '<button type="button" data-qr-copy style="border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.10);color:inherit;border-radius:999px;padding:10px 14px;font:900 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
-        '</div>'+
+        '<p style="margin:0 0 6px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;opacity:.72;">Scan to Upload</p>'+
+        '<h3 style="margin:0 0 8px;font-size:clamp(18px,3vw,24px);line-height:1.15;">Share Photos & Videos</h3>'+
+        '<p style="margin:0 0 10px;opacity:.8;font-size:14px;line-height:1.45;">Guests scan this code on their phone, leave a wish, then upload photos or videos.</p>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+        '<a href="'+qrUrl+'" download="oneday-upload-qr.png" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:inherit;text-decoration:none;padding:8px 12px;font:800 12px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
+        '<button type="button" data-upload-qr-copy style="border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);color:inherit;border-radius:999px;padding:8px 12px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
         '</div>'+
         '</div>';
-      var copy=sec.querySelector('[data-qr-copy]');
-      copy.onclick=function(){
-        if(navigator.clipboard&&navigator.clipboard.writeText){
-          navigator.clipboard.writeText(pageUrl).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Link'; },1600); }).catch(function(){});
-        }
-      };
-      document.body.appendChild(sec);
-      return sec;
+      var copy=box.querySelector('[data-upload-qr-copy]');
+      if(copy){
+        copy.onclick=function(){
+          if(navigator.clipboard&&navigator.clipboard.writeText){
+            navigator.clipboard.writeText(pageUrl).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Link'; },1600); }).catch(function(){});
+          }
+        };
+      }
+      if(anchorSection){
+        var insertBefore=anchorSection.querySelector('[data-oneday-managed]')||
+          anchorSection.querySelector('button,label,a,[role="button"]')||
+          anchorSection.firstElementChild;
+        if(insertBefore&&insertBefore.parentNode) insertBefore.parentNode.insertBefore(box, insertBefore);
+        else anchorSection.insertBefore(box, anchorSection.firstChild||null);
+      } else {
+        document.body.appendChild(box);
+      }
+      return box;
     }
     function greetingKey(){
       return 'oneday_share_greeting_'+eid;
@@ -1268,7 +1317,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
       else document.body.appendChild(sec);
       sec.querySelector('[data-w-refresh]').onclick=function(){ loadShareWishes(true); };
-      setTimeout(function(){ ensureShareQrCode(); applyShareStepFlow(); },0);
+      setTimeout(function(){ applyShareStepFlow(); },0);
       return sec;
     }
     function renderShareWishes(messages){
@@ -2178,7 +2227,6 @@ const PHOTO_ENGINE_S3 = `<script>
       normalizeShareInvitationCopy();
       cleanupFakeShareQrCodes();
       syncShareStepsFromProgress();
-      ensureShareQrCode();
       loadShareWishes(false);
       applyShareStepFlow();
     }
@@ -2224,6 +2272,7 @@ const PHOTO_ENGINE_S3 = `<script>
       grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
       revealPhotoWall(fb, grid);
+      if(shareMode) applyShareStepFlow();
 
       noticeState.grids[String(si)] = grid;
       loadGrid(grid, si);

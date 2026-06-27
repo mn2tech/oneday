@@ -95,7 +95,7 @@ export default async function handler(req, res) {
 
   const { data: ev, error: evErr } = await supabase
     .from('event_apps')
-    .select('id, title')
+    .select('id, title, html, prompt')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -105,6 +105,19 @@ export default async function handler(req, res) {
   }
   if (!ev) {
     return res.status(404).json({ error: 'Event not found.' });
+  }
+
+  const html = String(ev.html || '');
+  const promptText = String(ev.prompt || '');
+  const isShareEvent =
+    /data-oneday-event-mode=['"]share['"]/i.test(html) ||
+    /\bevent mode:\s*share\b/i.test(promptText) ||
+    /\bshare event\b/i.test(promptText);
+  if (isShareEvent) {
+    return res.status(400).json({
+      error: 'Email invitations are not available for Share Events. Use the QR code on the page instead.',
+      code: 'SHARE_EVENT_NO_INVITES',
+    });
   }
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
