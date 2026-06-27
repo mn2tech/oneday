@@ -1133,28 +1133,36 @@ const PHOTO_ENGINE_S3 = `<script>
           lockShareStepBlock(b.el);
         }
       });
-      var showExtras=getShareSteps().upload;
-      ['oneday-share-wishes','oneday-share-qr'].forEach(function(id){
-        var el=document.getElementById(id);
-        if(!el) return;
-        if(showExtras){
-          el.style.removeProperty('display');
-          el.removeAttribute('data-oneday-share-locked');
+      var showWishes=getShareSteps().upload;
+      var wishesEl=document.getElementById('oneday-share-wishes');
+      if(wishesEl){
+        if(showWishes){
+          wishesEl.style.removeProperty('display');
+          wishesEl.removeAttribute('data-oneday-share-locked');
         } else {
-          el.style.setProperty('display','none','important');
-          el.setAttribute('data-oneday-share-locked','1');
+          wishesEl.style.setProperty('display','none','important');
+          wishesEl.setAttribute('data-oneday-share-locked','1');
         }
-      });
+      }
+      var qrEl=ensureShareQrCode();
+      if(qrEl){
+        qrEl.style.removeProperty('display');
+        qrEl.removeAttribute('data-oneday-share-locked');
+        if(qrEl.parentNode) qrEl.parentNode.appendChild(qrEl);
+      }
     }
     function ensureShareQrCode(){
       if(!isShareEventMode()) return null;
       var existing=document.getElementById('oneday-share-qr');
-      if(existing) return existing;
+      if(existing){
+        if(existing.parentNode) existing.parentNode.appendChild(existing);
+        return existing;
+      }
       var pageUrl=window.location.origin+window.location.pathname;
       var qrUrl=shareQrImageUrl();
       var sec=document.createElement('section');
       sec.id='oneday-share-qr';
-      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;display:none;';
+      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;';
       sec.innerHTML=
         '<div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:22px;align-items:center;text-align:left;">'+
         '<div style="background:#fff;border-radius:22px;padding:14px;box-shadow:0 18px 48px rgba(0,0,0,.24);">'+
@@ -1177,17 +1185,7 @@ const PHOTO_ENGINE_S3 = `<script>
           navigator.clipboard.writeText(pageUrl).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Link'; },1600); }).catch(function(){});
         }
       };
-      var anchor=document.getElementById('oneday-share-wishes')||
-        document.querySelector('[data-oneday-managed="1"]')||
-        document.getElementById('photos')||
-        document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
-      if(anchor){
-        var block=anchor.closest&&anchor.closest('section') ? anchor.closest('section') : anchor;
-        if(block&&block.parentNode) block.parentNode.insertBefore(sec, block.nextSibling);
-        else document.body.appendChild(sec);
-      } else {
-        document.body.appendChild(sec);
-      }
+      document.body.appendChild(sec);
       return sec;
     }
     function greetingKey(){
@@ -2180,6 +2178,7 @@ const PHOTO_ENGINE_S3 = `<script>
       normalizeShareInvitationCopy();
       cleanupFakeShareQrCodes();
       syncShareStepsFromProgress();
+      ensureShareQrCode();
       loadShareWishes(false);
       applyShareStepFlow();
     }
