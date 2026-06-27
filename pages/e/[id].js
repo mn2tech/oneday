@@ -940,6 +940,43 @@ const PHOTO_ENGINE_S3 = `<script>
     function isShareEventMode(){
       return document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share';
     }
+    function ensureShareQrCode(anchorControl){
+      if(!isShareEventMode()) return null;
+      var existing=document.getElementById('oneday-share-qr');
+      if(existing) return existing;
+      var pageUrl=window.location.origin+window.location.pathname;
+      var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=24&data='+encodeURIComponent(pageUrl);
+      var sec=document.createElement('section');
+      sec.id='oneday-share-qr';
+      sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;';
+      sec.innerHTML=
+        '<div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:22px;align-items:center;text-align:left;">'+
+        '<div style="background:#fff;border-radius:22px;padding:14px;box-shadow:0 18px 48px rgba(0,0,0,.24);">'+
+        '<img alt="Scan QR code to open this event" src="'+qrUrl+'" style="display:block;width:100%;height:auto;border-radius:14px;">'+
+        '</div>'+
+        '<div>'+
+        '<p style="margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;opacity:.72;">Event QR Code</p>'+
+        '<h2 style="margin:0 0 10px;font-size:clamp(28px,5vw,48px);line-height:1.02;">Scan to Share Photos & Videos</h2>'+
+        '<p style="margin:0 0 14px;opacity:.82;font-size:clamp(15px,2.5vw,18px);line-height:1.5;">Guests scan this code, leave a wish for the host, and upload photos or videos.</p>'+
+        '<div style="word-break:break-all;font-size:12px;line-height:1.45;opacity:.72;background:rgba(0,0,0,.12);border-radius:12px;padding:10px 12px;">'+pageUrl+'</div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">'+
+        '<a href="'+qrUrl+'" download="oneday-event-qr.png" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);color:inherit;text-decoration:none;padding:10px 14px;font:900 13px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
+        '<button type="button" data-qr-copy style="border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.10);color:inherit;border-radius:999px;padding:10px 14px;font:900 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
+        '</div>'+
+        '</div>'+
+        '</div>';
+      var copy=sec.querySelector('[data-qr-copy]');
+      copy.onclick=function(){
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(pageUrl).then(function(){ copy.textContent='Copied'; setTimeout(function(){ copy.textContent='Copy Link'; },1600); }).catch(function(){});
+        }
+      };
+      var anchor=anchorControl&&(anchorControl.closest('section')||anchorControl.parentElement);
+      if(!anchor) anchor=document.getElementById('photos')||document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
+      if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor);
+      else document.body.insertBefore(sec, document.body.firstChild);
+      return sec;
+    }
     function greetingKey(){
       return 'oneday_share_greeting_'+eid;
     }
@@ -1783,7 +1820,10 @@ const PHOTO_ENGINE_S3 = `<script>
       buttons=buttons.slice(0,maxSections);
     }
 
-    if(isShareEventMode()) loadShareWishes(false);
+    if(isShareEventMode()){
+      ensureShareQrCode(buttons[0]);
+      loadShareWishes(false);
+    }
     if (!buttons.length) return;
 
     var MAX_SECTIONS = maxSections;
