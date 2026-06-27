@@ -598,6 +598,7 @@ const PHOTO_ENGINE_LEGACY = `<script>
     // Match original OneDay behavior (+ case-insensitive text + file-picker labels).
     // Do not exclude by #poll — some layouts nest sections oddly and uploads would disappear.
     function isPhotoUploadControl(el){
+      if(!el || el.getAttribute('data-oneday-ignore-upload')==='1' || el.getAttribute('aria-hidden')==='true') return false;
       var fo=(el.getAttribute('for')||'');
       if(el.tagName==='LABEL'&&/^photo-input/i.test(fo)) return true;
       var t=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
@@ -1830,24 +1831,23 @@ const PHOTO_ENGINE_S3 = `<script>
         linked.setAttribute('aria-hidden','true');
         linked.setAttribute('tabindex','-1');
       }
-      if(block){
-        Array.prototype.slice.call(block.querySelectorAll('input[type=file]')).forEach(function(inp){
-          if(containsKept&&keepButtons.some(function(btn){ return btn.getAttribute&&btn.getAttribute('for')===inp.id; })) return;
-          inp.disabled=true;
-          inp.value='';
-          inp.style.setProperty('display','none','important');
-          inp.setAttribute('aria-hidden','true');
-          inp.setAttribute('tabindex','-1');
-        });
+      var sib=el.nextElementSibling;
+      if(sib&&sib.matches&&sib.matches('input[type=file]')){
+        sib.disabled=true;
+        sib.value='';
+        sib.style.setProperty('display','none','important');
+        sib.setAttribute('aria-hidden','true');
+        sib.setAttribute('tabindex','-1');
       }
-      if(block&&!containsKept) block.style.display='none';
-      else {
-        el.style.setProperty('display','none','important');
-        el.setAttribute('aria-hidden','true');
-        el.setAttribute('tabindex','-1');
-        if(el.tagName==='LABEL') el.removeAttribute('for');
-        el.onclick=function(ev){ if(ev&&ev.preventDefault) ev.preventDefault(); return false; };
+      if(block&&!containsKept&&block.querySelectorAll('button,label,a,[role="button"]').length<=1) {
+        block.style.display='none';
       }
+      el.setAttribute('data-oneday-ignore-upload','1');
+      el.style.setProperty('display','none','important');
+      el.setAttribute('aria-hidden','true');
+      el.setAttribute('tabindex','-1');
+      if(el.tagName==='LABEL') el.removeAttribute('for');
+      el.onclick=function(ev){ if(ev&&ev.preventDefault) ev.preventDefault(); return false; };
     }
 
     // No fallback creation. Only wire explicit upload controls present in the generated page.
