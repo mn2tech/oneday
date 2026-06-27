@@ -1142,6 +1142,14 @@ const PHOTO_ENGINE_S3 = `<script>
           markShareStep('message',true);
           dismissShareWizard();
         }
+        function escapeHtmlLocal(text){
+          return String(text==null?'':text)
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+        }
         function submitLocalMessageFallback(authorName, msgText){
           try{
             var fn = window.submitMessage || window.sendMessage || window.addMessage ||
@@ -1167,15 +1175,47 @@ const PHOTO_ENGINE_S3 = `<script>
             }
             if(msgInput) msgInput.value = msgText;
             if(nameInput && authorName) nameInput.value = authorName;
-            if(typeof fn === 'function'){
+            var canUseLocalFn = typeof fn === 'function' && String(fn).indexOf('/api/event-messages/create')===-1;
+            if(canUseLocalFn){
               fn();
               return true;
             }
-            var sendBtn = firstOutsideWizard(document.querySelectorAll(
-              '.btn-post,.btn-send,.btn-submit-msg,[class*="btn-post"],[id*="postBtn"],[id*="sendBtn"],[id*="msgBtn"],[id*="submitMsg"],[id*="postMessage"],button[class*="post-message"]'
+            var list = firstOutsideWizard(document.querySelectorAll(
+              '#msgList,#messageList,#msg-list,[class*="msg-list"],[class*="message-list"]'
             ));
-            if(sendBtn){
-              sendBtn.click();
+            if(list){
+              var txt=String(msgText||'').trim();
+              if(!txt) return false;
+              var name=String(authorName||'').trim()||'Guest';
+              var key='onet_local_fallback_msgs_'+eid;
+              var rows=[];
+              try{
+                rows=JSON.parse(localStorage.getItem(key)||'[]');
+                if(!Array.isArray(rows)) rows=[];
+              }catch(e){ rows=[]; }
+              rows.unshift({
+                id:'local_'+Date.now()+'_'+Math.random().toString(16).slice(2,8),
+                author_name:name,
+                body:txt,
+                created_at:new Date().toISOString()
+              });
+              if(rows.length>100) rows=rows.slice(0,100);
+              try{ localStorage.setItem(key, JSON.stringify(rows)); }catch(e){}
+              var row=rows[0];
+              var timeLabel='';
+              try{
+                timeLabel=new Date(row.created_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              }catch(e){}
+              var looksEmpty = !list.children.length || /no messages yet|be the first/i.test((list.textContent||'').toLowerCase());
+              if(looksEmpty) list.innerHTML='';
+              var card=document.createElement('div');
+              card.className='onet-msg-card';
+              card.style.cssText='margin:10px 0;padding:12px;border-radius:10px;border:1px solid rgba(0,0,0,.08);';
+              card.innerHTML='<div><strong>'+escapeHtmlLocal(row.author_name)+'</strong> <span style="opacity:.6;font-size:.85em;">'+escapeHtmlLocal(timeLabel)+'</span></div>'+
+                '<div class="onet-msg-body" style="margin-top:8px;white-space:pre-wrap;">'+escapeHtmlLocal(row.body)+'</div>';
+              list.insertBefore(card, list.firstChild||null);
+              if(msgInput) msgInput.value='';
+              if(nameInput) nameInput.value='';
               return true;
             }
           }catch(e){}
@@ -1209,8 +1249,7 @@ const PHOTO_ENGINE_S3 = `<script>
             if(res.ok){
               completeMessageStep();
             } else {
-              var shouldFallback = res.status===503 || res.status===404 || (res.d&&res.d.code==='TABLE_MISSING');
-              if(shouldFallback && submitLocalMessageFallback(authorName, msgText)){
+              if(submitLocalMessageFallback(authorName, msgText)){
                 completeMessageStep();
                 return;
               }
