@@ -368,6 +368,36 @@ function injectShareEventCleanup(html) {
         first.textContent='Add Photos & Videos';
       }
     }
+    function hideEl(el){
+      if(!el) return;
+      el.style.setProperty('display','none','important');
+      el.setAttribute('data-oneday-share-hidden','1');
+      el.setAttribute('aria-hidden','true');
+    }
+    function isDecorativeQrGrid(el){
+      if(!el||el.tagName!=='DIV') return false;
+      var kids=el.children;
+      if(kids.length<16) return false;
+      var cells=0;
+      for(var i=0;i<kids.length;i++){ if(kids[i].tagName==='DIV') cells++; }
+      return cells>=16;
+    }
+    Array.prototype.slice.call(document.querySelectorAll('section,article,div')).forEach(function(block){
+      if(!block||block.id==='oneday-share-qr') return;
+      var meta=((block.id||'')+' '+(block.className||'').toString()).toLowerCase();
+      var text=(block.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+      var qrish=/\\b(qr|qrcode|qr-code|signboard)\\b/.test(meta)||/\\b(scan to share photos|event qr code|qr code)\\b/.test(text.slice(0,220));
+      if(!qrish) return;
+      Array.prototype.slice.call(block.querySelectorAll('canvas,svg')).forEach(hideEl);
+      Array.prototype.slice.call(block.querySelectorAll('div')).forEach(function(d){
+        if(isDecorativeQrGrid(d)) hideEl(d);
+      });
+      Array.prototype.slice.call(block.querySelectorAll('img')).forEach(function(img){
+        var src=(img.getAttribute('src')||'').toLowerCase();
+        if(src.indexOf('qrserver.com')!==-1) return;
+        if(/qr|scan/i.test((img.alt||'')+' '+(img.className||'').toString())) hideEl(img);
+      });
+    });
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run);
   else run();
@@ -393,7 +423,7 @@ function buildUserPrompt(prompt, eventDateTime, eventMeta) {
     ? `\n\nCOUNTDOWN TARGET: Use exactly "${eventDateTime.isoLocal}" as the JavaScript countdown target. This is the event's local date${eventDateTime.hasTime ? ' and start time' : ''}; do not invent a different date or time.`
     : '';
   const shareInstruction = eventMeta?.eventMode === 'share'
-    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use "Welcome" as the greeting headline, never "You are invited" or invitation wording. Use this exact guest-facing sequence: 1) Welcome / event intro. 2) Enter name and write a short congratulations note/wish for the honoree. 3) Upload photos or videos in one single media upload section. 4) View the shared media wall and "Wishes for the Honoree" board. 5) Show the visible event QR code/signboard area at the bottom as the final step. Include only: a bold signboard-style hero, event name/date/host if provided, a large "Leave a Wish, Then Upload" call-to-action, a simple greeting/wish step, one single media wall upload section, a wishes board, and a bottom QR code/signboard area labeled "Scan to Share Photos & Videos". Do NOT create multiple upload sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard QR code.'
+    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use "Welcome" as the greeting headline, never "You are invited" or invitation wording. Use this exact guest-facing sequence: 1) Welcome / event intro. 2) Enter name and write a short congratulations note/wish for the honoree. 3) Upload photos or videos in one single media upload section. 4) View the shared media wall and "Wishes for the Honoree" board. 5) End with a text-only signboard area labeled "Scan to Share Photos & Videos" (OneDay injects the real scannable QR code automatically at the bottom). Include only: a bold signboard-style hero, event name/date/host if provided, a large "Leave a Wish, Then Upload" call-to-action, a simple greeting/wish step, one single media wall upload section, a wishes board, and a bottom text signboard CTA. Do NOT draw or render a QR code image, SVG, canvas, CSS grid QR pattern, or placeholder QR box — the platform adds the real QR automatically. Do NOT create multiple upload sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard.'
     : '';
   const intro = eventMeta?.eventMode === 'share'
     ? 'Create a complete Share Event app for the following event:'

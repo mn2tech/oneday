@@ -959,12 +959,60 @@ const PHOTO_ENGINE_S3 = `<script>
         }
       });
     }
+    function shareQrImageUrl(){
+      var pageUrl=window.location.origin+window.location.pathname;
+      return 'https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=24&data='+encodeURIComponent(pageUrl);
+    }
+    function isRealQrImg(el){
+      if(!el||el.tagName!=='IMG') return false;
+      var src=(el.getAttribute('src')||'').toLowerCase();
+      return src.indexOf('qrserver.com')!==-1||src.indexOf('create-qr-code')!==-1;
+    }
+    function hideSharePlaceholder(el){
+      if(!el) return;
+      el.style.setProperty('display','none','important');
+      el.setAttribute('data-oneday-share-hidden','1');
+      el.setAttribute('aria-hidden','true');
+    }
+    function isDecorativeQrGrid(el){
+      if(!el||el.tagName!=='DIV') return false;
+      var kids=el.children;
+      if(kids.length<16) return false;
+      var cells=0;
+      for(var i=0;i<kids.length;i++){
+        if(kids[i].tagName==='DIV') cells++;
+      }
+      return cells>=16;
+    }
+    function cleanupFakeShareQrCodes(){
+      if(!isShareEventMode()) return;
+      Array.prototype.slice.call(document.querySelectorAll('section,article,div')).forEach(function(block){
+        if(!block||block.id==='oneday-share-qr'||block.id==='oneday-share-wishes') return;
+        if(block.closest&&block.closest('#oneday-share-qr')) return;
+        var meta=((block.id||'')+' '+(block.className||'').toString()).toLowerCase();
+        var text=(block.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+        var qrish=/\b(qr|qrcode|qr-code|signboard)\b/.test(meta)||/\b(scan to share photos|event qr code|qr code)\b/.test(text.slice(0,220));
+        if(!qrish) return;
+        Array.prototype.slice.call(block.querySelectorAll('canvas,svg')).forEach(hideSharePlaceholder);
+        Array.prototype.slice.call(block.querySelectorAll('div')).forEach(function(d){
+          if(isDecorativeQrGrid(d)) hideSharePlaceholder(d);
+        });
+        Array.prototype.slice.call(block.querySelectorAll('img')).forEach(function(img){
+          if(isRealQrImg(img)) return;
+          if(/qr|scan/i.test((img.alt||'')+' '+(img.className||'').toString())) hideSharePlaceholder(img);
+        });
+      });
+      Array.prototype.slice.call(document.querySelectorAll('[class*="qr" i],[id*="qr" i]')).forEach(function(el){
+        if(!el||el.id==='oneday-share-qr'||el.closest('#oneday-share-qr')) return;
+        if(el.matches('canvas,svg,img')||isDecorativeQrGrid(el)) hideSharePlaceholder(el);
+      });
+    }
     function ensureShareQrCode(){
       if(!isShareEventMode()) return null;
       var existing=document.getElementById('oneday-share-qr');
       if(existing) return existing;
       var pageUrl=window.location.origin+window.location.pathname;
-      var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=24&data='+encodeURIComponent(pageUrl);
+      var qrUrl=shareQrImageUrl();
       var sec=document.createElement('section');
       sec.id='oneday-share-qr';
       sec.style.cssText='margin:28px auto;padding:24px;width:min(92vw,980px);box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;text-align:center;';
@@ -1987,6 +2035,7 @@ const PHOTO_ENGINE_S3 = `<script>
 
     if(shareMode){
       normalizeShareInvitationCopy();
+      cleanupFakeShareQrCodes();
       loadShareWishes(false);
     }
     if (!buttons.length) return;
