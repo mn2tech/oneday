@@ -1035,109 +1035,99 @@ const PHOTO_ENGINE_S3 = `<script>
       s[name]=!!val;
       try{ localStorage.setItem(shareStepsKey(), JSON.stringify(s)); }catch(e){}
     }
-    function maxUnlockedShareStep(){
-      var s=getShareSteps();
-      if(s.upload) return 99;
-      if(s.welcome) return 2;
-      return 1;
-    }
-    function findShareStepBlocks(){
-      var blocks=[];
-      var seen=new Set();
-      function addBlock(step, el){
-        if(!el||seen.has(el)) return;
-        if(el.id==='oneday-share-greeting-modal'||el.closest('#oneday-share-greeting-modal')) return;
-        if(el.id==='oneday-share-wishes'||el.id==='oneday-share-upload-qr'||el.id==='oneday-share-qr') return;
-        seen.add(el);
-        blocks.push({step:step, el:el});
-      }
-      function dedupeShareStepBlocks(list){
-        var byStep={};
-        list.forEach(function(b){
-          var prev=byStep[b.step];
-          if(!prev){
-            byStep[b.step]=b;
-            return;
-          }
-          var prevLen=(prev.el.textContent||'').length;
-          var nextLen=(b.el.textContent||'').length;
-          if(nextLen<prevLen||(prev.el.contains&&prev.el.contains(b.el))) byStep[b.step]=b;
-        });
-        return Object.keys(byStep).map(function(k){ return byStep[Number(k)]; }).sort(function(a,b){ return a.step-b.step; });
-      }
-      Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,p,strong,span')).forEach(function(h){
-        var m=(h.textContent||'').match(/^step\\s*(\\d+)\\b/i);
-        if(!m) return;
-        var step=parseInt(m[1],10);
-        if(!step||step<1) return;
-        var el=h.closest('section')||h.closest('article')||h.parentElement;
-        addBlock(step, el);
-      });
-      if(blocks.length) return dedupeShareStepBlocks(blocks);
-      var sections=Array.prototype.slice.call(document.querySelectorAll('body > section, body > main > section, body > div > section'));
-      sections=sections.filter(function(s){ return s.id!=='oneday-share-wishes'&&s.id!=='oneday-share-upload-qr'&&s.id!=='oneday-share-qr'; });
-      if(sections[0]) addBlock(1, sections[0]);
-      sections.forEach(function(s){
-        var t=(s.textContent||'').toLowerCase();
-        if(/photo|video|media|upload|gallery/.test(t)&&!isShareWishBlock(s)) addBlock(2, s);
-      });
-      return dedupeShareStepBlocks(blocks);
-    }
-    function lockShareStepBlock(el){
-      if(!el) return;
-      el.setAttribute('data-oneday-share-locked','1');
-      el.style.setProperty('display','none','important');
-    }
-    function unlockShareStepBlock(el){
-      if(!el) return;
-      el.removeAttribute('data-oneday-share-locked');
-      el.style.removeProperty('display');
-    }
-    function ensureStepContinueButton(stepEl){
-      if(!stepEl||getShareSteps().welcome||stepEl.querySelector('[data-oneday-step-continue]')) return;
-      var btn=document.createElement('button');
-      btn.type='button';
-      btn.setAttribute('data-oneday-step-continue','1');
-      btn.textContent='Continue to Upload';
-      btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin-top:18px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:12px 18px;font:900 14px/1 Inter,system-ui,sans-serif;cursor:pointer;';
-      btn.onclick=function(){
-        markShareStep('welcome', true);
-        applyShareStepFlow();
-        var step2=document.querySelector('[data-oneday-share-step="2"],[data-oneday-share-step="3"]');
-        if(step2) step2.scrollIntoView({behavior:'smooth',block:'start'});
-      };
-      stepEl.appendChild(btn);
-    }
-    function applyShareStepFlow(){
-      if(!isShareEventMode()) return;
-      removeShareWishUI();
-      var max=maxUnlockedShareStep();
-      var blocks=findShareStepBlocks();
-      blocks.forEach(function(b){
-        if(isShareWishBlock(b.el)){
-          lockShareStepBlock(b.el);
-          return;
-        }
-        var effectiveStep=b.step>=3?2:b.step;
-        b.el.setAttribute('data-oneday-share-step', String(effectiveStep));
-        if(effectiveStep<=max){
-          unlockShareStepBlock(b.el);
-          if(effectiveStep===1){
-            if(!getShareSteps().welcome) ensureStepContinueButton(b.el);
-            else{
-              var cont=b.el.querySelector('[data-oneday-step-continue]');
-              if(cont) cont.style.display='none';
-            }
-          }
-        } else {
-          lockShareStepBlock(b.el);
-        }
-      });
-      var uploadStep=document.querySelector('[data-oneday-share-step="2"]')||
-        document.querySelector('[data-oneday-managed="1"]')&&document.querySelector('[data-oneday-managed="1"]').closest('section')||
+
+    function findUploadSection(){
+      return (document.querySelector('[data-oneday-managed="1"]')&&document.querySelector('[data-oneday-managed="1"]').closest('section'))||
         document.getElementById('photos')||
         document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
-      placeShareUploadQr(uploadStep, max);
+    }
+    function escapeHtmlWizard(s){
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    function dismissShareWizard(){
+      var oz=document.getElementById('oneday-wizard-overlay');
+      if(oz){
+        oz.style.transition='opacity .3s ease';
+        oz.style.opacity='0';
+        setTimeout(function(){ if(oz.parentNode) oz.remove(); },340);
+      }
+      try{ document.body.style.overflow=''; }catch(e){}
+      markShareStep('upload',true);
+      placeShareUploadQr(findUploadSection(),99);
+    }
+    function renderShareWizard(step){
+      var oz=document.getElementById('oneday-wizard-overlay');
+      if(!oz){
+        oz=document.createElement('div');
+        oz.id='oneday-wizard-overlay';
+        document.body.appendChild(oz);
+      }
+      try{ document.body.style.overflow='hidden'; }catch(e){}
+      var pageUrl=window.location.origin+window.location.pathname;
+      var qrUrl=shareQrImageUrl();
+      var title=(window.__ONEDAY_EVENT_TITLE__&&window.__ONEDAY_EVENT_TITLE__.trim())||
+        (function(){ var h=document.querySelector('h1'); return h?(h.textContent||'').trim():''; }())||'Welcome';
+      var pgStyle=window.getComputedStyle(document.body);
+      var bg=pgStyle.background;
+      var solidBg=pgStyle.backgroundColor;
+      var useBg=(solidBg&&solidBg!=='rgba(0, 0, 0, 0)'&&solidBg!=='transparent')?solidBg:
+                (bg&&bg!=='rgba(0, 0, 0, 0)'&&bg!=='transparent')?bg:
+                'linear-gradient(135deg,#080814 0%,#18082e 100%)';
+      var col=pgStyle.color||'#fff';
+      oz.style.cssText='position:fixed;inset:0;z-index:2147483640;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:32px 20px 48px;box-sizing:border-box;min-height:100vh;background:'+useBg+';color:'+col+';font-family:Inter,system-ui,-apple-system,sans-serif;';
+      var dots='<div style="display:flex;gap:7px;margin-bottom:22px;">'+
+        '<div style="width:28px;height:6px;border-radius:3px;background:currentColor;opacity:'+(step>=1?'.9':'.25')+'"></div>'+
+        '<div style="width:28px;height:6px;border-radius:3px;background:currentColor;opacity:'+(step>=2?'.9':'.25')+'"></div>'+
+        '</div>';
+      if(step===1){
+        oz.innerHTML=
+          '<div style="width:100%;max-width:480px;padding-top:max(8vh,32px);">'+
+          dots+
+          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 1 of 2</p>'+
+          '<h1 style="margin:0 0 14px;font-size:clamp(30px,7vw,56px);line-height:1.05;font-weight:900;">'+escapeHtmlWizard(title)+'</h1>'+
+          '<p style="margin:0 0 40px;font-size:clamp(15px,2.8vw,20px);line-height:1.55;opacity:.82;">Tap below to share your photos and videos from today.</p>'+
+          '<button type="button" id="owiz-start" style="display:block;width:100%;max-width:340px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);">Start Sharing →</button>'+
+          '</div>';
+        var s=oz.querySelector('#owiz-start');
+        if(s) s.onclick=function(){ markShareStep('welcome',true); renderShareWizard(2); };
+      } else {
+        oz.innerHTML=
+          '<div style="width:100%;max-width:480px;padding-top:max(5vh,24px);text-align:center;">'+
+          dots+
+          '<p style="margin:0 0 12px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.6;">Step 2 of 2</p>'+
+          '<h2 style="margin:0 0 10px;font-size:clamp(24px,5vw,42px);line-height:1.1;font-weight:900;">Share Photos & Videos</h2>'+
+          '<p style="margin:0 0 20px;font-size:clamp(14px,2.5vw,17px);line-height:1.5;opacity:.8;">Scan the QR code with your phone, or tap the button to upload directly.</p>'+
+          '<div style="background:#fff;border-radius:24px;padding:14px;box-shadow:0 18px 52px rgba(0,0,0,.32);width:min(66vw,230px);margin:0 auto 22px;">'+
+          '<img alt="Scan to share photos and videos" src="'+qrUrl+'" style="display:block;width:100%;height:auto;border-radius:16px;">'+
+          '</div>'+
+          '<button type="button" id="owiz-upload" style="display:block;width:100%;max-width:340px;margin:0 auto 14px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:18px 28px;font:900 17px/1 Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(124,58,237,.45);">Add Photos & Videos</button>'+
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'+
+          '<a href="'+qrUrl+'" download="oneday-event-qr.png" style="display:inline-flex;align-items:center;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:inherit;text-decoration:none;padding:9px 15px;font:800 12px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
+          '<button type="button" id="owiz-copy" style="border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:inherit;border-radius:999px;padding:9px 15px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
+          '</div>'+
+          '</div>';
+        var ul=oz.querySelector('#owiz-upload');
+        var cp=oz.querySelector('#owiz-copy');
+        if(ul) ul.onclick=function(){
+          var inp=document.querySelector('input[data-oneday-engine="1"]')||document.querySelector('input[type="file"]');
+          if(inp) inp.click();
+        };
+        if(cp) cp.onclick=function(){
+          if(navigator.clipboard&&navigator.clipboard.writeText){
+            navigator.clipboard.writeText(pageUrl).then(function(){ cp.textContent='Copied!'; setTimeout(function(){ cp.textContent='Copy Link'; },1600); }).catch(function(){});
+          }
+        };
+      }
+    }
+    function bootShareWizard(){
+      if(!isShareEventMode()) return;
+      if(document.getElementById('oneday-wizard-overlay')) return;
+      var steps=getShareSteps();
+      if(steps.upload){
+        placeShareUploadQr(findUploadSection(),99);
+        return;
+      }
+      renderShareWizard(steps.welcome ? 2 : 1);
     }
     function removeLegacyShareQr(){
       var legacy=document.getElementById('oneday-share-qr');
@@ -1967,7 +1957,7 @@ const PHOTO_ENGINE_S3 = `<script>
       normalizeShareInvitationCopy();
       cleanupFakeShareQrCodes();
       removeShareWishUI();
-      applyShareStepFlow();
+      bootShareWizard();
     }
     if (!buttons.length) return;
 
@@ -2011,7 +2001,7 @@ const PHOTO_ENGINE_S3 = `<script>
       grid.setAttribute('data-oneday-section-index', String(si));
       grid.style.cssText=GCSS;
       revealPhotoWall(fb, grid);
-      if(shareMode) applyShareStepFlow();
+      if(shareMode) bootShareWizard();
 
       noticeState.grids[String(si)] = grid;
       loadGrid(grid, si);
@@ -2060,14 +2050,14 @@ const PHOTO_ENGINE_S3 = `<script>
                 body:JSON.stringify({eventId:eid,sectionIndex:si,key:d.key,byteSize:bodyBlob.size,contentType:ct,deviceId:getDeviceId()})
               }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'register failed'); return j; }); });
             })
-            .then(function(){ loadGrid(grid, si, {force:true}); markShareStep('upload', true); applyShareStepFlow(); })
+            .then(function(){ loadGrid(grid, si, {force:true}); dismissShareWizard(); })
             .catch(function(err){ alert(err.message||'Upload failed'); });
           });
         });
       });
     });
 
-    if(isShareEventMode()) applyShareStepFlow();
+    if(isShareEventMode()) bootShareWizard();
   }
 
   document.addEventListener('DOMContentLoaded', function(){
