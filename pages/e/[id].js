@@ -942,7 +942,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share') return true;
       var text='';
       try{ text=(document.body&&document.body.textContent||'').replace(/\s+/g,' ').toLowerCase(); }catch(e){}
-      var looksShare=/share event|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
+      var looksShare=/share event|scan to share|add photos & videos|event mode.*share|oneday-wizard-overlay/.test(text);
       if(looksShare&&document.documentElement){
         document.documentElement.setAttribute('data-oneday-event-mode','share');
         return true;
@@ -2357,6 +2357,18 @@ export async function getServerSideProps({ params, res, query }) {
   const phase1Source = allowDraftPreview && data.content_phase1_draft ? data.content_phase1_draft : data.content_phase1;
   const phase1Content = normalizePhase1Content(phase1Source || {}, data.title || '');
   const phase1Payload = JSON.stringify(phase1Content).replace(/</g, '\\u003c');
+
+  // Detect share events at serve-time from saved HTML so old events that predate
+  // injectShareEventCleanup still get the wizard without relying on text detection.
+  const isShareEventPage =
+    /data-oneday-event-mode="share"/.test(data.html || '') ||
+    /event mode: share event/i.test(data.html || '') ||
+    /scan to share photos/i.test(data.html || '') ||
+    /add photos & videos/i.test(data.html || '') ||
+    /share event/i.test(data.html || '');
+  const shareModeBootstrap = isShareEventPage
+    ? `<script>document.documentElement.setAttribute('data-oneday-event-mode','share');<\/script>`
+    : '';
   const liveEventDetails = extractLiveEventDetailsFromHtml(data.html || '', {
     title: data.title || '',
     eventDate: data.event_date || '',
@@ -2638,6 +2650,8 @@ label[for^="photo-input"] {
 </style>`;
   // Cloud interactions run before photo engine so submitMessage / vote / handleRSVP are shared before onclick wiring.
   const injection =
+    shareModeBootstrap +
+    '\n' +
     watermark +
     '\n' +
     themeStyleTag +
