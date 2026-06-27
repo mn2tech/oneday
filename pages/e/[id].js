@@ -1019,13 +1019,30 @@ const PHOTO_ENGINE_S3 = `<script>
         '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Congratulations / wish</label>'+
         '<textarea data-g-wish maxlength="2000" rows="4" placeholder="Write a blessing, congratulations note, or memory..." style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.45 Inter,system-ui,sans-serif;resize:vertical;color:#111827;background:#fff;"></textarea>'+
         '<div data-g-error style="display:none;color:#dc2626;font:700 13px/1.4 Inter,system-ui,sans-serif;margin-top:10px;"></div>'+
-        '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">'+
+        '<div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:18px;">'+
+        '<button type="button" data-g-ai style="border:1px solid #d8b4fe;background:#faf5ff;color:#6d28d9;border-radius:999px;padding:10px 14px;font:800 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">AI Help Me Write</button>'+
+        '<div style="display:flex;gap:10px;">'+
         '<button type="button" data-g-cancel style="border:1px solid #d1d5db;background:#fff;color:#334155;border-radius:999px;padding:10px 14px;font:800 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Cancel</button>'+
         '<button type="button" data-g-submit style="border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:11px 16px;font:900 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Continue to Upload</button>'+
+        '</div>'+
         '</div>'+
         '</div>';
       document.body.appendChild(root);
       root.querySelector('[data-g-cancel]').onclick=function(){ root.style.display='none'; };
+      root.querySelector('[data-g-ai]').onclick=function(){
+        var wish=root.querySelector('[data-g-wish]');
+        var name=root.querySelector('[data-g-name]');
+        var who=(name&&name.value||'').trim();
+        var options=[
+          'Congratulations! Wishing you a lifetime filled with love, joy, peace, and beautiful memories together.',
+          'May God bless this special day and fill your home with love, laughter, and grace for all the years ahead.',
+          'So happy to celebrate with you today. May this new chapter be full of blessing, unity, and endless joy.',
+          'Wishing you both a beautiful beginning and a marriage rooted in love, faith, patience, and happiness.'
+        ];
+        var pick=options[Math.floor(Math.random()*options.length)];
+        wish.value=who ? pick.replace('Congratulations!', 'Congratulations from '+who+'!') : pick;
+        wish.focus();
+      };
       root.addEventListener('click', function(ev){ if(ev.target===root) root.style.display='none'; });
       return root;
     }
@@ -1077,6 +1094,67 @@ const PHOTO_ENGINE_S3 = `<script>
         body.style.cssText='margin:0;line-height:1.55;white-space:pre-wrap;';
         card.appendChild(name);
         card.appendChild(body);
+        if(m.owned_by_me){
+          var actions=document.createElement('div');
+          actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;';
+          var edit=document.createElement('button');
+          edit.type='button';
+          edit.textContent='Edit';
+          edit.style.cssText='border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:8px 11px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;';
+          var del=document.createElement('button');
+          del.type='button';
+          del.textContent='Delete';
+          del.style.cssText='border:1px solid rgba(248,113,113,.38);background:rgba(248,113,113,.14);color:inherit;border-radius:999px;padding:8px 11px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;';
+          edit.onclick=function(){
+            var ta=document.createElement('textarea');
+            ta.value=m.body||'';
+            ta.rows=4;
+            ta.style.cssText='width:100%;box-sizing:border-box;margin-top:8px;border:1px solid rgba(255,255,255,.24);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);color:inherit;font:500 14px/1.45 Inter,system-ui,sans-serif;';
+            body.replaceWith(ta);
+            actions.innerHTML='';
+            var save=document.createElement('button');
+            save.type='button';
+            save.textContent='Save';
+            save.style.cssText=edit.style.cssText;
+            var cancel=document.createElement('button');
+            cancel.type='button';
+            cancel.textContent='Cancel';
+            cancel.style.cssText=edit.style.cssText;
+            save.onclick=function(){
+              var payload={eventId:eid,id:m.id,body:ta.value,authorName:m.author_name,deviceId:getDeviceId()};
+              var ht=getHostToken();
+              if(ht) payload.adminToken=ht;
+              fetch('/api/event-messages/update',{
+                method:'PATCH',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(payload)
+              })
+              .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not update wish'); return j; }); })
+              .then(function(){ loadShareWishes(true); })
+              .catch(function(err){ alert(err.message||'Could not update wish'); });
+            };
+            cancel.onclick=function(){ loadShareWishes(true); };
+            actions.appendChild(save);
+            actions.appendChild(cancel);
+          };
+          del.onclick=function(){
+            if(!confirm('Delete this wish?')) return;
+            var payload={eventId:eid,id:m.id,deviceId:getDeviceId()};
+            var ht=getHostToken();
+            if(ht) payload.adminToken=ht;
+            fetch('/api/event-messages/delete',{
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify(payload)
+            })
+            .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not delete wish'); return j; }); })
+            .then(function(){ loadShareWishes(true); })
+            .catch(function(err){ alert(err.message||'Could not delete wish'); });
+          };
+          actions.appendChild(edit);
+          actions.appendChild(del);
+          card.appendChild(actions);
+        }
         list.appendChild(card);
       });
     }
