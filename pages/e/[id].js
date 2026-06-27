@@ -942,7 +942,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(document.documentElement && document.documentElement.getAttribute('data-oneday-event-mode') === 'share') return true;
       var text='';
       try{ text=(document.body&&document.body.textContent||'').replace(/\s+/g,' ').toLowerCase(); }catch(e){}
-      var looksShare=/share event|leave a wish|wishes for the host|wishes for the honoree|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
+      var looksShare=/share event|scan to share photos|scan to share photos & videos|add photos & videos/.test(text);
       if(looksShare&&document.documentElement){
         document.documentElement.setAttribute('data-oneday-event-mode','share');
         return true;
@@ -1010,30 +1010,34 @@ const PHOTO_ENGINE_S3 = `<script>
         if(el.matches('canvas,svg,img')||isDecorativeQrGrid(el)) hideSharePlaceholder(el);
       });
     }
+    function removeShareWishUI(){
+      if(!isShareEventMode()) return;
+      ['oneday-share-wishes','oneday-share-greeting-modal'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el) el.remove();
+      });
+    }
+    function isShareWishBlock(el){
+      if(!el) return false;
+      var text=(el.textContent||'').toLowerCase();
+      return /wishes for the honoree|wishes for the host|leave a wish|leave your wish|write a wish|congratulations.*wish|greeting.*wish|wish for the honoree/.test(text.slice(0,320));
+    }
     function shareStepsKey(){
       return 'oneday_share_steps_'+eid;
     }
     function getShareSteps(){
       try{
-        return Object.assign({welcome:false,wish:false,upload:false}, JSON.parse(localStorage.getItem(shareStepsKey())||'{}'));
-      }catch(e){ return {welcome:false,wish:false,upload:false}; }
+        return Object.assign({welcome:false,upload:false}, JSON.parse(localStorage.getItem(shareStepsKey())||'{}'));
+      }catch(e){ return {welcome:false,upload:false}; }
     }
     function markShareStep(name, val){
       var s=getShareSteps();
       s[name]=!!val;
       try{ localStorage.setItem(shareStepsKey(), JSON.stringify(s)); }catch(e){}
     }
-    function syncShareStepsFromProgress(){
-      if(hasShareGreeting()){
-        markShareStep('welcome', true);
-        markShareStep('wish', true);
-      }
-    }
     function maxUnlockedShareStep(){
-      syncShareStepsFromProgress();
       var s=getShareSteps();
       if(s.upload) return 99;
-      if(s.wish||hasShareGreeting()) return 3;
       if(s.welcome) return 2;
       return 1;
     }
@@ -1075,8 +1079,7 @@ const PHOTO_ENGINE_S3 = `<script>
       if(sections[0]) addBlock(1, sections[0]);
       sections.forEach(function(s){
         var t=(s.textContent||'').toLowerCase();
-        if(/wish|greeting|congratulations|leave a wish/.test(t)) addBlock(2, s);
-        if(/photo|video|media|upload|gallery/.test(t)&&!/wishes for the honoree/.test(t)) addBlock(3, s);
+        if(/photo|video|media|upload|gallery/.test(t)&&!isShareWishBlock(s)) addBlock(2, s);
       });
       return dedupeShareStepBlocks(blocks);
     }
@@ -1095,94 +1098,63 @@ const PHOTO_ENGINE_S3 = `<script>
       var btn=document.createElement('button');
       btn.type='button';
       btn.setAttribute('data-oneday-step-continue','1');
-      btn.textContent='Continue to Step 2';
+      btn.textContent='Continue to Upload';
       btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin-top:18px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:12px 18px;font:900 14px/1 Inter,system-ui,sans-serif;cursor:pointer;';
       btn.onclick=function(){
         markShareStep('welcome', true);
         applyShareStepFlow();
-        var step2=document.querySelector('[data-oneday-share-step="2"]');
+        var step2=document.querySelector('[data-oneday-share-step="2"],[data-oneday-share-step="3"]');
         if(step2) step2.scrollIntoView({behavior:'smooth',block:'start'});
       };
       stepEl.appendChild(btn);
     }
-    function ensureStepWishButton(stepEl){
-      if(!stepEl||hasShareGreeting()||stepEl.querySelector('[data-oneday-step-wish]')) return;
-      var btn=document.createElement('button');
-      btn.type='button';
-      btn.setAttribute('data-oneday-step-wish','1');
-      btn.textContent='Leave Your Wish';
-      btn.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin-top:18px;border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:12px 18px;font:900 14px/1 Inter,system-ui,sans-serif;cursor:pointer;';
-      btn.onclick=function(){ openShareWishFlow(); };
-      stepEl.appendChild(btn);
-    }
-    function openShareWishFlow(){
-      collectShareGreeting(function(){
-        markShareStep('wish', true);
-        applyShareStepFlow();
-        var step3=document.querySelector('[data-oneday-share-step="3"]');
-        if(step3) step3.scrollIntoView({behavior:'smooth',block:'start'});
-      });
-    }
     function applyShareStepFlow(){
       if(!isShareEventMode()) return;
-      syncShareStepsFromProgress();
+      removeShareWishUI();
       var max=maxUnlockedShareStep();
       var blocks=findShareStepBlocks();
       blocks.forEach(function(b){
-        b.el.setAttribute('data-oneday-share-step', String(b.step));
-        if(b.step<=max){
+        if(isShareWishBlock(b.el)){
+          lockShareStepBlock(b.el);
+          return;
+        }
+        var effectiveStep=b.step>=3?2:b.step;
+        b.el.setAttribute('data-oneday-share-step', String(effectiveStep));
+        if(effectiveStep<=max){
           unlockShareStepBlock(b.el);
-          if(b.step===1){
+          if(effectiveStep===1){
             if(!getShareSteps().welcome) ensureStepContinueButton(b.el);
             else{
               var cont=b.el.querySelector('[data-oneday-step-continue]');
               if(cont) cont.style.display='none';
             }
           }
-          if(b.step===2&&max>=2){
-            if(!hasShareGreeting()) ensureStepWishButton(b.el);
-            else{
-              var wb=b.el.querySelector('[data-oneday-step-wish]');
-              if(wb) wb.style.display='none';
-            }
-          }
         } else {
           lockShareStepBlock(b.el);
         }
       });
-      var showWishes=getShareSteps().upload;
-      var wishesEl=document.getElementById('oneday-share-wishes');
-      if(wishesEl){
-        if(showWishes){
-          wishesEl.style.removeProperty('display');
-          wishesEl.removeAttribute('data-oneday-share-locked');
-        } else {
-          wishesEl.style.setProperty('display','none','important');
-          wishesEl.setAttribute('data-oneday-share-locked','1');
-        }
-      }
-      var step3=document.querySelector('[data-oneday-share-step="3"]')||
+      var uploadStep=document.querySelector('[data-oneday-share-step="2"]')||
         document.querySelector('[data-oneday-managed="1"]')&&document.querySelector('[data-oneday-managed="1"]').closest('section')||
         document.getElementById('photos')||
         document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
-      placeShareUploadQr(step3, max);
+      placeShareUploadQr(uploadStep, max);
     }
     function removeLegacyShareQr(){
       var legacy=document.getElementById('oneday-share-qr');
       if(legacy) legacy.remove();
     }
-    function placeShareUploadQr(step3, max){
+    function placeShareUploadQr(uploadStep, max){
       removeLegacyShareQr();
-      var qr=ensureShareUploadQr(step3);
+      var qr=ensureShareUploadQr(uploadStep);
       if(!qr) return;
       qr.style.removeProperty('display');
       qr.removeAttribute('data-oneday-share-locked');
-      if(max>=3&&step3){
-        var insertBefore=step3.querySelector('[data-oneday-managed]')||
-          step3.querySelector('button,label,a,[role="button"]')||
-          step3.firstElementChild;
+      if(max>=2&&uploadStep){
+        var insertBefore=uploadStep.querySelector('[data-oneday-managed]')||
+          uploadStep.querySelector('button,label,a,[role="button"]')||
+          uploadStep.firstElementChild;
         if(insertBefore&&insertBefore.parentNode) insertBefore.parentNode.insertBefore(qr, insertBefore);
-        else step3.insertBefore(qr, step3.firstChild||null);
+        else uploadStep.insertBefore(qr, uploadStep.firstChild||null);
       } else if(qr.parentNode) {
         qr.parentNode.appendChild(qr);
       }
@@ -1212,7 +1184,7 @@ const PHOTO_ENGINE_S3 = `<script>
         '<div>'+
         '<p style="margin:0 0 6px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;opacity:.72;">Scan to Upload</p>'+
         '<h3 style="margin:0 0 8px;font-size:clamp(18px,3vw,24px);line-height:1.15;">Share Photos & Videos</h3>'+
-        '<p style="margin:0 0 10px;opacity:.8;font-size:14px;line-height:1.45;">Guests scan this code on their phone, leave a wish, then upload photos or videos.</p>'+
+        '<p style="margin:0 0 10px;opacity:.8;font-size:14px;line-height:1.45;">Guests scan this code on their phone and upload photos or videos.</p>'+
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<a href="'+qrUrl+'" download="oneday-upload-qr.png" style="display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:inherit;text-decoration:none;padding:8px 12px;font:800 12px/1 Inter,system-ui,sans-serif;">Download QR</a>'+
         '<button type="button" data-upload-qr-copy style="border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);color:inherit;border-radius:999px;padding:8px 12px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Copy Link</button>'+
@@ -1236,238 +1208,6 @@ const PHOTO_ENGINE_S3 = `<script>
         document.body.appendChild(box);
       }
       return box;
-    }
-    function greetingKey(){
-      return 'oneday_share_greeting_'+eid;
-    }
-    function markShareGreeting(name, wish){
-      try{
-        localStorage.setItem(greetingKey(), JSON.stringify({
-          name: String(name || 'Guest').trim() || 'Guest',
-          wish: String(wish || '').trim() || 'Shared a wish',
-          at: Date.now()
-        }));
-      }catch(e){}
-    }
-    function hasShareGreeting(){
-      try{
-        var saved=JSON.parse(localStorage.getItem(greetingKey())||'null');
-        return !!(saved&&saved.name&&saved.wish);
-      }catch(e){ return false; }
-    }
-    function ensureGreetingModal(){
-      var root=document.getElementById('oneday-share-greeting-modal');
-      if(root) return root;
-      root=document.createElement('div');
-      root.id='oneday-share-greeting-modal';
-      root.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(8,10,16,.72);display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';
-      root.innerHTML=
-        '<div style="width:min(94vw,440px);background:#fff;color:#111827;border-radius:22px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.38);font-family:Inter,system-ui,-apple-system,sans-serif;">'+
-        '<h2 style="margin:0 0 8px;font-size:22px;line-height:1.2;">Leave a wish for the honoree</h2>'+
-        '<p style="margin:0 0 16px;color:#64748b;font-size:14px;line-height:1.5;">Add your name and a short congratulations note before sharing photos or videos.</p>'+
-        '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Your name</label>'+
-        '<input data-g-name maxlength="120" placeholder="e.g. Priya Sharma" style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.3 Inter,system-ui,sans-serif;margin-bottom:14px;color:#111827;background:#fff;">'+
-        '<label style="display:block;margin:0 0 10px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;">Congratulations / wish</label>'+
-        '<textarea data-g-wish maxlength="2000" rows="4" placeholder="Write a blessing, congratulations note, or memory..." style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:12px;padding:12px 13px;font:500 15px/1.45 Inter,system-ui,sans-serif;resize:vertical;color:#111827;background:#fff;"></textarea>'+
-        '<div data-g-error style="display:none;color:#dc2626;font:700 13px/1.4 Inter,system-ui,sans-serif;margin-top:10px;"></div>'+
-        '<div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:18px;">'+
-        '<button type="button" data-g-ai style="border:1px solid #d8b4fe;background:#faf5ff;color:#6d28d9;border-radius:999px;padding:10px 14px;font:800 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">AI Help Me Write</button>'+
-        '<div style="display:flex;gap:10px;">'+
-        '<button type="button" data-g-cancel style="border:1px solid #d1d5db;background:#fff;color:#334155;border-radius:999px;padding:10px 14px;font:800 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Cancel</button>'+
-        '<button type="button" data-g-submit style="border:0;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border-radius:999px;padding:11px 16px;font:900 13px/1 Inter,system-ui,sans-serif;cursor:pointer;">Continue to Upload</button>'+
-        '</div>'+
-        '</div>'+
-        '</div>';
-      document.body.appendChild(root);
-      root.querySelector('[data-g-cancel]').onclick=function(){ root.style.display='none'; };
-      root.querySelector('[data-g-ai]').onclick=function(){
-        var wish=root.querySelector('[data-g-wish]');
-        var name=root.querySelector('[data-g-name]');
-        var who=(name&&name.value||'').trim();
-        var options=[
-          'Congratulations! Wishing you a lifetime filled with love, joy, peace, and beautiful memories together.',
-          'May God bless this special day and fill your home with love, laughter, and grace for all the years ahead.',
-          'So happy to celebrate with you today. May this new chapter be full of blessing, unity, and endless joy.',
-          'Wishing you both a beautiful beginning and a marriage rooted in love, faith, patience, and happiness.'
-        ];
-        var pick=options[Math.floor(Math.random()*options.length)];
-        wish.value=who ? pick.replace('Congratulations!', 'Congratulations from '+who+'!') : pick;
-        wish.focus();
-      };
-      root.addEventListener('click', function(ev){ if(ev.target===root) root.style.display='none'; });
-      return root;
-    }
-    function ensureShareWishesBoard(){
-      if(!isShareEventMode()) return null;
-      var existing=document.getElementById('oneday-share-wishes');
-      if(existing) return existing;
-      var sec=document.createElement('section');
-      sec.id='oneday-share-wishes';
-      sec.style.cssText='margin:28px auto;padding:22px;width:min(92vw,980px);box-sizing:border-box;border-radius:22px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(12px);color:inherit;font-family:Inter,system-ui,-apple-system,sans-serif;display:none;';
-      sec.innerHTML=
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;">'+
-        '<div><h2 style="margin:0 0 6px;font-size:clamp(22px,4vw,34px);line-height:1.1;">Wishes for the Honoree</h2>'+
-        '<p style="margin:0;opacity:.78;font-size:14px;line-height:1.5;">Guest congratulations and blessings appear here after they scan and upload.</p></div>'+
-        '<button type="button" data-w-refresh style="border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:9px 13px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;">Refresh</button>'+
-        '</div>'+
-        '<div data-w-list style="display:grid;gap:10px;"></div>';
-      var anchor=document.querySelector('[data-oneday-managed="1"]');
-      anchor=anchor&&(anchor.closest('section')||anchor.parentElement);
-      if(!anchor) anchor=document.getElementById('photos')||document.querySelector('section[id*="photo" i],section[class*="photo" i],section[class*="media" i]');
-      if(anchor&&anchor.parentNode) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
-      else document.body.appendChild(sec);
-      sec.querySelector('[data-w-refresh]').onclick=function(){ loadShareWishes(true); };
-      setTimeout(function(){ applyShareStepFlow(); },0);
-      return sec;
-    }
-    function renderShareWishes(messages){
-      var board=ensureShareWishesBoard();
-      if(!board) return;
-      var list=board.querySelector('[data-w-list]');
-      list.innerHTML='';
-      if(!messages||!messages.length){
-        var empty=document.createElement('p');
-        empty.textContent='No wishes yet. Be the first to leave a congratulations note.';
-        empty.style.cssText='margin:0;padding:16px;border-radius:16px;background:rgba(255,255,255,.10);opacity:.82;';
-        list.appendChild(empty);
-        return;
-      }
-      messages.forEach(function(m){
-        if(m&&m.owned_by_me&&m.body) markShareGreeting(m.author_name, m.body);
-      });
-      messages.slice().reverse().forEach(function(m){
-        var card=document.createElement('article');
-        card.style.cssText='padding:14px 15px;border-radius:16px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);';
-        var name=document.createElement('div');
-        name.textContent=m.author_name||'Guest';
-        name.style.cssText='font-weight:900;margin-bottom:6px;';
-        var body=document.createElement('p');
-        body.textContent=m.body||'';
-        body.style.cssText='margin:0;line-height:1.55;white-space:pre-wrap;';
-        card.appendChild(name);
-        card.appendChild(body);
-        if(m.owned_by_me){
-          var actions=document.createElement('div');
-          actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;';
-          var edit=document.createElement('button');
-          edit.type='button';
-          edit.textContent='Edit';
-          edit.style.cssText='border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.12);color:inherit;border-radius:999px;padding:8px 11px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;';
-          var del=document.createElement('button');
-          del.type='button';
-          del.textContent='Delete';
-          del.style.cssText='border:1px solid rgba(248,113,113,.38);background:rgba(248,113,113,.14);color:inherit;border-radius:999px;padding:8px 11px;font:800 12px/1 Inter,system-ui,sans-serif;cursor:pointer;';
-          edit.onclick=function(){
-            var ta=document.createElement('textarea');
-            ta.value=m.body||'';
-            ta.rows=4;
-            ta.style.cssText='width:100%;box-sizing:border-box;margin-top:8px;border:1px solid rgba(255,255,255,.24);border-radius:12px;padding:10px;background:rgba(0,0,0,.16);color:inherit;font:500 14px/1.45 Inter,system-ui,sans-serif;';
-            body.replaceWith(ta);
-            actions.innerHTML='';
-            var save=document.createElement('button');
-            save.type='button';
-            save.textContent='Save';
-            save.style.cssText=edit.style.cssText;
-            var cancel=document.createElement('button');
-            cancel.type='button';
-            cancel.textContent='Cancel';
-            cancel.style.cssText=edit.style.cssText;
-            save.onclick=function(){
-              var payload={eventId:eid,id:m.id,body:ta.value,authorName:m.author_name,deviceId:getDeviceId()};
-              var ht=getHostToken();
-              if(ht) payload.adminToken=ht;
-              fetch('/api/event-messages/update',{
-                method:'PATCH',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify(payload)
-              })
-              .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not update wish'); return j; }); })
-              .then(function(){ loadShareWishes(true); })
-              .catch(function(err){ alert(err.message||'Could not update wish'); });
-            };
-            cancel.onclick=function(){ loadShareWishes(true); };
-            actions.appendChild(save);
-            actions.appendChild(cancel);
-          };
-          del.onclick=function(){
-            if(!confirm('Delete this wish?')) return;
-            var payload={eventId:eid,id:m.id,deviceId:getDeviceId()};
-            var ht=getHostToken();
-            if(ht) payload.adminToken=ht;
-            fetch('/api/event-messages/delete',{
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify(payload)
-            })
-            .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not delete wish'); return j; }); })
-            .then(function(){ loadShareWishes(true); })
-            .catch(function(err){ alert(err.message||'Could not delete wish'); });
-          };
-          actions.appendChild(edit);
-          actions.appendChild(del);
-          card.appendChild(actions);
-        }
-        list.appendChild(card);
-      });
-    }
-    function loadShareWishes(force){
-      if(!isShareEventMode()) return;
-      var board=ensureShareWishesBoard();
-      if(!board) return;
-      if(board.dataset.loading==='1'&&!force) return;
-      board.dataset.loading='1';
-      fetch('/api/event-messages/list?eventId='+encodeURIComponent(eid)+'&deviceId='+encodeURIComponent(getDeviceId())+hostQs())
-        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not load wishes'); return j; }); })
-        .then(function(data){ renderShareWishes(data&&data.messages?data.messages:[]); })
-        .catch(function(err){ console.warn('[OneDay] share wishes failed', err); })
-        .finally(function(){ board.dataset.loading='0'; });
-    }
-    function collectShareGreeting(next){
-      if(!isShareEventMode()){ next(); return; }
-      if(hasShareGreeting()){
-        loadShareWishes(true);
-        applyShareStepFlow();
-        next();
-        return;
-      }
-      var modal=ensureGreetingModal();
-      var nameEl=modal.querySelector('[data-g-name]');
-      var wishEl=modal.querySelector('[data-g-wish]');
-      var errEl=modal.querySelector('[data-g-error]');
-      var submit=modal.querySelector('[data-g-submit]');
-      function showError(msg){
-        errEl.textContent=msg;
-        errEl.style.display='block';
-      }
-      function hideError(){ errEl.style.display='none'; }
-      submit.onclick=function(){
-        var name=(nameEl.value||'').trim();
-        var wish=(wishEl.value||'').trim();
-        hideError();
-        if(!name){ showError('Please enter your name.'); nameEl.focus(); return; }
-        if(!wish){ showError('Please write a congratulations note or wish.'); wishEl.focus(); return; }
-        submit.disabled=true;
-        submit.textContent='Saving...';
-        fetch('/api/event-messages/create',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({eventId:eid,authorName:name,body:wish,deviceId:getDeviceId()})
-        })
-        .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||'Could not save wish'); return j; }); })
-        .then(function(){
-          markShareGreeting(name, wish);
-          markShareStep('welcome', true);
-          markShareStep('wish', true);
-          modal.style.display='none';
-          loadShareWishes(true);
-          applyShareStepFlow();
-          next();
-        })
-        .catch(function(err){ showError(err.message||'Could not save your wish. Please try again.'); })
-        .finally(function(){ submit.disabled=false; submit.textContent='Continue to Upload'; });
-      };
-      modal.style.display='flex';
-      setTimeout(function(){ nameEl.focus(); },30);
     }
 
     function ensurePhotoViewer(){
@@ -2226,8 +1966,7 @@ const PHOTO_ENGINE_S3 = `<script>
     if(shareMode){
       normalizeShareInvitationCopy();
       cleanupFakeShareQrCodes();
-      syncShareStepsFromProgress();
-      loadShareWishes(false);
+      removeShareWishUI();
       applyShareStepFlow();
     }
     if (!buttons.length) return;
@@ -2260,7 +1999,7 @@ const PHOTO_ENGINE_S3 = `<script>
       fb.textContent = 'Add Photos & Videos';
       fb.onclick=function(e){
         e.preventDefault();
-        collectShareGreeting(function(){ inp.click(); });
+        inp.click();
       };
 
       var grid=findNextGrid(fb);
@@ -2283,7 +2022,6 @@ const PHOTO_ENGINE_S3 = `<script>
             var gridRef=noticeState.grids[key];
             if(gridRef&&document.body.contains(gridRef)) loadGrid(gridRef, Number(key));
           });
-          loadShareWishes(false);
         }, 45000);
       }
 

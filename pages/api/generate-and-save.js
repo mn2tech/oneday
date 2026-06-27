@@ -365,9 +365,16 @@ function injectShareEventCleanup(html) {
     if(invitePanel) hideEl(invitePanel);
     var legacyQr=document.getElementById('oneday-share-qr');
     if(legacyQr) hideEl(legacyQr);
+    var wishesBoard=document.getElementById('oneday-share-wishes');
+    if(wishesBoard) hideEl(wishesBoard);
     Array.prototype.slice.call(document.querySelectorAll('[data-oneday-invite],[id*="invite" i]')).forEach(function(el){
       if(el.id==='oneday-share-qr'||el.id==='oneday-share-upload-qr'||el.closest('#oneday-share-qr')||el.closest('#oneday-share-upload-qr')) return;
       hideEl(el);
+    });
+    Array.prototype.slice.call(document.querySelectorAll('section,article')).forEach(function(el){
+      if(!el||el.id==='oneday-share-upload-qr'||el.closest('#oneday-share-upload-qr')) return;
+      var wishText=(el.textContent||'').replace(/\\s+/g,' ').trim().toLowerCase();
+      if(/wishes for the honoree|leave a wish|leave your wish|write a wish|wish for the honoree/.test(wishText.slice(0,240))) hideEl(el);
     });
     var photos=document.getElementById('photos')||document.querySelector('[id*="photo" i],section[class*="photo" i]');
     if(photos){
@@ -432,7 +439,7 @@ function buildUserPrompt(prompt, eventDateTime, eventMeta) {
     ? `\n\nCOUNTDOWN TARGET: Use exactly "${eventDateTime.isoLocal}" as the JavaScript countdown target. This is the event's local date${eventDateTime.hasTime ? ' and start time' : ''}; do not invent a different date or time.`
     : '';
   const shareInstruction = eventMeta?.eventMode === 'share'
-    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use "Welcome" as the greeting headline, never "You are invited" or invitation wording. Structure the page as numbered guest steps with clear headings exactly "Step 1", "Step 2", and "Step 3" (do not skip numbers). Step 1: Welcome / event intro only. Step 2: Enter name and write a short congratulations note/wish for the honoree. Step 3: Upload photos or videos in one single media upload section (OneDay injects one real scannable QR code into this upload section automatically). After Step 3, guests can view the shared media wall and "Wishes for the Honoree" board. Include only: a bold signboard-style hero, event name/date/host if provided, a large "Leave a Wish, Then Upload" call-to-action, and the three numbered step sections above. Do NOT include email invitation forms, guest email lists, or "send invitations" UI. Do NOT draw or render a QR code image, SVG, canvas, CSS grid QR pattern, or placeholder QR box — the platform adds one real QR automatically in Step 3. Do NOT create multiple upload sections or duplicate step sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard.'
+    ? '\n\nEVENT MODE: SHARE EVENT. Create an event-day signboard and photo/video sharing page, not a full invitation. Use "Welcome" as the greeting headline, never "You are invited" or invitation wording. Structure the page as numbered guest steps with clear headings exactly "Step 1" and "Step 2" (do not skip numbers). Step 1: Welcome / event intro only. Step 2: Upload photos or videos in one single media upload section (OneDay injects one real scannable QR code into this upload section automatically). After Step 2, guests can view the shared media wall. Include only: a bold signboard-style hero, event name/date/host if provided, a large "Scan to Share Photos & Videos" call-to-action, and the two numbered step sections above. Do NOT include wishes for the honoree, guest wish forms, congratulations notes, message boards, email invitation forms, guest email lists, or "send invitations" UI. Do NOT draw or render a QR code image, SVG, canvas, CSS grid QR pattern, or placeholder QR box — the platform adds one real QR automatically in Step 2. Do NOT create multiple upload sections or duplicate step sections. Do NOT include RSVP, schedule, itinerary, dress code, venue details, full message wall, guest book, guest count, attendee registration, "Who is coming", poll/voting, meal counts, attendance forms, or invitation acceptance language. Use concise wording suitable for a printed signboard.'
     : '';
   const intro = eventMeta?.eventMode === 'share'
     ? 'Create a complete Share Event app for the following event:'

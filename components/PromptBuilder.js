@@ -81,7 +81,7 @@ function assemblePrompt(f) {
   if (!isShareEvent(f) && f.venue) parts.push(`The event will be held at ${f.venue}.`);
 
   if (isShareEvent(f)) {
-    parts.push('Create this as a Share Event: a simple event-day signboard and photo and video sharing page for guests who scan a QR code. Structure it as three numbered steps with headings "Step 1", "Step 2", and "Step 3": Step 1 welcome/intro, Step 2 enter name and write a congratulations note or wish for the honoree, Step 3 share photos and videos in one upload section. Make one upload section the main action in Step 3. Include signboard-style hero text like "Scan to Share Photos & Videos" and "Leave a Wish, Then Upload". Do not include email invitations or guest email forms. Do not draw a QR code image — OneDay adds one real scannable QR automatically in the Step 3 upload section.');
+    parts.push('Create this as a Share Event: a simple event-day signboard and photo and video sharing page for guests who scan a QR code. Structure it as two numbered steps with headings "Step 1" and "Step 2": Step 1 welcome/intro, Step 2 share photos and videos in one upload section. Make one upload section the main action in Step 2. Include signboard-style hero text like "Scan to Share Photos & Videos". Do not include wishes for the honoree, guest wish forms, or email invitations. Do not draw a QR code image — OneDay adds one real scannable QR automatically in the Step 2 upload section.');
   }
 
   // Conference-specific fields
